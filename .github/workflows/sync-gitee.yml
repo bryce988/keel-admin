@@ -1,0 +1,38 @@
+name: Sync to Gitee (手动兜底)
+
+# 日常同步走本地双 push 地址，见 CONTRIBUTING.md「推送到两个仓库」。
+# 本工作流仅作兜底：当本地两边推歪了、或换机器暂时没配 Gitee 密钥时，
+# 到 Actions 页面手动点一次即可把 GitHub 的分支与 tag 强制同步到 Gitee。
+#
+# 主仓库 github.com/bryce988/keel-admin → 镜像 gitee.com/yewang_top/keel-admin
+# 使用前需配置 Secret：Settings → Secrets and variables → Actions
+#     GITEE_SSH_KEY   专用于同步的 SSH 私钥（对应公钥加到 Gitee 账号的 SSH 公钥中）
+# 未配置该 Secret 时本工作流不会自动运行，也就不会报错。
+on:
+  workflow_dispatch:          # 只手动触发
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # 镜像必须带全量历史，浅克隆会推送失败
+
+      - name: 配置 SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITEE_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t rsa,ed25519 gitee.com >> ~/.ssh/known_hosts
+
+      - name: 推送到 Gitee
+        run: |
+          git remote add gitee git@gitee.com:yewang_top/keel-admin.git
+          git push gitee --all --force
+          git push gitee --tags --force
+
+      # 说明：用 --all --force 而不是 --mirror。
+      # --mirror 会把 GitHub 上不存在的分支从 Gitee 删掉，
+      # 一旦密钥或配置出错，可能误删 Gitee 上的内容，风险不对称。

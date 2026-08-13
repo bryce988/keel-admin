@@ -1,0 +1,54 @@
+# ===== 通用 =====
+.DS_Store
+Thumbs.db
+*.log
+*.local
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# ===== 环境变量与密钥 =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!public/**/*.key
+
+# ===== 前端 web/ =====
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/.vite/
+web/coverage/
+web/stats.html
+web/*.tsbuildinfo
+pnpm-debug.log*
+npm-debug.log*
+yarn-error.log*
+
+# ===== 后端 server/（webman）=====
+server/vendor/
+server/runtime/
+server/.env
+server/composer.lock.bak
+server/public/uploads/
+server/public/storage/
+server/.phpunit.result.cache
+server/.php-cs-fixer.cache
+
+# webman 运行产物
+*.pid
+workerman.log
+stdout.log
+
+# ===== Docker 本地数据 =====
+docker/data/
+docker/logs/
+
+# ===== 构建与临时 =====
+*.zip
+*.tar.gz
+tmp/
+temp/
