@@ -1,3 +1,7 @@
+# ===== 本地专用，不提交 =====
+CLAUDE.md
+DESIGN-apple.md
+
 # ===== 通用 =====
 .DS_Store
 Thumbs.db
