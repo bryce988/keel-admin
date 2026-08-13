@@ -10,7 +10,7 @@
 [![webman](https://img.shields.io/badge/webman-2.x-42b983.svg)](https://www.workerman.net/webman)
 [![Vue](https://img.shields.io/badge/Vue-3.x-42b883.svg)](https://vuejs.org/)
 
-[在线原型](https://claude.ai/code/artifact/97f2c6d1-9b75-4927-8b38-926d0cb926f2) · [项目文档](PROJECT.md) · [更新日志](CHANGELOG.md)
+[在线原型](https://claude.ai/code/artifact/97f2c6d1-9b75-4927-8b38-926d0cb926f2) · [项目文档](PROJECT.md) · [数据库设计](docs/database.md) · [接口契约](docs/api.md) · [更新日志](CHANGELOG.md)
 
 [**GitHub 主仓库**](https://github.com/bryce988/keel-admin)（Issue / PR 请到这里） · [**Gitee 镜像**](https://gitee.com/yewang_top/keel-admin)（国内克隆更快）
 

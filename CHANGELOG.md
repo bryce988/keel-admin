@@ -10,6 +10,8 @@
 - 交互原型定稿：16 个页面，含五种页型模板与系统管理全套
 - 项目文档 `PROJECT.md`：技术选型、多端架构、RBAC 设计、接口约定、部署规范
 - 开源仓库文件：README、CONTRIBUTING、SECURITY、LICENSE、CHANGELOG
+- 数据库设计 `docs/database.md`：13 张系统表 DDL、索引约定、初始化数据
+- 接口契约 `docs/api.md`：通用响应约定、错误码表、系统管理各模块接口清单
 
 ### 计划中
 - M1 框架搭建：webman 多应用骨架、JWT 鉴权、四个中间件、前端布局与多页签
