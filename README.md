@@ -91,8 +91,14 @@ cd web && npm install && VITE_PROXY_TARGET=http://127.0.0.1:8787 npm run dev
 **部署到服务器**
 
 ```bash
-# 服务器上准备 .env（数据库密码、JWT 密钥务必用随机值）
+# 首次部署
+git clone https://gitee.com/yewang_top/keel-admin.git /opt/keel
+cd /opt/keel
+cp .env.example .env && vi .env      # 数据库密码、JWT 密钥务必用随机值
 docker compose -f docker-compose.prod.yml up -d --build
+
+# 后续更新：拉代码 + 重建 + 健康检查，一条命令
+./scripts/deploy.sh
 ```
 
 生产编排与开发编排的区别：前端构建成静态文件由 nginx 托管（不跑 vite）、
