@@ -1,0 +1,31 @@
+{
+    "name": "keel/admin-server",
+    "type": "project",
+    "description": "Keel 后端 · webman 多应用",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1",
+        "workerman/webman-framework": "^2.0",
+        "monolog/monolog": "^3.0",
+        "illuminate/database": "^11.0",
+        "illuminate/events": "^11.0",
+        "illuminate/pagination": "^11.0",
+        "firebase/php-jwt": "^7.0",
+        "predis/predis": "^2.2"
+    },
+    "suggest": {
+        "ext-event": "更高性能的事件循环",
+        "ext-redis": "phpredis 扩展，性能优于 predis，生产环境可替换"
+    },
+    "autoload": {
+        "psr-4": {
+            "": "./",
+            "app\\": "app/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

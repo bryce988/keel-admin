@@ -42,39 +42,48 @@
 
 ## 快速开始
 
-```bash
-# 国外
-git clone https://github.com/bryce988/keel-admin.git
-# 国内更快
-git clone https://gitee.com/yewang_top/keel-admin.git
+**只需要 Docker**，不必在本机安装 PHP / Node / MySQL / Redis。
 
+```bash
+git clone https://github.com/bryce988/keel-admin.git   # 国内可用 Gitee 镜像
 cd keel-admin
+
+cp .env.example .env      # 按需修改端口、密码、JWT 密钥
+docker compose up -d      # 首次启动会拉取 webman 骨架并装依赖，约 2-3 分钟
 ```
 
-**后端**
+启动完成后：
+
+| 地址 | 说明 |
+|---|---|
+| http://localhost:5173 | 管理后台（默认账号 `admin` / `admin123`） |
+| http://localhost:8787/admin/ping | 后端存活探测 |
+
+查看启动进度与日志：
 
 ```bash
-cd server
-composer install
-cp .env.example .env          # 配置数据库与 Redis
-php start.php start           # 调试模式，前台运行
-# php start.php start -d      # 生产模式，守护进程
+docker compose logs -f server     # 后端
+docker compose logs -f web        # 前端
+docker compose ps                 # 服务状态
 ```
 
-**前端**
+**常用命令**
 
 ```bash
-cd web
-pnpm install
-pnpm dev
+docker compose restart server                        # 重启后端
+docker compose exec server php start.php reload      # 平滑重载业务代码（改 PHP 后）
+docker compose exec server php scripts/install.php   # 重新初始化管理员（幂等）
+docker compose exec mysql mysql -ukeel -pkeel123456 keel   # 进数据库
+docker compose down -v                               # 停止并清空数据，从头再来
 ```
 
-浏览器打开 `http://localhost:5173`，默认账号 `admin` / `admin123`（首次登录强制改密）。
+> 改 PHP 代码后调试模式会自动 reload；改了 `config/` 或自定义进程需要 `docker compose restart server`。
 
-**Docker 一键起**
+**不用 Docker 本地跑**（需自备 PHP 8.1+ / Node 18+ / MySQL 8 / Redis）
 
 ```bash
-docker-compose up -d          # nginx + php + mysql + redis
+cd server && composer install && php start.php start
+cd web && npm install && VITE_PROXY_TARGET=http://127.0.0.1:8787 npm run dev
 ```
 
 ## 功能一览
@@ -119,7 +128,10 @@ keel-admin/
 ## 路线图
 
 - [x] 交互原型定稿
-- [ ] M1 框架搭建：多应用骨架、鉴权、中间件、布局与页签
+- [x] 项目文档、数据库设计、接口契约
+- [x] Docker 一键启动环境
+- [x] 登录闭环：验证码 → JWT 签发 → 鉴权中间件 → 用户/权限/菜单下发
+- [ ] M1 其余：多页签工作区、权限指令、菜单动态路由
 - [ ] M2 系统管理：用户/部门/角色/权限/字典/参数/日志
 - [ ] M3 页型模板与通用组件
 - [ ] M4 压测加固与部署脚本

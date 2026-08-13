@@ -1,0 +1,176 @@
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import request, { BizError } from '@/utils/request'
+import { useUserStore } from '@/stores/user'
+
+const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
+
+const formRef = ref<FormInstance>()
+const loading = ref(false)
+const captchaImage = ref('')
+
+const form = reactive({
+  username: 'admin',
+  password: 'admin123',
+  captchaKey: '',
+  captchaCode: ''
+})
+
+const rules: FormRules = {
+  username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+}
+
+async function loadCaptcha() {
+  const data = await request.get<unknown, { captchaKey: string; captchaImage: string }>(
+    '/admin/auth/captcha'
+  )
+  form.captchaKey = data.captchaKey
+  form.captchaCode = ''
+  captchaImage.value = data.captchaImage
+}
+
+async function onSubmit() {
+  if (!(await formRef.value?.validate().catch(() => false))) return
+
+  loading.value = true
+  try {
+    const res = await userStore.login({ ...form })
+    await userStore.fetchProfile()
+
+    if (res.mustChangePassword) {
+      ElMessage.warning('您还未修改过初始密码，建议尽快修改')
+    }
+    ElMessage.success('登录成功')
+    router.replace((route.query.redirect as string) || '/dashboard')
+  } catch (e) {
+    // 422 的字段级错误由拦截器放行到这里，回填到表单
+    if (e instanceof BizError) {
+      if (e.status === 422 && e.details) {
+        const first = Object.values(e.details)[0]?.[0]
+        ElMessage.error(first || e.message)
+      } else if (e.status === 401) {
+        ElMessage.error(e.message)
+      }
+    }
+    loadCaptcha()
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadCaptcha)
+</script>
+
+<template>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-head">
+        <b>Keel</b>
+        <p>多端后台系统的底座</p>
+      </div>
+
+      <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="onSubmit">
+        <el-form-item prop="username">
+          <el-input v-model="form.username" placeholder="账号" clearable />
+        </el-form-item>
+
+        <el-form-item prop="password">
+          <el-input v-model="form.password" type="password" placeholder="密码" show-password />
+        </el-form-item>
+
+        <el-form-item prop="captchaCode">
+          <div class="captcha-row">
+            <el-input v-model="form.captchaCode" placeholder="验证码" maxlength="4" />
+            <img
+              v-if="captchaImage"
+              :src="captchaImage"
+              class="captcha-img"
+              title="点击刷新"
+              alt="验证码"
+              @click="loadCaptcha"
+            />
+          </div>
+        </el-form-item>
+
+        <el-button type="primary" class="login-btn" :loading="loading" @click="onSubmit">
+          登 录
+        </el-button>
+      </el-form>
+
+      <p class="login-tip">演示环境默认账号 admin / admin123</p>
+    </div>
+
+    <div class="login-foot">Keel v1.0.0 · MIT License</div>
+  </div>
+</template>
+
+<style scoped>
+.login-wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background:
+    radial-gradient(1000px 500px at 50% -10%, #ecf5ff, transparent 70%),
+    var(--el-bg-color-page, #f2f3f5);
+}
+.login-card {
+  width: min(400px, 92vw);
+  padding: 32px 36px 28px;
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 4px;
+  box-shadow: var(--el-box-shadow-light);
+}
+.login-head {
+  margin-bottom: 24px;
+  text-align: center;
+}
+.login-head b {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.login-head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.captcha-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+.captcha-img {
+  width: 104px;
+  height: 40px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.login-btn {
+  width: 100%;
+  height: 40px;
+  letter-spacing: 0.24em;
+}
+.login-tip {
+  margin: 16px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
+}
+.login-foot {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+</style>

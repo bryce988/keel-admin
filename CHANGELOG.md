@@ -13,6 +13,15 @@
 - 数据库设计 `docs/database.md`：13 张系统表 DDL、索引约定、初始化数据
 - 接口契约 `docs/api.md`：通用响应约定、错误码表、系统管理各模块接口清单
 
+### 已完成（开发中）
+- Docker 一键开发环境：mysql 8 + redis 7 + webman + vite，宿主机只需 Docker
+- 后端骨架：webman 多应用目录、TraceMiddleware（traceId 与上下文清理）、
+  统一异常处理器（HTTP 状态码 + 业务码两层）、Db / Cache / Ctx / Result 基础设施
+- 登录闭环：SVG 图形验证码（不依赖 GD）、JWT 签发与校验、登录失败锁定、
+  登录日志、权限版本号机制、鉴权中间件、用户与菜单下发
+- 前端骨架：Vue 3 + Vite + Element Plus + Pinia，登录页、布局、路由守卫、
+  请求封装（按 HTTP 状态码分派 + 业务码细化）
+
 ### 计划中
 - M1 框架搭建：webman 多应用骨架、JWT 鉴权、四个中间件、前端布局与多页签
 - M2 系统管理：用户、部门、角色、菜单与权限、数据字典、参数配置、操作日志

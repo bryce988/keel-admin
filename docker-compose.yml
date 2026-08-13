@@ -1,0 +1,107 @@
+# Keel 本地开发环境：一条 docker compose up -d 起全套
+# 宿主机只需要装 Docker，不需要 PHP / Node / MySQL / Redis
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: keel-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: ${DB_DATABASE:-keel}
+      MYSQL_USER: ${DB_USERNAME:-keel}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-keel123456}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    ports:
+      - "${PORT_MYSQL:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动自动执行，建表 + 基础数据（不含管理员，由 install 脚本创建）
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD:-root123456}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: keel-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${PORT_REDIS:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build: ./docker/php
+    container_name: keel-server
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      APP_NAME: ${APP_NAME:-Keel}
+      APP_ENV: ${APP_ENV:-dev}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-keel}
+      DB_USERNAME: ${DB_USERNAME:-keel}
+      DB_PASSWORD: ${DB_PASSWORD:-keel123456}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-7200}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-604800}
+      LOGIN_FAIL_LIMIT: ${LOGIN_FAIL_LIMIT:-5}
+      LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-30}
+      CAPTCHA_TTL: ${CAPTCHA_TTL:-120}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      TZ: Asia/Shanghai
+      COMPOSER_ALLOW_SUPERUSER: 1
+    ports:
+      - "${PORT_SERVER:-8787}:8787"
+    volumes:
+      - ./server:/app
+      - composer-cache:/root/.composer
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    image: node:20-alpine
+    container_name: keel-web
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${PORT_WEB:-5173}:5173"
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+    command: >
+      sh -c "npm install --no-audit --no-fund &&
+             npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - server
+
+volumes:
+  mysql-data:
+  redis-data:
+  composer-cache:
+  web-node-modules:
