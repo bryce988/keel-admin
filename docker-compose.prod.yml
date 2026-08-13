@@ -1,45 +1,47 @@
-# Keel 本地开发环境：一条 docker compose up -d 起全套
-# 宿主机只需要装 Docker，不需要 PHP / Node / MySQL / Redis
+# Keel 生产/预览编排
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# 与开发编排的区别：
+# - 前端构建成静态文件由 nginx 托管，不跑 vite dev server
+# - MySQL / Redis 不对宿主机暴露端口，只在容器网络内可达
+# - 只开放一个 HTTP 端口（默认 8080），避免与服务器上已有的 nginx 冲突
 
 services:
   mysql:
     image: mysql:8.0
     container_name: keel-mysql
-    restart: unless-stopped
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123456}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?必须在 .env 中设置}
       MYSQL_DATABASE: ${DB_DATABASE:-keel}
       MYSQL_USER: ${DB_USERNAME:-keel}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-keel123456}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?必须在 .env 中设置}
       TZ: Asia/Shanghai
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
-    ports:
-      - "${PORT_MYSQL:-3306}:3306"
+      # 小内存机器上限制缓冲池，避免挤占宿主机
+      - --innodb-buffer-pool-size=256M
     volumes:
       - mysql-data:/var/lib/mysql
-      # 首次启动自动执行，建表 + 基础数据（不含管理员，由 install 脚本创建）
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD:-root123456}"]
-      interval: 5s
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
       timeout: 5s
       retries: 20
 
   redis:
     image: redis:7-alpine
     container_name: keel-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    ports:
-      - "${PORT_REDIS:-6379}:6379"
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 10
 
@@ -47,36 +49,35 @@ services:
     build:
       context: ./docker/php
       args:
+        # 网络受限时在 .env 里设置，默认走官方源
         APK_MIRROR: ${APK_MIRROR:-}
         COMPOSER_MIRROR: ${COMPOSER_MIRROR:-}
     container_name: keel-server
-    restart: unless-stopped
+    restart: always
     working_dir: /app
     environment:
       APP_NAME: ${APP_NAME:-Keel}
-      APP_ENV: ${APP_ENV:-dev}
-      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_ENV: prod
+      APP_DEBUG: "false"
       DB_HOST: mysql
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE:-keel}
       DB_USERNAME: ${DB_USERNAME:-keel}
-      DB_PASSWORD: ${DB_PASSWORD:-keel123456}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_DB: ${REDIS_DB:-0}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:?必须在 .env 中设置}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-7200}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-604800}
       LOGIN_FAIL_LIMIT: ${LOGIN_FAIL_LIMIT:-5}
       LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-30}
       CAPTCHA_TTL: ${CAPTCHA_TTL:-120}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须在 .env 中设置}
       TZ: Asia/Shanghai
       COMPOSER_ALLOW_SUPERUSER: 1
-    ports:
-      - "${PORT_SERVER:-8787}:8787"
     volumes:
       - ./server:/app
       - composer-cache:/root/.composer
@@ -87,20 +88,13 @@ services:
         condition: service_healthy
 
   web:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
     container_name: keel-web
-    restart: unless-stopped
-    working_dir: /app
-    environment:
-      TZ: Asia/Shanghai
+    restart: always
     ports:
-      - "${PORT_WEB:-5173}:5173"
-    volumes:
-      - ./web:/app
-      - web-node-modules:/app/node_modules
-    command: >
-      sh -c "npm install --no-audit --no-fund &&
-             npm run dev -- --host 0.0.0.0"
+      - "${PORT_HTTP:-8080}:80"
     depends_on:
       - server
 
@@ -108,4 +102,3 @@ volumes:
   mysql-data:
   redis-data:
   composer-cache:
-  web-node-modules:

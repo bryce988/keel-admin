@@ -10,9 +10,11 @@
 [![webman](https://img.shields.io/badge/webman-2.x-42b983.svg)](https://www.workerman.net/webman)
 [![Vue](https://img.shields.io/badge/Vue-3.x-42b883.svg)](https://vuejs.org/)
 
-[在线原型](https://claude.ai/code/artifact/97f2c6d1-9b75-4927-8b38-926d0cb926f2) · [项目文档](PROJECT.md) · [数据库设计](docs/database.md) · [接口契约](docs/api.md) · [更新日志](CHANGELOG.md)
+[在线预览](http://43.143.249.52:8080) · [项目文档](PROJECT.md) · [数据库设计](docs/database.md) · [接口契约](docs/api.md) · [更新日志](CHANGELOG.md)
 
 [**GitHub 主仓库**](https://github.com/bryce988/keel-admin)（Issue / PR 请到这里） · [**Gitee 镜像**](https://gitee.com/yewang_top/keel-admin)（国内克隆更快）
+
+> **在线预览**：http://43.143.249.52:8080 演示账号 `admin` / `4IWvhcE9gKLL`
 
 </div>
 
@@ -85,6 +87,17 @@ docker compose down -v                               # 停止并清空数据，�
 cd server && composer install && php start.php start
 cd web && npm install && VITE_PROXY_TARGET=http://127.0.0.1:8787 npm run dev
 ```
+
+**部署到服务器**
+
+```bash
+# 服务器上准备 .env（数据库密码、JWT 密钥务必用随机值）
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+生产编排与开发编排的区别：前端构建成静态文件由 nginx 托管（不跑 vite）、
+MySQL 与 Redis 不对宿主机暴露端口、只开放一个 HTTP 端口（默认 8080）。
+网络受限时可在 `.env` 中设置 `APK_MIRROR` 与 `COMPOSER_MIRROR` 加速构建。
 
 ## 功能一览
 

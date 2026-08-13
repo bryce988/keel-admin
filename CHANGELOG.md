@@ -22,6 +22,10 @@
 - 前端骨架：Vue 3 + Vite + Element Plus + Pinia，登录页、布局、路由守卫、
   请求封装（按 HTTP 状态码分派 + 业务码细化）
 
+- 生产编排 `docker-compose.prod.yml`：前端静态化 + nginx 托管，
+  MySQL/Redis 不暴露宿主机端口，构建源可配置（APK_MIRROR / COMPOSER_MIRROR）
+- 部署上线：http://43.143.249.52:8080
+
 ### 计划中
 - M1 框架搭建：webman 多应用骨架、JWT 鉴权、四个中间件、前端布局与多页签
 - M2 系统管理：用户、部门、角色、菜单与权限、数据字典、参数配置、操作日志
