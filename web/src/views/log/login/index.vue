@@ -1,11 +1,117 @@
 <script setup lang="ts">
-import ModulePlaceholder from '@/components/ModulePlaceholder.vue'
+import { onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
+import { exportLoginLogs, fetchLoginLogs, splitDateRange } from '@/api/log'
+import type { ProColumn, ProTableInstance, SearchField, TableQuery } from '@/components'
+import { useDictStore } from '@/stores/dict'
+
+/**
+ * 登录日志（只读）
+ *
+ * 登录**失败也要记**（含失败原因）——连续失败锁定的审计依据就在这里，
+ * 排查「我的账号是不是被人试密码了」也只能靠它。
+ */
+const dictStore = useDictStore()
+
+const tableRef = ref<ProTableInstance | null>(null)
+
+const query = ref<Record<string, unknown>>({
+  keyword: '',
+  type: '',
+  status: '',
+  date_range: [] as string[]
+})
+
+const paramParsers = {
+  type: Number,
+  status: Number,
+  date_range: (raw: string) => raw.split(',').filter(Boolean)
+}
+
+const searchFields: SearchField[] = [
+  { prop: 'keyword', label: '关键词', placeholder: '账号 / IP' },
+  { prop: 'date_range', label: '时间范围', type: 'daterange' },
+  { prop: 'type', label: '类型', type: 'dict', dict: 'login_type', numeric: true },
+  { prop: 'status', label: '结果', type: 'dict', dict: 'log_status', numeric: true }
+]
+
+const columns: ProColumn[] = [
+  { prop: 'created_at', label: '时间', width: 165, sortable: true },
+  { prop: 'username', label: '账号', minWidth: 120 },
+  { prop: 'ip', label: 'IP', width: 140 },
+  { prop: 'browser', label: '浏览器', width: 110 },
+  { prop: 'os', label: '操作系统', width: 110 },
+  { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'login_type' },
+  { prop: 'status', label: '结果', width: 90, align: 'center', dict: 'log_status' },
+  { prop: 'msg', label: '说明', minWidth: 160, slot: 'msg' },
+  // 归属地要接 IP 库才有值，现在恒为空，所以默认藏起来
+  { prop: 'location', label: '归属地', width: 120, hidden: true }
+]
+
+function requestLogs(params: TableQuery) {
+  return fetchLoginLogs(splitDateRange(params))
+}
+
+const exporting = ref(false)
+
+async function onExport() {
+  exporting.value = true
+  try {
+    await exportLoginLogs(splitDateRange(query.value))
+    ElMessage.success('导出完成')
+  } finally {
+    exporting.value = false
+  }
+}
+
+onMounted(() => dictStore.preload(['login_type', 'log_status']))
 </script>
 
 <template>
-  <ModulePlaceholder
-    title="登录日志"
-    description="登录与登出记录。失败也会入库并记下原因，连续失败锁定的审计依据就在这里。"
-    perm-prefix="sys:log:login:*"
-  />
+  <div class="page">
+    <SearchForm
+      v-model="query"
+      :fields="searchFields"
+      @search="tableRef?.reload()"
+      @reset="tableRef?.reload()"
+    />
+
+    <ProTable
+      ref="tableRef"
+      v-model:params="query"
+      :request="requestLogs"
+      :param-parsers="paramParsers"
+      :columns="columns"
+      index
+    >
+      <template #toolbar>
+        <el-button
+          v-permission="'sys:log:login:export'"
+          :icon="Download"
+          :loading="exporting"
+          @click="onExport"
+        >
+          导出
+        </el-button>
+        <span class="hint">不选时间范围时默认查最近 7 天</span>
+      </template>
+
+      <template #msg="{ row }">
+        <span :class="{ error: !row.status }">{{ row.msg || '—' }}</span>
+      </template>
+    </ProTable>
+  </div>
 </template>
+
+<style scoped>
+.hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.error {
+  color: var(--el-color-danger);
+}
+</style>

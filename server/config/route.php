@@ -5,6 +5,7 @@ declare(strict_types=1);
 use app\admin\controller\AuthController;
 use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
+use app\admin\controller\LogController;
 use app\admin\controller\MenuController;
 use app\admin\controller\ParamController;
 use app\admin\controller\PostController;
@@ -262,6 +263,25 @@ Route::group('/admin', function () {
     Route::delete('/params/{id:\d+}', [ParamController::class, 'destroy'])->setParams([
         'perm' => 'sys:param:delete',
         'log'  => ['module' => '系统管理/参数', 'action' => 3, 'title' => '删除参数'],
+    ]);
+
+    // ---------------- 日志审计（只读）----------------
+    // 没有写接口：操作日志由中间件落库，登录日志由 AuthService 落库
+    Route::get('/logs/operation', [LogController::class, 'operation'])
+        ->setParams(['perm' => 'sys:log:operation:list']);
+    // 固定路径排在 {id} 之前，否则 export 会被当成 id 匹配掉
+    Route::get('/logs/operation/export', [LogController::class, 'exportOperation'])->setParams([
+        'perm' => 'sys:log:operation:export',
+        'log'  => ['module' => '日志审计/操作日志', 'action' => 4, 'title' => '导出操作日志'],
+    ]);
+    Route::get('/logs/operation/{id:\d+}', [LogController::class, 'operationDetail'])
+        ->setParams(['perm' => 'sys:log:operation:list']);
+
+    Route::get('/logs/login', [LogController::class, 'login'])
+        ->setParams(['perm' => 'sys:log:login:list']);
+    Route::get('/logs/login/export', [LogController::class, 'exportLogin'])->setParams([
+        'perm' => 'sys:log:login:export',
+        'log'  => ['module' => '日志审计/登录日志', 'action' => 4, 'title' => '导出登录日志'],
     ]);
 })->middleware([
     AdminAuthMiddleware::class,       // 认证：你是谁

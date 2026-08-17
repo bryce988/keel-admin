@@ -527,11 +527,41 @@ PUT /admin/params
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/logs/operation` | `sys:log:operation:list` | 操作日志，必带时间范围 |
-| GET | `/admin/logs/operation/{id}` | `sys:log:operation:list` | 详情，含字段级变更 |
-| GET | `/admin/logs/login` | `sys:log:login:list` | 登录日志 |
+| GET | `/admin/logs/operation/{id}` | `sys:log:operation:list` | 详情，含字段级变更与脱敏后的入参 |
 | GET | `/admin/logs/operation/export` | `sys:log:operation:export` | 导出（导出行为本身也记日志） |
+| GET | `/admin/logs/login` | `sys:log:login:list` | 登录日志 |
+| GET | `/admin/logs/login/export` | `sys:log:login:export` | 导出 |
+
+**只读**：日志没有写接口。操作日志由 `OperationLogMiddleware` 落库，
+登录日志由登录流程落库；能从界面改删日志，审计就失去意义了。
 
 时间范围为**必填**，未传时后端默认最近 7 天，避免全表扫描。
+`start_time` / `end_time` 只给到日期（`2026-08-17`）时后端自动补成
+`00:00:00` / `23:59:59`——否则「查今天」会一条都查不到。
+
+筛选：`keyword`（操作人/描述/对象）· `module`（**前缀匹配**，传「系统管理」能查到整个大类）·
+`action` · `status` · `trace_id`（排障入口：从报错弹窗里的那串直接定位到那次请求）。
+
+```json
+GET /admin/logs/operation/32 → 200 OK
+{
+  "id": 32, "trace_id": "TRC-4e73d1f1ea19", "username": "admin",
+  "module": "系统管理/参数", "action": 2, "title": "保存参数",
+  "target": "系统参数 sys.login.failLimit,sys.login.lockMinutes",
+  "api_method": "PUT", "api_path": "/admin/params", "status": 1, "duration": 18,
+  "params": { "items": [ { "param_key": "sys.login.failLimit", "param_value": "5" } ] },
+  "changes": [
+    { "field": "sys.login.failLimit",   "old": "3",  "new": "5"  },
+    { "field": "sys.login.lockMinutes", "old": "15", "new": "30" }
+  ]
+}
+```
+
+列表**不返回** `params` 与 `changes`：两个 JSON 字段可能很大，一页 20 行光这两列就是几百 KB，
+而列表页一列都不显示。列表只给 `change_count`，用户据此知道哪几行值得点开。
+
+两张表都带数据权限全局 Scope：部门主管只看得到本部门的记录。
+这一点不能靠界面收敛——「看不到但能查」的日志等于没有隔离。
 
 ---
 
