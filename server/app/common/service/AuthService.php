@@ -157,7 +157,16 @@ class AuthService
         ];
     }
 
-    /** 只保留目录与菜单（type 1、2），按钮权限在 permissions 数组里 */
+    /**
+     * 只保留目录与菜单（type 1、2），按钮权限在 permissions 数组里
+     *
+     * **空目录要剪掉**：目录（type=1）自己没有 path 与 component，它的全部意义
+     * 就是装下面的菜单。授权时只勾到目录、没勾任何子菜单是很常见的手滑，
+     * 不剪的话侧边栏会出现一个点开什么都没有的死条目——
+     * 用户看到的是「有这个功能但坏了」，而不是「你没有这个权限」。
+     *
+     * 菜单（type=2）没有子节点是正常的，那就是一个叶子页面，不能剪。
+     */
     private static function buildMenuTree(array $nodes, int $parentId = 0): array
     {
         $tree = [];
@@ -165,7 +174,13 @@ class AuthService
             if ((int) $node['parent_id'] !== $parentId || !in_array((int) $node['type'], [1, 2], true)) {
                 continue;
             }
+
             $children = self::buildMenuTree($nodes, (int) $node['id']);
+
+            if ((int) $node['type'] === 1 && !$children) {
+                continue;
+            }
+
             $item = [
                 'id'         => (int) $node['id'],
                 'name'       => $node['name'],

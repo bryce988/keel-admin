@@ -174,13 +174,29 @@ echo '  ✓ 权限点 ' . Db::table('sys_permissions')->count() . " 条\n";
 // 这里给它全量只是为了角色详情页能正常展示。
 $grants = [
     'ROLE_SUPER'    => ['*'],
+    /**
+     * 部门主管：管得了本部门的人，看得到组织结构与日志，但碰不到系统级配置
+     *
+     * 刻意留出的空白也是演示的一部分：
+     * - 没有 `sys:dict:list` / `sys:param:list` → 侧边栏根本不出现这两个菜单
+     * - 没有 `sys:user:grantRole` / `sys:role:grantPerm` → 授权按钮不渲染，
+     *   直接调接口也是 403（授权是系统管理员的活，主管能授权就等于能自我提权）
+     * - 没有 `sys:user:delete` / `sys:user:import` → 破坏力大的批量操作不下放
+     * - 有 `sys:field:user:phone` 但没有 `sys:field:user:email` → 手机号看得见、
+     *   邮箱是掩码，一个账号上就能看出字段级权限的效果
+     */
     'ROLE_DEPT_MGR' => [
         'sys:dashboard', 'sys:dashboard:view',
-        'sys', 'sys:user:list', 'sys:user:update', 'sys:user:export',
-        'sys:dept:list', 'sys:post:list',
-        'sys:log', 'sys:log:operation:list',
+        'sys',
+        'sys:user:list', 'sys:user:create', 'sys:user:update',
+        'sys:user:resetPwd', 'sys:user:export',
+        'sys:dept:list', 'sys:post:list', 'sys:role:list',
+        'sys:log', 'sys:log:operation:list', 'sys:log:login:list',
         'sys:field:user:phone',
     ],
+
+    // 普通员工：只有概览。它是对照组——越权测试要有一个「什么都没有」的账号，
+    // 才能验证 fail-closed 是真的关着，而不是碰巧没人去点
     'ROLE_STAFF'    => ['sys:dashboard', 'sys:dashboard:view'],
 ];
 
