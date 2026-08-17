@@ -2,7 +2,7 @@
 
 > **Keel（龙骨）** —— 多端后台系统的底座
 > 版本 v1.3 · 2026-08-13 · 状态：原型定稿，待进入开发 · 开源协议 MIT
-> 技术栈：Vue 3 + Element Plus / PHP 8.1 + webman 2.x（多应用）
+> 技术栈：Vue 3 + Element Plus / PHP 8.4 + webman 2.x（多应用）
 > 仓库：`keel-admin`（monorepo）· Composer `keel/admin` · npm `@keel/ui`
 > 在线预览：http://43.143.249.52:8080（演示账号 admin / admin123）
 > 交互原型（静态稿）：https://claude.ai/code/artifact/97f2c6d1-9b75-4927-8b38-926d0cb926f2
@@ -55,7 +55,7 @@
 
 | 层次 | 选型 | 说明 |
 |---|---|---|
-| 运行时 | **PHP >= 8.1** | webman 2.x 要求，低于此版本无法安装 |
+| 运行时 | **PHP >= 8.4**（含 `ext-zip`） | webman 2.x 只要求 8.1，8.4 是 openspout ^5（导入导出）的下限 |
 | 框架 | **webman 2.x**（Workerman） | 常驻内存的 HTTP 服务，非 PHP-FPM 模型，见 §14 |
 | 包管理 | Composer >= 2.0 | `composer create-project workerman/webman:~2.0` |
 | ORM | `webman/database`（illuminate/database） | Laravel Eloquent，团队熟悉度优先 |

@@ -6,7 +6,7 @@
 
 [![Stars](https://img.shields.io/github/stars/bryce988/keel-admin?style=flat&logo=github)](https://github.com/bryce988/keel-admin)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-777bb3.svg)](https://www.php.net/)
+[![PHP](https://img.shields.io/badge/PHP-%3E%3D8.4-777bb3.svg)](https://www.php.net/)
 [![webman](https://img.shields.io/badge/webman-2.x-42b983.svg)](https://www.workerman.net/webman)
 [![Vue](https://img.shields.io/badge/Vue-3.x-42b883.svg)](https://vuejs.org/)
 
@@ -42,7 +42,7 @@
 | | |
 |---|---|
 | 前端 | Vue 3 + TypeScript + Vite 5 + Element Plus + Pinia |
-| 后端 | PHP 8.1+ + webman 2.x（多应用）+ Eloquent + Redis |
+| 后端 | PHP 8.4+ + webman 2.x（多应用）+ Eloquent + Redis |
 | 数据库 | MySQL 8.0+ |
 
 ## 快速开始
@@ -84,7 +84,7 @@ docker compose down -v                               # 停止并清空数据，�
 
 > 改 PHP 代码后调试模式会自动 reload；改了 `config/` 或自定义进程需要 `docker compose restart server`。
 
-**不用 Docker 本地跑**（需自备 PHP 8.1+ / Node 18+ / MySQL 8 / Redis）
+**不用 Docker 本地跑**（需自备 PHP 8.4+（含 ext-zip） / Node 18+ / MySQL 8 / Redis）
 
 ```bash
 cd server && composer install && php start.php start
@@ -121,9 +121,9 @@ MySQL 与 Redis 不对宿主机暴露端口、只开放一个 HTTP 端口（默�
 | 概览 | 指标卡、系统状态、待办聚合 | ⚠️ 静态示例数据，接业务时换取数逻辑 |
 | 用户管理 | 部门树筛选、角色分配、账号健康度指标 | ⚠️ 列表与筛选可用，增删改在 M2 |
 | 数据字典 | 字典类型与字典项，驱动全站枚举与状态色 | ⚠️ 读取可用，维护界面在 M2 |
-| 部门管理 | 组织树、岗位、默认角色 | 🔜 M2 |
-| 角色管理 | 功能权限树、数据范围、字段级权限、成员、继承与互斥约束 | 🔜 M2 |
-| 菜单与权限 | 菜单树、权限点定义、角色×权限审计矩阵 | 🔜 M2 |
+| 部门管理 | 组织树、岗位、默认角色 | ✅ 已完成 |
+| 角色管理 | 功能权限树、数据范围、字段级权限、成员、继承与互斥约束 | ✅ 已完成 |
+| 菜单与权限 | 菜单树、权限点定义、角色×权限审计矩阵 | ✅ 已完成 |
 | 参数配置 | 基础设置、安全策略、集成配置、高级参数 | 🔜 M2 |
 | 操作日志 | 操作/登录日志，字段级变更留痕 | ⚠️ 后端已落库，查询界面在 M2 |
 | 个人中心 | 资料、安全设置、通知偏好、登录记录 | 🔜 M2 |
@@ -174,7 +174,7 @@ keel-admin/
 - [ ] M4 压测加固与部署脚本
 - [ ] 二期：App / 小程序端接入，开放平台
 
-M1 遗留两项，不阻塞 M2：列表页刷新后筛选条件未保持；数据权限的「本部门」「自定义部门集合」两种范围尚未实测。
+M2 进行中：前置三项与部门/岗位、菜单权限、角色三个模块已完成，执行拆分见 [docs/roadmap-m2.md](docs/roadmap-m2.md)。
 
 ## 参与贡献
 
