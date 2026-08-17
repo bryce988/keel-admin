@@ -1,161 +1,328 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { Refresh } from '@element-plus/icons-vue'
+import { fetchOverview, type Overview } from '@/api/dashboard'
+import { useDictStore } from '@/stores/dict'
 import { useUserStore } from '@/stores/user'
 
+/**
+ * 系统概览
+ *
+ * 只汇总**系统本身已有的模块**：用户、组织、角色权限、字典参数、日志。
+ * 不摆「今日订单」「转化率」这类假指标——脚手架不含业务逻辑，
+ * 编出来的数字对接业务的人没有任何价值，第一件事还是得全删掉。
+ *
+ * 所有数字都由服务端在**数据权限之内**算好：部门主管看到的「用户 2 人」
+ * 就是他管得到的那两个。前端不做任何过滤，也就不会与列表页的口径打架。
+ */
+const router = useRouter()
 const userStore = useUserStore()
+const dictStore = useDictStore()
 
-/** 指标卡：接业务时只换取数逻辑，结构与样式不动 */
-const stats = [
-  { label: '今日访问量', value: '12,486', unit: '', trend: 'up', delta: '8.4%', bar: 68, tone: '' },
-  { label: '在线用户', value: '326', unit: '', trend: 'up', delta: '2.1%', bar: 42, tone: 'success' },
-  { label: '待处理任务', value: '18', unit: '', trend: '', delta: '6 项即将超时', bar: 36, tone: 'warning' },
-  { label: '异常告警', value: '3', unit: '', trend: '', delta: '1 项严重', bar: 12, tone: 'danger' }
-]
+const data = ref<Overview | null>(null)
+const loading = ref(false)
 
-const systemStatus = [
-  { label: 'CPU 使用率', value: 38, text: '38%', tone: 'success' },
-  { label: '内存使用率', value: 64, text: '64%', tone: 'warning' },
-  { label: '磁盘占用', value: 82, text: '82%', tone: 'exception' },
-  { label: '接口成功率', value: 99.6, text: '99.6%', tone: 'success' }
-]
+async function load() {
+  loading.value = true
+  try {
+    data.value = await fetchOverview()
+  } finally {
+    loading.value = false
+  }
+}
 
-const todos = [
-  { type: 'danger', tag: '待审批', title: '数据导出申请', desc: '申请导出用户表 2,486 条', time: '09:12' },
-  { type: 'warning', tag: '待确认', title: '角色权限变更', desc: '「部门主管」新增 3 个权限点', time: '08:40' },
-  { type: 'primary', tag: '通知', title: '本周六 02:00 例行维护', desc: '预计 30 分钟', time: '昨天' },
-  { type: 'info', tag: '已完成', title: '新用户账号开通', desc: '王强 · 运营部', time: '昨天' }
-]
+/** 有权限才跳，没权限的卡片只是不可点，而不是藏起来——藏了反而看不出规模 */
+function go(to: string, perm: string) {
+  if (!perm || userStore.can(perm)) router.push(to)
+}
 
 const scopeText = computed(
   () => ['', '全部数据', '本部门及下属', '本部门', '仅本人', '自定义'][userStore.profile?.data_scope ?? 4]
 )
+
+// ---------------------------------------------------------------- 趋势图
+/**
+ * 不引图表库
+ *
+ * 一个七根柱子的图去背 1MB 的 echarts 不划算，而且颜色要跟着
+ * Element Plus 的令牌走（CLAUDE.md：不写死颜色），自己用 div 画反而更好控制。
+ */
+const trendMax = computed(() => Math.max(1, ...(data.value?.trend ?? []).map((t) => t.total)))
+
+function barHeight(value: number): string {
+  if (!value) return '0'
+
+  // 最矮也留 4%，否则「有 1 次登录」和「一次都没有」在图上长得一样
+  return `${Math.max(4, (value / trendMax.value) * 100)}%`
+}
+
+const trendTotal = computed(() => (data.value?.trend ?? []).reduce((s, t) => s + t.total, 0))
+const trendFailed = computed(() => (data.value?.trend ?? []).reduce((s, t) => s + t.failed, 0))
+
+/**
+ * 概览是按权限过滤的，权限很少的账号可能一张卡都拿不到
+ *
+ * 那时候不能只剩一排空卡片——要明确告诉他「不是坏了，是你没有这些模块的权限」。
+ * 运行状态对所有登录用户都给，所以它不参与这个判断。
+ */
+const nothingVisible = computed(
+  () => !!data.value && !data.value.stats.length && !data.value.modules.length
+)
+
+onMounted(() => {
+  dictStore.preload(['log_action'])
+  load()
+})
 </script>
 
 <template>
-  <div class="page">
+  <div v-loading="loading" class="page">
     <div class="page-head">
-      <h1>系统概览</h1>
-      <span class="desc">示例数据 · 指标卡与图表按实际业务替换</span>
-      <div class="actions">
-        <el-button>刷新</el-button>
-        <el-button type="primary">+ 新建</el-button>
+      <div>
+        <h1>系统概览</h1>
+        <span class="desc">
+          汇总当前系统已有的模块，数字都在你的数据权限之内（{{ scopeText }}）
+        </span>
       </div>
+      <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
     </div>
 
+    <el-alert
+      v-if="nothingVisible"
+      type="info"
+      :closable="false"
+      show-icon
+      title="当前账号没有任何系统管理模块的权限"
+      description="概览只展示你有权限访问的模块，所以这里是空的。需要查看更多内容请联系管理员分配角色。"
+    />
+
     <!-- 指标卡 -->
-    <el-row :gutter="16">
-      <el-col v-for="s in stats" :key="s.label" :xs="24" :sm="12" :lg="6">
-        <el-card shadow="never" class="stat-card">
-          <div class="stat">
-            <span class="label">{{ s.label }}</span>
-            <span class="value">{{ s.value }}<small v-if="s.unit">{{ s.unit }}</small></span>
-            <span class="foot">
-              <span v-if="s.trend === 'up'" class="up">▲ {{ s.delta }} 较昨日</span>
-              <el-tag v-else-if="s.tone === 'danger'" type="danger" size="small">{{ s.delta }}</el-tag>
-              <el-tag v-else-if="s.tone === 'warning'" type="warning" size="small">{{ s.delta }}</el-tag>
-              <span v-else>{{ s.delta }}</span>
+    <div v-if="data?.stats.length" class="stat-grid">
+      <el-card
+        v-for="s in data?.stats ?? []"
+        :key="s.key"
+        shadow="never"
+        :class="['stat-card', { clickable: userStore.can(s.perm) }]"
+        @click="go(s.to, s.perm)"
+      >
+        <span class="label">{{ s.label }}</span>
+        <span class="value num">
+          {{ s.value }}<small>{{ s.unit }}</small>
+        </span>
+        <el-tag :type="s.tone" size="small" effect="plain">{{ s.hint }}</el-tag>
+        <span v-if="s.extra" class="extra">
+          今日操作 {{ s.extra.op_today }} 次<template v-if="s.extra.op_failed">
+            ，其中被拒 {{ s.extra.op_failed }} 次</template>
+        </span>
+      </el-card>
+    </div>
+
+    <div class="main-grid">
+      <!-- 登录趋势 -->
+      <el-card v-if="data?.trend.length" shadow="never">
+        <template #header>
+          <div class="card-head">
+            <b>近 7 天登录</b>
+            <span class="legend">
+              <i class="dot success" />成功
+              <i class="dot failed" />失败
             </span>
-            <el-progress
-              :percentage="s.bar"
-              :stroke-width="6"
-              :show-text="false"
-              :status="s.tone === 'danger' ? 'exception' : s.tone === 'success' ? 'success' : undefined"
-            />
+            <span class="desc">共 {{ trendTotal }} 次，失败 {{ trendFailed }} 次</span>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        </template>
 
-    <el-row :gutter="16">
-      <!-- 当前登录态：M1 验证用，接业务后替换为趋势图 -->
-      <el-col :xs="24" :lg="16">
-        <el-card shadow="never">
-          <template #header>
-            <div class="card-head">
-              <b>当前登录信息</b>
-              <span class="desc">登录 → 鉴权 → 权限下发链路已打通</span>
-            </div>
-          </template>
-
-          <el-descriptions :column="3" border>
-            <el-descriptions-item label="账号">{{ userStore.profile?.user.username }}</el-descriptions-item>
-            <el-descriptions-item label="姓名">{{ userStore.profile?.user.real_name }}</el-descriptions-item>
-            <el-descriptions-item label="部门">{{ userStore.profile?.user.dept_name || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="角色">
-              <el-tag v-for="r in userStore.profile?.roles" :key="r" size="small" class="mr">{{ r }}</el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="数据范围">{{ scopeText }}</el-descriptions-item>
-            <el-descriptions-item label="超级管理员">
-              <el-tag :type="userStore.isSuper ? 'success' : 'info'" size="small">
-                {{ userStore.isSuper ? '是' : '否' }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="权限点" :span="3">
-              <el-tag v-for="p in userStore.profile?.permissions" :key="p" type="info" size="small" class="mr">
-                {{ p }}
-              </el-tag>
-            </el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
-
-      <!-- 系统状态 -->
-      <el-col :xs="24" :lg="8">
-        <el-card shadow="never">
-          <template #header>
-            <div class="card-head"><b>系统状态</b><span class="desc">实时</span></div>
-          </template>
-          <div class="status-list">
-            <div v-for="s in systemStatus" :key="s.label" class="status-item">
-              <span class="name">{{ s.label }}</span>
-              <el-progress
-                :percentage="s.value"
-                :stroke-width="6"
-                :show-text="false"
-                :status="s.tone === 'exception' ? 'exception' : s.tone === 'success' ? 'success' : undefined"
-                class="bar"
-              />
-              <span class="num val">{{ s.text }}</span>
-            </div>
+        <div class="chart">
+          <div v-for="t in data?.trend ?? []" :key="t.day" class="col">
+            <el-tooltip
+              :content="`${t.day}　成功 ${t.success} · 失败 ${t.failed}`"
+              placement="top"
+            >
+              <div class="bar-wrap">
+                <!-- 失败堆在上面：一眼就能看出哪天不对劲 -->
+                <div class="bar failed" :style="{ height: barHeight(t.failed) }" />
+                <div class="bar success" :style="{ height: barHeight(t.success) }" />
+              </div>
+            </el-tooltip>
+            <span class="x num">{{ t.label }}</span>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 待办 -->
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-head">
-          <b>待办事项</b>
-          <span class="desc">来自审批、通知、系统事件三类</span>
         </div>
-      </template>
-      <el-table :data="todos" size="default">
-        <el-table-column width="110">
-          <template #default="{ row }">
-            <el-tag :type="row.type" size="small">{{ row.tag }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="标题">
-          <template #default="{ row }">
-            <div class="cell-title">{{ row.title }}</div>
-            <div class="cell-sub">{{ row.desc }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="时间" width="120" prop="time" class-name="num" />
-        <el-table-column label="操作" width="100" align="right">
-          <template #default>
-            <el-button size="small">处理</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+      </el-card>
+
+      <!-- 系统状态：只报真的测得到的东西 -->
+      <el-card shadow="never">
+        <template #header>
+          <div class="card-head">
+            <b>运行状态</b>
+            <span class="desc">{{ data?.system.server_time }}</span>
+          </div>
+        </template>
+
+        <el-descriptions :column="1" size="small" border>
+          <el-descriptions-item label="PHP">{{ data?.system.php_version }}</el-descriptions-item>
+          <el-descriptions-item label="Workerman">{{ data?.system.workerman }}</el-descriptions-item>
+          <el-descriptions-item label="进程内存">
+            <span class="num">{{ data?.system.memory_mb }} MB</span>
+            <span class="desc">（峰值 {{ data?.system.memory_peak_mb }} MB）</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="数据库">
+            <el-tag :type="data?.system.db ? 'success' : 'danger'" size="small">
+              {{ data?.system.db ? '连通' : '异常' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="缓存">
+            <el-tag :type="data?.system.redis ? 'success' : 'danger'" size="small">
+              {{ data?.system.redis ? '连通' : '异常' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="慢查询阈值">
+            <span class="num">{{ data?.system.slow_query_ms }} ms</span>
+          </el-descriptions-item>
+        </el-descriptions>
+        <p class="foot-note">
+          CPU 与磁盘没有列：容器里读到的不是你以为的那台机器，给个会误导的数字不如不给
+        </p>
+      </el-card>
+    </div>
+
+    <div class="main-grid">
+      <!-- 最近操作 -->
+      <el-card v-if="data?.recent.length || userStore.can('sys:log:operation:list')" shadow="never">
+        <template #header>
+          <div class="card-head">
+            <b>最近操作</b>
+            <span class="desc">越权被拒的尝试同样在列</span>
+            <el-button
+              v-permission="'sys:log:operation:list'"
+              link
+              type="primary"
+              @click="router.push('/log/operation')"
+            >
+              全部日志
+            </el-button>
+          </div>
+        </template>
+
+        <div v-if="!data?.recent.length" class="empty">还没有操作记录</div>
+        <ul v-else class="recent">
+          <li v-for="r in data.recent" :key="r.id">
+            <DictTag code="log_action" :value="r.action" />
+            <div class="body">
+              <div class="title">
+                {{ r.title }}
+                <span class="target">{{ r.target || '—' }}</span>
+              </div>
+              <div class="meta">
+                {{ r.username }} · {{ r.module }} · {{ r.created_at }}
+              </div>
+            </div>
+            <el-tooltip v-if="!r.status" :content="r.error_msg || '失败'">
+              <el-tag type="danger" size="small">失败</el-tag>
+            </el-tooltip>
+          </li>
+        </ul>
+      </el-card>
+
+      <!-- 模块规模 -->
+      <el-card v-if="data?.modules.length" shadow="never">
+        <template #header>
+          <div class="card-head">
+            <b>模块</b>
+            <span class="desc">当前系统装了这些</span>
+          </div>
+        </template>
+
+        <ul class="modules">
+          <li
+            v-for="m in data?.modules ?? []"
+            :key="m.name"
+            :class="{ clickable: userStore.can(m.perm) }"
+            @click="go(m.to, m.perm)"
+          >
+            <span class="name">{{ m.name }}</span>
+            <span class="count num">{{ m.count }}</span>
+          </li>
+        </ul>
+      </el-card>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.stat-card {
-  margin-bottom: 16px;
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.desc {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.stat-card :deep(.el-card__body) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.stat-card.clickable:hover {
+  border-color: var(--el-color-primary);
+}
+
+.stat-card .label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.stat-card .value {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--el-text-color-primary);
+}
+
+.stat-card .value small {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--el-text-color-secondary);
+}
+
+.stat-card .extra {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .card-head {
@@ -164,53 +331,172 @@ const scopeText = computed(
   gap: 10px;
 }
 
-.card-head .desc {
+.card-head .desc,
+.card-head .el-button {
   margin-left: auto;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 
-.mr {
-  margin: 2px 6px 2px 0;
+.legend .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
 }
 
-.status-list {
+.legend .dot.success {
+  background: var(--el-color-primary);
+}
+
+.legend .dot.failed {
+  background: var(--el-color-danger);
+}
+
+/* ---------------------------------------------------------------- 趋势图 */
+.chart {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  align-items: flex-end;
+  gap: 10px;
+  height: 190px;
 }
 
-.status-item {
+.chart .col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.bar-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  max-width: 46px;
+  /* 段与段之间留一道缝，堆叠的两色不会糊成一片 */
+  gap: 2px;
+  cursor: default;
+}
+
+.bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s;
+}
+
+.bar.success {
+  background: var(--el-color-primary-light-3);
+  border-radius: 0;
+}
+
+.bar-wrap .bar.success:first-child {
+  border-radius: 3px 3px 0 0;
+}
+
+.bar.failed {
+  background: var(--el-color-danger);
+}
+
+.chart .x {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+/* ---------------------------------------------------------------- 最近操作 */
+.recent {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent li {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
-.status-item .name {
-  width: 90px;
+.recent li:last-child {
+  border-bottom: none;
+}
+
+.recent .body {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent .title {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+}
+
+.recent .target {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.recent .meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------- 模块 */
+.modules {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.modules li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px;
+  border-radius: 4px;
   font-size: 13px;
   color: var(--el-text-color-regular);
 }
 
-.status-item .bar {
-  flex: 1;
+.modules li.clickable {
+  cursor: pointer;
 }
 
-.status-item .val {
-  width: 52px;
-  text-align: right;
+.modules li.clickable:hover {
+  background: var(--el-fill-color-light);
+  color: var(--el-color-primary);
+}
+
+.modules .count {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.empty {
+  padding: 28px 0;
+  text-align: center;
   font-size: 13px;
-  color: var(--el-text-color-primary);
+  color: var(--el-text-color-secondary);
 }
 
-.cell-title {
-  font-weight: 500;
-  color: var(--el-text-color-primary);
-}
-
-.cell-sub {
-  margin-top: 2px;
+.foot-note {
+  margin: 10px 0 0;
   font-size: 12px;
+  line-height: 1.6;
   color: var(--el-text-color-secondary);
 }
 </style>

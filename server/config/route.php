@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use app\admin\controller\AuthController;
+use app\admin\controller\DashboardController;
 use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
 use app\admin\controller\LogController;
@@ -62,6 +63,10 @@ Route::group('/admin', function () {
         'perm' => '',
         'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '修改密码'],
     ]);
+
+    // 系统概览：数据都受数据权限约束，部门主管看到的是他管得到的那部分
+    Route::get('/dashboard/overview', [DashboardController::class, 'overview'])
+        ->setParams(['perm' => 'sys:dashboard:view']);
 
     // 数据字典：所有页面的下拉与标签都依赖它，登录即可读
     Route::get('/dicts/batch', [DictController::class, 'batch'])->setParams(['perm' => '']);
