@@ -780,6 +780,7 @@ $user = Context::get('user');
 |---|---|---|
 | M1 框架搭建 | 登录、布局、菜单、页签、请求封装、权限指令 | webman **多应用骨架（admin/client/open/common）**、分端中间件与异常处理器、统一响应、JWT 鉴权、日志通道 |
 | M2 系统管理 | 用户、部门、角色、菜单权限、字典、参数、日志七个页面 | 对应七组接口 + RBAC 落库 + 数据权限全局 Scope |
+| | ↳ 执行拆分见 [docs/roadmap-m2.md](docs/roadmap-m2.md) | |
 | M3 页型模板 | 五种页型 + 通用组件（ProTable / SearchForm / DictSelect） | 分页/导出/导入通用能力、队列进程、定时任务进程 |
 | M4 联调加固 | 权限矩阵验证、异常场景、性能优化 | 压测与进程数定值、内存泄漏观察、部署脚本与守护配置、client/open 空壳链路联通验证 |
 
