@@ -175,16 +175,18 @@ onMounted(() => {
       </template>
 
       <template #actions="{ row }">
-        <el-button link type="primary" @click="onView(row)">详情</el-button>
-        <el-button v-permission="'sys:dept:create'" link type="primary" @click="onCreate(row.id)">
-          新增下级
-        </el-button>
-        <el-button v-permission="'sys:dept:update'" link type="primary" @click="onEdit(row)">
-          编辑
-        </el-button>
-        <el-button v-permission="'sys:dept:delete'" link type="danger" @click="onDelete(row)">
-          删除
-        </el-button>
+        <div class="table-actions">
+          <el-button link type="primary" @click="onView(row)">详情</el-button>
+          <el-button v-permission="'sys:dept:create'" link type="primary" @click="onCreate(row.id)">
+            新增下级
+          </el-button>
+          <el-button v-permission="'sys:dept:update'" link type="primary" @click="onEdit(row)">
+            编辑
+          </el-button>
+          <el-button v-permission="'sys:dept:delete'" link type="danger" @click="onDelete(row)">
+            删除
+          </el-button>
+        </div>
       </template>
     </ProTable>
 

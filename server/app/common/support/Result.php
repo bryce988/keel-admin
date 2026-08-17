@@ -46,6 +46,33 @@ class Result
         ]);
     }
 
+    /**
+     * 文件下载
+     *
+     * webman 自带的 `download()` 只写 `filename="原始字节"`，中文名在部分客户端会乱码。
+     * 这里按 RFC 6266 同时给两种形式：ASCII 兜底 + `filename*=UTF-8''` 百分号编码，
+     * 认得 `filename*` 的客户端优先用它，老客户端退回 ASCII 名。
+     */
+    public static function download(string $path, string $filename): Response
+    {
+        // ASCII 兜底名：去掉所有非 ASCII 字符，只留扩展名可辨认
+        $ascii = preg_replace('/[^\x20-\x7e]/', '', $filename) ?: 'download';
+        $ascii = str_replace(['"', "\r", "\n", "\0"], '', $ascii);
+
+        return (new Response())
+            ->withFile($path)
+            ->withHeaders([
+                'Content-Disposition' => sprintf(
+                    "attachment; filename=\"%s\"; filename*=UTF-8''%s",
+                    $ascii,
+                    rawurlencode($filename)
+                ),
+                // 让前端能读到这个头：跨域时不暴露的话 JS 拿不到文件名
+                'Access-Control-Expose-Headers' => 'Content-Disposition',
+                'X-Trace-Id' => Ctx::traceId(),
+            ]);
+    }
+
     /** 错误响应，由异常处理器统一调用，业务代码请抛异常而不是直接构造 */
     public static function error(int $status, int $code, string $message, ?array $details = null): Response
     {

@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { acceptHMRUpdate, defineStore } from 'pinia'
 import request from '@/utils/request'
 
 export interface DictItem {
@@ -91,3 +91,14 @@ export const useDictStore = defineStore('dict', {
     }
   }
 })
+
+/**
+ * Pinia 的 HMR 支持
+ *
+ * 不加这段，热更时 store 定义被替换、已挂载的组件却仍持有旧实例，
+ * 表现为「接口明明返回了数据，界面就是不更新」，而且刷新一下又好了——
+ * 最难查的一类问题。开发期才有影响，生产构建不会走到。
+ */
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useDictStore, import.meta.hot))
+}

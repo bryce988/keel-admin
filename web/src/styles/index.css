@@ -143,3 +143,19 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--el-border-color-darker);
 }
+
+/* ---------------------------------------------------------------- 表格操作列
+ * el-button 与 el-dropdown 的默认 vertical-align 不同，直接并排会错开半行。
+ * 统一用 flex 排，顺便把按钮间距也统一了（EP 的 link 按钮之间默认没有间距）。
+ */
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.table-actions .el-button + .el-button {
+  margin-left: 0;
+}

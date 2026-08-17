@@ -162,9 +162,45 @@ Route::group('/admin', function () {
         'log'  => ['module' => '系统管理/菜单权限', 'action' => 3, 'title' => '删除权限点'],
     ]);
 
-    // ---------------- 用户 ----------------
-    // M1 只做查询，增删改见 M2.4
+    // ---------------- 用户（分配层）----------------
     Route::get('/users', [UserController::class, 'index'])->setParams(['perm' => 'sys:user:list']);
+    // 固定路径要排在 {id} 之前，否则 export / import-template 会被当成 id 匹配掉
+    Route::get('/users/export', [UserController::class, 'export'])->setParams([
+        'perm' => 'sys:user:export',
+        'log'  => ['module' => '系统管理/用户', 'action' => 4, 'title' => '导出用户'],
+    ]);
+    Route::get('/users/import-template', [UserController::class, 'importTemplate'])
+        ->setParams(['perm' => 'sys:user:import']);
+    Route::post('/users/import', [UserController::class, 'import'])->setParams([
+        'perm' => 'sys:user:import',
+        'log'  => ['module' => '系统管理/用户', 'action' => 1, 'title' => '导入用户'],
+    ]);
+    Route::get('/users/{id:\d+}', [UserController::class, 'show'])
+        ->setParams(['perm' => 'sys:user:list']);
+    Route::post('/users', [UserController::class, 'store'])->setParams([
+        'perm' => 'sys:user:create',
+        'log'  => ['module' => '系统管理/用户', 'action' => 1, 'title' => '新增用户'],
+    ]);
+    Route::put('/users/{id:\d+}', [UserController::class, 'update'])->setParams([
+        'perm' => 'sys:user:update',
+        'log'  => ['module' => '系统管理/用户', 'action' => 2, 'title' => '编辑用户'],
+    ]);
+    Route::delete('/users/{id:\d+}', [UserController::class, 'destroy'])->setParams([
+        'perm' => 'sys:user:delete',
+        'log'  => ['module' => '系统管理/用户', 'action' => 3, 'title' => '删除用户'],
+    ]);
+    Route::put('/users/{id:\d+}/status', [UserController::class, 'setStatus'])->setParams([
+        'perm' => 'sys:user:update',
+        'log'  => ['module' => '系统管理/用户', 'action' => 2, 'title' => '启用/停用用户'],
+    ]);
+    Route::put('/users/{id:\d+}/roles', [UserController::class, 'grantRoles'])->setParams([
+        'perm' => 'sys:user:grantRole',
+        'log'  => ['module' => '系统管理/用户', 'action' => 5, 'title' => '分配角色'],
+    ]);
+    Route::put('/users/{id:\d+}/password/reset', [UserController::class, 'resetPassword'])->setParams([
+        'perm' => 'sys:user:resetPwd',
+        'log'  => ['module' => '系统管理/用户', 'action' => 2, 'title' => '重置密码'],
+    ]);
 })->middleware([
     AdminAuthMiddleware::class,       // 认证：你是谁
     OperationLogMiddleware::class,    // 审计：声明了 log 的接口自动落库

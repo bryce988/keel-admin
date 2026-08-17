@@ -51,8 +51,58 @@ export interface PostRow {
 }
 
 // ---------------------------------------------------------------- 用户
+export interface UserDetail extends UserRow {
+  post_id: number
+  remark: string
+  role_ids: number[]
+}
+
 export function fetchUsers(params: TableQuery) {
   return request.get<unknown, PageResult<UserRow>>('/admin/users', { params })
+}
+
+export function fetchUser(id: number) {
+  return request.get<unknown, UserDetail>(`/admin/users/${id}`)
+}
+
+/** 新建成功时返回 initial_password —— 只有这一次能拿到明文 */
+export function createUser(data: Record<string, unknown>) {
+  return request.post<unknown, UserDetail & { initial_password: string }>('/admin/users', data)
+}
+
+export function updateUser(id: number, data: Record<string, unknown>) {
+  return request.put<unknown, UserDetail>(`/admin/users/${id}`, data)
+}
+
+export function deleteUser(id: number) {
+  return request.delete<unknown, void>(`/admin/users/${id}`)
+}
+
+export function setUserStatus(id: number, status: number) {
+  return request.put<unknown, void>(`/admin/users/${id}/status`, { status })
+}
+
+export function grantUserRoles(id: number, role_ids: number[]) {
+  return request.put<unknown, void>(`/admin/users/${id}/roles`, { role_ids })
+}
+
+export function resetUserPassword(id: number, password = '') {
+  return request.put<unknown, { password: string }>(`/admin/users/${id}/password/reset`, {
+    password
+  })
+}
+
+/**
+ * 导入用户
+ *
+ * 不设 Content-Type —— 交给浏览器自己带上 multipart 的 boundary，
+ * 手写会漏掉 boundary 导致后端解析不出文件。
+ */
+export function importUsers(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+
+  return request.post<unknown, BatchOutcome>('/admin/users/import', form)
 }
 
 // ---------------------------------------------------------------- 部门

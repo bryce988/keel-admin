@@ -149,35 +149,37 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
       </template>
 
       <template #actions="{ row }">
-        <el-button link type="primary" @click="onView(row)">详情</el-button>
-        <el-button
-          v-permission.any="['sys:role:grantPerm', 'sys:role:grantData']"
-          link
-          type="primary"
-          :icon="Key"
-          @click="grantRef?.open(row)"
-        >
-          授权
-        </el-button>
-        <el-button link type="primary" :icon="User" @click="memberRef?.open(row)">成员</el-button>
-        <el-button
-          v-permission="'sys:role:update'"
-          link
-          type="primary"
-          :disabled="row.is_builtin"
-          @click="onEdit(row)"
-        >
-          编辑
-        </el-button>
-        <el-button
-          v-permission="'sys:role:delete'"
-          link
-          type="danger"
-          :disabled="row.is_builtin"
-          @click="onDelete(row)"
-        >
-          删除
-        </el-button>
+        <div class="table-actions">
+          <el-button link type="primary" @click="onView(row)">详情</el-button>
+          <el-button
+            v-permission.any="['sys:role:grantPerm', 'sys:role:grantData']"
+            link
+            type="primary"
+            :icon="Key"
+            @click="grantRef?.open(row)"
+          >
+            授权
+          </el-button>
+          <el-button link type="primary" :icon="User" @click="memberRef?.open(row)">成员</el-button>
+          <el-button
+            v-permission="'sys:role:update'"
+            link
+            type="primary"
+            :disabled="row.is_builtin"
+            @click="onEdit(row)"
+          >
+            编辑
+          </el-button>
+          <el-button
+            v-permission="'sys:role:delete'"
+            link
+            type="danger"
+            :disabled="row.is_builtin"
+            @click="onDelete(row)"
+          >
+            删除
+          </el-button>
+        </div>
       </template>
     </ProTable>
 
