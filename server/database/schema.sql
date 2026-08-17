@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS `sys_login_logs` (
   `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '用户 ID',
   `username`   VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '登录账号',
+  `dept_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '登录人部门，日志本身也受数据权限约束',
   `ip`         VARCHAR(45)     NOT NULL DEFAULT ''     COMMENT '来源 IP',
   `location`   VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT 'IP 归属地',
   `browser`    VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '浏览器',
@@ -123,7 +124,8 @@ CREATE TABLE IF NOT EXISTS `sys_login_logs` (
   `msg`        VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '失败原因',
   `created_at` DATETIME        NOT NULL                COMMENT '创建时间',
   PRIMARY KEY (`id`),
-  KEY `idx_username_time` (`username`, `created_at`)
+  KEY `idx_username_time` (`username`, `created_at`),
+  KEY `idx_dept` (`dept_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录日志';
 
 

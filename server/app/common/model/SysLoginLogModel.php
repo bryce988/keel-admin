@@ -24,14 +24,21 @@ class SysLoginLogModel extends BaseModel
 
     protected $casts = [
         'user_id' => 'integer',
+        'dept_id' => 'integer',
         'type'    => 'integer',
         'status'  => 'integer',
     ];
 
-    /** 建表时没有 dept_id，只能按人隔离 */
+    /**
+     * 有 dept_id，与操作日志一致按部门隔离
+     *
+     * ⚠️ 这里**返回 null 是危险的**：DataScope 在非「仅本人」的范围下找不到部门列
+     * 就直接放行不加任何条件，等于登录日志对部门主管完全敞开。
+     * 早期建表漏了这一列，正是这么漏的。
+     */
     public function deptColumn(): ?string
     {
-        return null;
+        return 'dept_id';
     }
 
     public function ownerColumn(): ?string

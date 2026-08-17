@@ -10,6 +10,7 @@ use app\common\exception\ValidationException;
 use app\common\support\Cache;
 use app\common\support\Db;
 use app\common\support\Env;
+use app\common\support\IpLocation;
 
 /**
  * 认证业务
@@ -237,10 +238,20 @@ class AuthService
     ): void {
         [$browser, $os] = self::parseUserAgent($ua);
 
+        // 部门在这里查一次（主键查询，可忽略不计），而不是让五个调用点各传一遍——
+        // 总有一处会传漏，而传漏的后果是那条日志谁都看不见（dept_id=0）
+        $deptId = $userId > 0
+            ? (int) Db::table('sys_users')->where('id', $userId)->value('dept_id')
+            : 0;
+
         Db::table('sys_login_logs')->insert([
             'user_id'    => $userId,
             'username'   => $username,
+            'dept_id'    => $deptId,
             'ip'         => $ip,
+            // 离线库查，查不到给「未知」而不是留空——安全复核时一眼扫下来，
+            // 空白分不清是「查不到」还是「没记」
+            'location'   => IpLocation::of($ip),
             'browser'    => $browser,
             'os'         => $os,
             'type'       => $type,

@@ -365,8 +365,9 @@ CREATE TABLE `sys_login_logs` (
   `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户 ID',
   `username`   VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '登录账号',
+  `dept_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '登录人部门，日志本身也受数据权限约束',
   `ip`         VARCHAR(45)     NOT NULL DEFAULT '' COMMENT '来源 IP',
-  `location`   VARCHAR(64)     NOT NULL DEFAULT ''  COMMENT 'IP 归属地',
+  `location`   VARCHAR(64)     NOT NULL DEFAULT ''  COMMENT 'IP 归属地（ip2region 离线库）',
   `browser`    VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '浏览器',
   `os`         VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '操作系统',
   `type`       TINYINT         NOT NULL DEFAULT 1   COMMENT '1登录 2登出',
@@ -375,11 +376,20 @@ CREATE TABLE `sys_login_logs` (
   `created_at` DATETIME        NOT NULL COMMENT '创建时间',
   PRIMARY KEY (`id`),
   KEY `idx_username_time` (`username`, `created_at`),
-  KEY `idx_created` (`created_at`)
+  KEY `idx_created` (`created_at`),
+  KEY `idx_dept` (`dept_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录日志';
 ```
 
 登录失败也要记录（含失败原因），连续失败锁定的计数以此为依据。
+
+⚠️ **`dept_id` 不是可选的**。数据权限全局 Scope 在非「仅本人」的范围下，
+找不到部门列就**直接放行、不加任何条件**——这张表早期漏了这一列，
+结果部门主管能看到全公司的登录记录。写入时由 `AuthService::writeLoginLog()`
+按 `user_id` 反查填入；登录失败且账号不存在时为 0，只有「全部数据」范围看得到。
+
+`location` 用 ip2region 的离线库解析，不调第三方接口——登录是同步路径，
+一次外部 HTTP 请求就能让整个登录卡住。查不到统一写「未知」，不留空白。
 
 ---
 

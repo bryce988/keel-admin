@@ -64,5 +64,61 @@ foreach ($statements as $statement) {
     }
 }
 
+/**
+ * 存量表的列补丁
+ *
+ * `CREATE TABLE IF NOT EXISTS` 只管建表：表已经存在时，schema.sql 里新加的列
+ * **一个字都不会生效**。开发机上 `down -v` 重来看不出问题，线上却是静默漏列，
+ * 直到某个字段一直是默认值才被发现。
+ *
+ * MySQL 8 没有 `ADD COLUMN IF NOT EXISTS`（那是 MariaDB 的扩展），
+ * 所以先查 information_schema 再决定加不加。
+ *
+ * ⚠️ 这仍然是脚手架阶段的权宜之计：只处理「加列」，不处理改类型、删列、
+ * 数据迁移与回滚。表结构一旦开始频繁演进，就该换成 phinx 这类正式迁移工具。
+ *
+ * 每项：[表, 列, 列定义, 加完之后跑一次的回填 SQL（可为 null）]
+ */
+$columnPatches = [
+    [
+        'sys_login_logs',
+        'dept_id',
+        "BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '登录人部门，日志本身也受数据权限约束' AFTER `username`",
+        // 没有这一列时，数据权限对登录日志**整个失效**（DataScope 找不到部门列就直接放行），
+        // 部门主管能看到全公司的登录记录。所以补列之后必须立刻回填历史数据
+        'UPDATE `sys_login_logs` l JOIN `sys_users` u ON u.id = l.user_id
+            SET l.dept_id = u.dept_id WHERE l.user_id > 0 AND l.dept_id = 0',
+    ],
+];
+
+$database = Db::conn()->getDatabaseName();
+$patched  = 0;
+
+foreach ($columnPatches as [$table, $column, $definition, $backfill]) {
+    $exists = Db::conn()->selectOne(
+        'SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1',
+        [$database, $table, $column]
+    );
+
+    if ($exists) {
+        continue;
+    }
+
+    try {
+        Db::conn()->unprepared("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+        if ($backfill !== null) {
+            Db::conn()->unprepared($backfill);
+        }
+        $patched++;
+        echo "  ✓ 补列 {$table}.{$column}\n";
+    } catch (Throwable $e) {
+        fwrite(STDERR, "✗ 补列失败 {$table}.{$column}：{$e->getMessage()}\n");
+        exit(1);
+    }
+}
+
 $tables = count(Db::conn()->select('SHOW TABLES'));
-echo "  ✓ 表结构已对齐（{$created} 条建表语句，当前 {$tables} 张表）\n";
+echo "  ✓ 表结构已对齐（{$created} 条建表语句"
+    . ($patched > 0 ? "，{$patched} 处补列" : '')
+    . "，当前 {$tables} 张表）\n";
