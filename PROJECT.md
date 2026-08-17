@@ -4,7 +4,7 @@
 > 版本 v1.3 · 2026-08-13 · 状态：原型定稿，待进入开发 · 开源协议 MIT
 > 技术栈：Vue 3 + Element Plus / PHP 8.1 + webman 2.x（多应用）
 > 仓库：`keel-admin`（monorepo）· Composer `keel/admin` · npm `@keel/ui`
-> 在线预览：http://43.143.249.52:8080（演示账号 admin / 4IWvhcE9gKLL）
+> 在线预览：http://43.143.249.52:8080（演示账号 admin / admin123）
 > 交互原型（静态稿）：https://claude.ai/code/artifact/97f2c6d1-9b75-4927-8b38-926d0cb926f2
 > webman 官方文档：https://www.workerman.net/doc/webman/install.html · 多应用：https://www.workerman.net/doc/webman/multiapp.html
 
@@ -519,6 +519,23 @@ Nginx 按前缀分流：`/admin/` → 8787，`/client/` → 8788。导出、报�
 - ✅ `app/admin` 完整实现
 - ✅ `app/client`、`app/open` 建空壳 + 一个 `ping` 接口，验证分端中间件与异常处理链路通
 - ⛔ C 端业务接口、小程序登录、支付回调不在一期范围
+
+**落地情况（M1 已完成）**
+
+| 端 | 目录 | 应用中间件 | 异常处理器 | 空壳接口 |
+|---|---|---|---|---|
+| admin | `app/admin` | 挂在路由分组上（见下） | `AdminHandler` | 完整实现 |
+| client | `app/client` | `ChannelMiddleware` `RateLimitMiddleware` | `ClientHandler` | `/client/ping`、`/client/v1/profile` |
+| open | `app/open` | `IpWhitelistMiddleware` `SignatureMiddleware` | `OpenHandler` | `/open/ping`、`/open/echo` |
+| internal | `app/internal` | `InternalTokenMiddleware` | `InternalHandler` | `/internal/ping` |
+
+**与 §8.3 示例的一处偏差**：后台的 `AdminAuth` / `Permission` / `OperationLog` 挂在
+`config/route.php` 的分组上，而不是 `config/middleware.php` 的 `'admin'` 键下。
+原因是每个端都有公开接口（后台的登录与验证码、C 端的短信登录），
+应用级中间件会把登录接口自己也挡住。同理 `ClientAuthMiddleware` 也挂在路由分组上。
+
+**验证方式**：员工 token 调 `/client/v1/profile` 返回 401 + `10102`，
+C 端 token 调 `/admin/users` 同样 401 + `10102`，两个错误体结构不同即说明分端链路生效。
 
 这样二期接入 App 或小程序时，只需在 `app/client` 下加控制器，不动架构、不改后台。
 

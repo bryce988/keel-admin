@@ -74,6 +74,14 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       SEED_DEMO: ${SEED_DEMO:-1}          # 开发环境默认播演示账号，用于验证数据权限
+      # 多端（PROJECT.md §8）
+      CLIENT_RATE_LIMIT: ${CLIENT_RATE_LIMIT:-120}
+      CLIENT_RATE_WINDOW: ${CLIENT_RATE_WINDOW:-60}
+      OPEN_APP_KEY: ${OPEN_APP_KEY:-keel-demo}
+      OPEN_APP_SECRET: ${OPEN_APP_SECRET:-keel-demo-secret}
+      OPEN_IP_WHITELIST: ${OPEN_IP_WHITELIST:-}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-keel-internal-dev}
+      SLOW_QUERY_MS: ${SLOW_QUERY_MS:-500}
       TZ: Asia/Shanghai
       COMPOSER_ALLOW_SUPERUSER: 1
     ports:

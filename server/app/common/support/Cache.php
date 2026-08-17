@@ -70,6 +70,17 @@ class Cache
         return (bool) self::conn()->exists($key);
     }
 
+    /**
+     * 原子占位：key 不存在时写入并返回 true，已存在返回 false
+     *
+     * 用于防重放的 nonce 与幂等键。必须是 SET NX EX 单条命令，
+     * 拆成 exists + set 两步在并发下会双双通过。
+     */
+    public static function setNx(string $key, int $ttl, string $value = '1'): bool
+    {
+        return (bool) self::conn()->set($key, $value, 'EX', $ttl, 'NX');
+    }
+
     /** 计数并在首次设置过期时间，用于登录失败次数与限流 */
     public static function incr(string $key, int $ttl): int
     {

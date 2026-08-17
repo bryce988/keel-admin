@@ -101,7 +101,7 @@ class OperationLogMiddleware implements MiddlewareInterface
             ]);
         } catch (Throwable $e) {
             // 记日志失败绝不能影响主流程，转为错误日志
-            \support\Log::error('[操作日志写入失败] ' . $e->getMessage());
+            \support\Log::channel('error')->error('[操作日志写入失败] ' . $e->getMessage());
         }
     }
 

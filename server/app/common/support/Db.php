@@ -53,7 +53,44 @@ class Db
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
 
-        return self::$capsule = $capsule;
+        self::$capsule = $capsule;
+        self::watchSlowQueries();
+
+        return $capsule;
+    }
+
+    /**
+     * 慢查询监听 → sql 通道
+     *
+     * 全局 Scope 与关联预加载很容易在不经意间生成昂贵的 SQL，
+     * 而列表接口慢下来时最难定位的就是「到底哪条语句慢」。
+     * 阈值 0 表示关闭。
+     */
+    private static function watchSlowQueries(): void
+    {
+        $threshold = Env::int('SLOW_QUERY_MS', 500);
+        if ($threshold <= 0) {
+            return;
+        }
+
+        self::$capsule->getConnection()->listen(function ($query) use ($threshold) {
+            if ($query->time < $threshold) {
+                return;
+            }
+
+            try {
+                \support\Log::channel('sql')->warning(sprintf(
+                    '[%s] %.1fms | %s | %s',
+                    Ctx::traceId(),
+                    $query->time,
+                    $query->sql,
+                    json_encode($query->bindings, JSON_UNESCAPED_UNICODE)
+                ));
+            } catch (\Throwable) {
+                // 命令行脚本里 webman 的日志组件可能未初始化，
+                // 记不了日志也绝不能影响查询本身
+            }
+        });
     }
 
     public static function table(string $table): Builder

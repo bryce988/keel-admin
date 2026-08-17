@@ -489,7 +489,48 @@ GET /admin/dicts/common_status/items → 200 OK
 |---|---|---|
 | POST | `/admin/upload` | 文件上传，返回 `{url, name, size}`；先入临时目录，业务保存后转正 |
 | GET | `/admin/common/regions` | 省市区数据（如需要） |
-| GET | `/ping` · `/client/ping` · `/open/ping` | 各端存活探测，用于验证分端中间件链路 |
+| GET | `/ping` | 根探测（不属于任何应用），负载均衡健康检查用 |
+| GET | `/admin/ping` · `/client/ping` · `/open/ping` · `/internal/ping` | 各端存活探测，用于验证分端中间件与异常处理链路 |
+
+### 12.1 各端错误结构不同
+
+同一件事（比如未授权）在四个端返回的结构是**刻意不同**的，受众不一样（PROJECT.md §8.3）：
+
+```jsonc
+// admin —— 同事在用，要字段级明细与 traceId
+{ "code": 10101, "message": "未登录，请先登录", "trace_id": "TRC-…", "details": {…} }
+
+// client —— 终端用户在用，只给一句人话，内部标识不外露（仍有 X-Trace-Id 响应头）
+{ "code": 10102, "message": "登录凭证类型不匹配" }
+
+// open —— 第三方在用，字符串错误码比数字稳定，也不受我们内部码段重排影响
+{ "error_code": "INVALID_SIGNATURE", "error_message": "签名校验失败", "request_id": "TRC-…" }
+
+// internal —— 自己的服务在用，信息给足
+{ "code": 10500, "message": "…", "trace_id": "TRC-…", "exception": true }
+```
+
+### 12.2 C 端请求头
+
+`/client/*` 一律要带（缺失直接 400，见 PROJECT.md §8.5）：
+
+| 头 | 取值 |
+|---|---|
+| `X-Channel` | `app-ios` / `app-android` / `mp-weixin` / `h5` |
+| `X-App-Version` | 客户端版本号，用于灰度与强制更新 |
+| `X-Device-Id` | 设备标识，限流按它而不是 IP（移动网络大量共用出口 IP） |
+
+### 12.3 开放平台验签
+
+四个头：`X-App-Key` `X-Timestamp` `X-Nonce` `X-Signature`。
+
+```
+待签串 = "{METHOD}\n{PATH}\n{按键排序并 urlencode 的参数}\n{timestamp}\n{nonce}"
+签名   = hash_hmac('sha256', 待签串, app_secret)
+```
+
+三道防线缺一不可：签名防篡改、时间戳把重放窗口压到 5 分钟、nonce 让窗口内也只能成功一次。
+只验签名不验时间戳的话，抓到一个包就能永久重放。`/open/ping` 免签，供第三方校准时间戳与确认出口 IP。
 
 ---
 

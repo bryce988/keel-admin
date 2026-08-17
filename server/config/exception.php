@@ -2,17 +2,26 @@
 
 declare(strict_types=1);
 
-use app\common\exception\Handler;
+use app\common\exception\AdminHandler;
+use app\common\exception\ClientHandler;
+use app\common\exception\InternalHandler;
+use app\common\exception\OpenHandler;
 
 /**
- * 异常处理器
+ * 分端异常处理器（PROJECT.md §8.3）
  *
- * 每个应用可以配置不同的处理器：
- * 管理后台与 C 端返回统一的业务错误结构，
- * 开放平台（open）后续接入时换成按 REST 规范返回的处理器。
+ * 四个端的错误体结构刻意不同——这不是风格问题，是受众不同：
+ *   admin    { code, message, trace_id, details? }  同事在用，要字段级明细与 traceId
+ *   client   { code, message }                      终端用户在用，只给一句人话
+ *   open     { error_code, error_message, request_id } 第三方在用，字符串码更稳定
+ *   internal { code, message, trace_id, details? }  自己的服务在用，信息给足
+ *
+ * '' 是兜底：闭包路由与未匹配到应用的请求走这里。
  */
 return [
-    ''       => Handler::class,
-    'admin'  => Handler::class,
-    'client' => Handler::class,
+    ''         => AdminHandler::class,
+    'admin'    => AdminHandler::class,
+    'client'   => ClientHandler::class,
+    'open'     => OpenHandler::class,
+    'internal' => InternalHandler::class,
 ];

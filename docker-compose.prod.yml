@@ -77,6 +77,14 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须在 .env 中设置}
       SEED_DEMO: ${SEED_DEMO:-}           # 生产默认不播演示账号，预览站在 .env 里显式打开
+      # 多端：生产不给默认值，未配置即该端不可用（PROJECT.md §8）
+      CLIENT_RATE_LIMIT: ${CLIENT_RATE_LIMIT:-120}
+      CLIENT_RATE_WINDOW: ${CLIENT_RATE_WINDOW:-60}
+      OPEN_APP_KEY: ${OPEN_APP_KEY:-}
+      OPEN_APP_SECRET: ${OPEN_APP_SECRET:-}
+      OPEN_IP_WHITELIST: ${OPEN_IP_WHITELIST:-}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
+      SLOW_QUERY_MS: ${SLOW_QUERY_MS:-500}
       TZ: Asia/Shanghai
       COMPOSER_ALLOW_SUPERUSER: 1
     volumes:
