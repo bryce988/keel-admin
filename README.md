@@ -15,6 +15,9 @@
 [**GitHub 主仓库**](https://github.com/bryce988/keel-admin)（Issue / PR 请到这里） · [**Gitee 镜像**](https://gitee.com/yewang_top/keel-admin)（国内克隆更快）
 
 > **在线预览**：http://43.143.249.52:8080 演示账号 `admin` / `4IWvhcE9gKLL`
+>
+> 想看权限体系的效果，再用 `manager` / `demo123456`（部门主管）登录一次：
+> 菜单少了几项，用户列表只剩本部门的人——同一个接口，返回的数据自己变少了。
 
 </div>
 
