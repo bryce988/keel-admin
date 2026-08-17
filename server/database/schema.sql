@@ -152,6 +152,13 @@ CREATE TABLE IF NOT EXISTS `sys_role_depts` (
   PRIMARY KEY (`role_id`, `dept_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色自定义数据范围（data_scope=5 时生效）';
 
+-- ---------------------------------------------------------------- 角色互斥
+CREATE TABLE IF NOT EXISTS `sys_role_mutexes` (
+  `role_id`  BIGINT UNSIGNED NOT NULL COMMENT '角色 ID',
+  `mutex_id` BIGINT UNSIGNED NOT NULL COMMENT '与之互斥的角色 ID',
+  PRIMARY KEY (`role_id`, `mutex_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色互斥（职责分离）';
+
 -- ---------------------------------------------------------------- 字段级权限
 CREATE TABLE IF NOT EXISTS `sys_role_fields` (
   `id`       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',

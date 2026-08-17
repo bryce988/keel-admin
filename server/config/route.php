@@ -5,6 +5,9 @@ declare(strict_types=1);
 use app\admin\controller\AuthController;
 use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
+use app\admin\controller\MenuController;
+use app\admin\controller\PostController;
+use app\admin\controller\RoleController;
 use app\admin\controller\UserController;
 use app\client\controller\PingController as ClientPingController;
 use app\client\controller\v1\ProfileController as ClientProfileController;
@@ -58,11 +61,109 @@ Route::group('/admin', function () {
     Route::get('/dicts/batch', [DictController::class, 'batch'])->setParams(['perm' => '']);
     Route::get('/dicts/{code}/items', [DictController::class, 'items'])->setParams(['perm' => '']);
 
-    // 部门树：既是部门管理的数据源，也是用户列表的筛选条件，任一权限满足即可读
+    // ---------------- 部门 ----------------
+    // 部门树既是部门管理的数据源，也是用户列表的筛选条件，任一权限满足即可读
     Route::get('/depts/tree', [DeptController::class, 'tree'])
         ->setParams(['perm' => ['sys:dept:list', 'sys:user:list']]);
+    Route::get('/depts/{id:\d+}', [DeptController::class, 'show'])
+        ->setParams(['perm' => 'sys:dept:list']);
+    Route::post('/depts', [DeptController::class, 'store'])->setParams([
+        'perm' => 'sys:dept:create',
+        'log'  => ['module' => '系统管理/部门', 'action' => 1, 'title' => '新增部门'],
+    ]);
+    Route::put('/depts/{id:\d+}', [DeptController::class, 'update'])->setParams([
+        'perm' => 'sys:dept:update',
+        'log'  => ['module' => '系统管理/部门', 'action' => 2, 'title' => '编辑部门'],
+    ]);
+    Route::delete('/depts/{id:\d+}', [DeptController::class, 'destroy'])->setParams([
+        'perm' => 'sys:dept:delete',
+        'log'  => ['module' => '系统管理/部门', 'action' => 3, 'title' => '删除部门'],
+    ]);
 
-    // 用户管理（M1 只做查询，增删改见 M2）
+    // ---------------- 岗位 ----------------
+    Route::get('/posts', [PostController::class, 'index'])->setParams(['perm' => 'sys:post:list']);
+    Route::get('/posts/{id:\d+}', [PostController::class, 'show'])
+        ->setParams(['perm' => 'sys:post:list']);
+    Route::post('/posts', [PostController::class, 'store'])->setParams([
+        'perm' => 'sys:post:create',
+        'log'  => ['module' => '系统管理/岗位', 'action' => 1, 'title' => '新增岗位'],
+    ]);
+    Route::put('/posts/{id:\d+}', [PostController::class, 'update'])->setParams([
+        'perm' => 'sys:post:update',
+        'log'  => ['module' => '系统管理/岗位', 'action' => 2, 'title' => '编辑岗位'],
+    ]);
+    Route::delete('/posts/{id:\d+}', [PostController::class, 'destroy'])->setParams([
+        'perm' => 'sys:post:delete',
+        'log'  => ['module' => '系统管理/岗位', 'action' => 3, 'title' => '删除岗位'],
+    ]);
+    Route::post('/posts/batch-delete', [PostController::class, 'batchDestroy'])->setParams([
+        'perm' => 'sys:post:delete',
+        'log'  => ['module' => '系统管理/岗位', 'action' => 3, 'title' => '批量删除岗位'],
+    ]);
+
+    // ---------------- 角色（授权层）----------------
+    Route::get('/roles', [RoleController::class, 'index'])->setParams(['perm' => 'sys:role:list']);
+    Route::get('/roles/options', [RoleController::class, 'options'])
+        ->setParams(['perm' => ['sys:role:list', 'sys:user:list']]);
+    Route::get('/roles/{id:\d+}', [RoleController::class, 'show'])
+        ->setParams(['perm' => 'sys:role:list']);
+    Route::get('/roles/{id:\d+}/members', [RoleController::class, 'members'])
+        ->setParams(['perm' => 'sys:role:list']);
+    Route::post('/roles', [RoleController::class, 'store'])->setParams([
+        'perm' => 'sys:role:create',
+        'log'  => ['module' => '系统管理/角色', 'action' => 1, 'title' => '新增角色'],
+    ]);
+    Route::put('/roles/{id:\d+}', [RoleController::class, 'update'])->setParams([
+        'perm' => 'sys:role:update',
+        'log'  => ['module' => '系统管理/角色', 'action' => 2, 'title' => '编辑角色'],
+    ]);
+    Route::delete('/roles/{id:\d+}', [RoleController::class, 'destroy'])->setParams([
+        'perm' => 'sys:role:delete',
+        'log'  => ['module' => '系统管理/角色', 'action' => 3, 'title' => '删除角色'],
+    ]);
+    Route::put('/roles/{id:\d+}/permissions', [RoleController::class, 'grantPermissions'])->setParams([
+        'perm' => 'sys:role:grantPerm',
+        'log'  => ['module' => '系统管理/角色', 'action' => 5, 'title' => '保存功能权限'],
+    ]);
+    Route::put('/roles/{id:\d+}/data-scope', [RoleController::class, 'grantDataScope'])->setParams([
+        'perm' => 'sys:role:grantData',
+        'log'  => ['module' => '系统管理/角色', 'action' => 5, 'title' => '保存数据范围'],
+    ]);
+    Route::put('/roles/{id:\d+}/mutexes', [RoleController::class, 'saveMutexes'])->setParams([
+        'perm' => 'sys:role:grantData',
+        'log'  => ['module' => '系统管理/角色', 'action' => 5, 'title' => '保存互斥角色'],
+    ]);
+    Route::post('/roles/{id:\d+}/members', [RoleController::class, 'addMembers'])->setParams([
+        'perm' => 'sys:user:grantRole',
+        'log'  => ['module' => '系统管理/角色', 'action' => 5, 'title' => '添加角色成员'],
+    ]);
+    Route::delete('/roles/{id:\d+}/members/{userId:\d+}', [RoleController::class, 'removeMember'])->setParams([
+        'perm' => 'sys:user:grantRole',
+        'log'  => ['module' => '系统管理/角色', 'action' => 5, 'title' => '移除角色成员'],
+    ]);
+
+    // ---------------- 菜单与权限点（只定义，不授权）----------------
+    Route::get('/menus/tree', [MenuController::class, 'tree'])
+        ->setParams(['perm' => 'sys:menu:list']);
+    Route::get('/menus/matrix', [MenuController::class, 'matrix'])
+        ->setParams(['perm' => 'sys:menu:list']);
+    Route::get('/menus/{id:\d+}', [MenuController::class, 'show'])
+        ->setParams(['perm' => 'sys:menu:list']);
+    Route::post('/menus', [MenuController::class, 'store'])->setParams([
+        'perm' => 'sys:menu:create',
+        'log'  => ['module' => '系统管理/菜单权限', 'action' => 1, 'title' => '新增权限点'],
+    ]);
+    Route::put('/menus/{id:\d+}', [MenuController::class, 'update'])->setParams([
+        'perm' => 'sys:menu:update',
+        'log'  => ['module' => '系统管理/菜单权限', 'action' => 2, 'title' => '编辑权限点'],
+    ]);
+    Route::delete('/menus/{id:\d+}', [MenuController::class, 'destroy'])->setParams([
+        'perm' => 'sys:menu:delete',
+        'log'  => ['module' => '系统管理/菜单权限', 'action' => 3, 'title' => '删除权限点'],
+    ]);
+
+    // ---------------- 用户 ----------------
+    // M1 只做查询，增删改见 M2.4
     Route::get('/users', [UserController::class, 'index'])->setParams(['perm' => 'sys:user:list']);
 })->middleware([
     AdminAuthMiddleware::class,       // 认证：你是谁

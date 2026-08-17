@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\common\model;
 
 use app\common\model\concern\HasDataScope;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -34,5 +35,10 @@ class SysPostModel extends BaseModel
     public function auditColumns(): array
     {
         return [];   // 建表时未设审计列
+    }
+
+    public function dept(): BelongsTo
+    {
+        return $this->belongsTo(SysDeptModel::class, 'dept_id');
     }
 }

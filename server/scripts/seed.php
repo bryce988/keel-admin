@@ -277,6 +277,7 @@ $params = [
     ['sys.export.maxRows',   '50000',      'advanced', 'int',    '单次导出最大行数'],
     ['sys.log.retainDays',   '180',        'advanced', 'int',    '日志保留天数'],
     ['sys.cache.ttl',        '300',        'advanced', 'int',    '字典缓存秒数'],
+    ['sys.role.maxPerUser',  '5',          'security', 'int',    '单账号最多可持有的角色数'],
     ['sys.pwd.minLength',    '8',          'security', 'int',    '密码最小长度'],
     ['sys.pwd.expireDays',   '90',         'security', 'int',    '密码有效期（天）'],
     ['sys.login.failLimit',  '5',          'security', 'int',    '连续失败锁定次数'],

@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { fetchDeptTree, fetchUsers, type DeptNode } from '@/api/system'
-import type { ProColumn, SearchField } from '@/components'
+import type { ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
 
 /**
@@ -15,7 +15,7 @@ import { useDictStore } from '@/stores/dict'
  */
 const dictStore = useDictStore()
 
-const tableRef = ref<{ reload: () => void; refresh: () => void } | null>(null)
+const tableRef = ref<ProTableInstance | null>(null)
 
 /**
  * 用 ref 而不是 reactive：SearchForm 与 ProTable 都用 v-model 绑它，

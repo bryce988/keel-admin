@@ -5,9 +5,18 @@ declare(strict_types=1);
 namespace app\common\service;
 
 use app\common\model\SysDeptModel;
+use app\common\model\SysPostModel;
+use app\common\model\SysUserModel;
+use app\common\support\Db;
+use app\common\support\Guard;
+use app\common\support\OpLog;
 
 /**
- * 部门查询
+ * 部门
+ *
+ * 这张表是**数据权限的载体**：`ancestors` 祖级路径决定了「本部门及下属」
+ * 能看到哪些数据。所以移动部门时子孙的 ancestors 必须同步刷新，
+ * 漏刷的后果不是显示错乱，而是**权限失效**——用户看得到本不该看的数据。
  */
 class DeptService
 {
@@ -32,23 +41,192 @@ class DeptService
             ->all();
     }
 
-    /** 部门树，供筛选面板与表单的级联选择使用 */
-    public static function tree(): array
+    /**
+     * 部门树
+     *
+     * 同时服务两个场景：部门管理页（要全字段）与用户列表的筛选面板（只用 id/name）。
+     * 多返回几个字段比维护两个几乎一样的接口划算。
+     */
+    public static function tree(array $filters = []): array
     {
-        $rows = SysDeptModel::query()
-            ->where('status', 1)
-            ->orderBy('sort')
-            ->get()
-            ->map(fn (SysDeptModel $d) => [
-                'id'        => $d->id,
-                'parent_id' => $d->parent_id,
-                'name'      => $d->name,
-                'code'      => $d->code,
-                'sort'      => $d->sort,
-            ])
-            ->all();
+        // 筛选放在建树之前用「命中即保留祖先链」处理，不能直接写进 SQL：
+        // 停用的父部门被滤掉后，它下面启用的子部门会跟着从树上消失
+        $rows = SysDeptModel::query()->orderBy('sort')->orderBy('id')->get();
 
-        return self::buildTree($rows, 0);
+        // 用户数一次分组查出来，不在递归里逐个 count——那是标准的 N+1
+        $userCounts = SysUserModel::query()
+            ->whereIn('dept_id', $rows->pluck('id'))
+            ->selectRaw('dept_id, count(*) as total')
+            ->groupBy('dept_id')
+            ->pluck('total', 'dept_id');
+
+        $nodes = $rows->map(fn (SysDeptModel $d) => [
+            'id'         => $d->id,
+            'parent_id'  => $d->parent_id,
+            'name'       => $d->name,
+            'code'       => $d->code,
+            'leader_id'  => $d->leader_id,
+            'sort'       => $d->sort,
+            'status'     => $d->status,
+            'user_count' => (int) ($userCounts[$d->id] ?? 0),
+            'created_at' => $d->created_at?->format('Y-m-d H:i:s'),
+        ])->all();
+
+        $keyword = trim((string) ($filters['keyword'] ?? ''));
+        $status  = ($filters['status'] ?? '') === '' ? null : (int) $filters['status'];
+
+        if ($keyword !== '' || $status !== null) {
+            $nodes = self::filterKeepingAncestors($nodes, function (array $n) use ($keyword, $status) {
+                if ($keyword !== ''
+                    && !str_contains($n['name'], $keyword)
+                    && !str_contains($n['code'], $keyword)) {
+                    return false;
+                }
+
+                return !($status !== null && $n['status'] !== $status);
+            });
+        }
+
+        return self::buildTree($nodes, 0);
+    }
+
+    public static function detail(int $id): array
+    {
+        /** @var SysDeptModel $dept */
+        $dept = Guard::found(SysDeptModel::find($id));
+
+        return $dept->toArray();
+    }
+
+    public static function create(array $data): SysDeptModel
+    {
+        Guard::unique(SysDeptModel::class, 'code', $data['code'], null, '部门编码已存在', 20201);
+
+        $parentId = (int) ($data['parent_id'] ?? 0);
+
+        return Db::transaction(function () use ($data, $parentId) {
+            $dept = new SysDeptModel();
+            $dept->fill($data);
+            $dept->parent_id = $parentId;
+            $dept->ancestors = self::ancestorsOf($parentId);
+            $dept->save();
+
+            OpLog::target("部门 {$dept->name}({$dept->id})");
+
+            return $dept;
+        });
+    }
+
+    public static function update(int $id, array $data): SysDeptModel
+    {
+        /** @var SysDeptModel $dept */
+        $dept = Guard::found(SysDeptModel::find($id));
+
+        Guard::unique(SysDeptModel::class, 'code', $data['code'], $id, '部门编码已存在', 20201);
+
+        $newParentId = (int) ($data['parent_id'] ?? $dept->parent_id);
+        Guard::noCycle(SysDeptModel::class, $id, $newParentId, '上级部门不能是自己或其子部门', 20202);
+
+        $before = $dept->toArray();
+
+        return Db::transaction(function () use ($dept, $data, $newParentId, $before) {
+            $oldPrefix = $dept->descendantPrefix();
+
+            $dept->fill($data);
+            $dept->parent_id = $newParentId;
+            $dept->ancestors = self::ancestorsOf($newParentId);
+            $dept->save();
+
+            // 自己的位置变了，整棵子树的祖级路径都要跟着平移
+            $newPrefix = $dept->descendantPrefix();
+            if ($newPrefix !== $oldPrefix) {
+                self::shiftDescendants($oldPrefix, $newPrefix);
+            }
+
+            OpLog::target("部门 {$dept->name}({$dept->id})");
+            OpLog::diff($before, $dept->toArray());
+
+            return $dept;
+        });
+    }
+
+    public static function delete(int $id): void
+    {
+        /** @var SysDeptModel $dept */
+        $dept = Guard::found(SysDeptModel::find($id));
+
+        $message = '部门下存在用户、岗位或子部门，无法删除';
+        Guard::notReferenced(SysDeptModel::class, 'parent_id', $id, $message, 20203);
+        Guard::notReferenced(SysUserModel::class, 'dept_id', $id, $message, 20203);
+        Guard::notReferenced(SysPostModel::class, 'dept_id', $id, $message, 20203);
+
+        OpLog::target("部门 {$dept->name}({$dept->id})");
+
+        $dept->delete();
+    }
+
+    // ---------------------------------------------------------------- 内部
+
+    /** 新建/移动到某个父节点时，自己的祖级路径 */
+    private static function ancestorsOf(int $parentId): string
+    {
+        if ($parentId === 0) {
+            return '0';
+        }
+
+        /** @var SysDeptModel $parent */
+        $parent = Guard::found(SysDeptModel::find($parentId), '上级部门不存在');
+
+        return $parent->descendantPrefix();
+    }
+
+    /**
+     * 平移整棵子树的 ancestors
+     *
+     * 例：技术部(id=2) 从「总公司」挪到「运营部」
+     *   oldPrefix = '0,1,2'   newPrefix = '0,1,3,2'
+     *   子节点   '0,1,2'   → '0,1,3,2'
+     *   孙节点   '0,1,2,5' → '0,1,3,2,5'
+     * 即「换掉前缀，保留后缀」。用一条 UPDATE 完成，不递归——
+     * 子树可能有几百个节点，逐个 save 既慢又容易中途失败留下半更新状态。
+     */
+    private static function shiftDescendants(string $oldPrefix, string $newPrefix): void
+    {
+        Db::conn()->update(
+            'UPDATE sys_depts
+                SET ancestors = CONCAT(?, SUBSTRING(ancestors, ?)), updated_at = ?
+              WHERE deleted_at IS NULL
+                AND (ancestors = ? OR ancestors LIKE ?)',
+            [
+                $newPrefix,
+                strlen($oldPrefix) + 1,   // SUBSTRING 从 1 开始计数
+                date('Y-m-d H:i:s'),
+                $oldPrefix,
+                $oldPrefix . ',%',
+            ]
+        );
+    }
+
+    /** 命中的节点连同它的整条祖先链一起保留，否则树会从中间断掉 */
+    private static function filterKeepingAncestors(array $nodes, callable $match): array
+    {
+        $byId = array_column($nodes, null, 'id');
+        $keep = [];
+
+        foreach ($nodes as $node) {
+            if (!$match($node)) {
+                continue;
+            }
+
+            $keep[$node['id']] = true;
+            $cursor = $node['parent_id'];
+            while ($cursor > 0 && isset($byId[$cursor])) {
+                $keep[$cursor] = true;
+                $cursor = $byId[$cursor]['parent_id'];
+            }
+        }
+
+        return array_values(array_filter($nodes, fn ($n) => isset($keep[$n['id']])));
     }
 
     private static function buildTree(array $rows, int $parentId): array

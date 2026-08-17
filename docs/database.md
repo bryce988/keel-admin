@@ -232,6 +232,21 @@ CREATE TABLE `sys_role_depts` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色自定义数据范围（data_scope=5 时生效）';
 ```
 
+### 3.8.1 sys_role_mutexes 角色互斥
+
+```sql
+CREATE TABLE `sys_role_mutexes` (
+  `role_id`  BIGINT UNSIGNED NOT NULL COMMENT '角色 ID',
+  `mutex_id` BIGINT UNSIGNED NOT NULL COMMENT '与之互斥的角色 ID',
+  PRIMARY KEY (`role_id`, `mutex_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色互斥（职责分离）';
+```
+
+**职责分离**：审计员不能同时是数据管理员，否则「操作」与「审计操作」落在同一个人身上，
+留痕就失去意义。互斥是**对称**的，写入时两个方向都存一条，
+查询时就不用写 `where role_id = ? or mutex_id = ?` 这种两边都要考虑的条件——
+那种写法总有一处会漏。
+
 ### 3.9 sys_role_fields 字段级权限
 
 ```sql
@@ -248,6 +263,11 @@ CREATE TABLE `sys_role_fields` (
 ```
 
 **默认策略**：表中无记录 = 按该字段的全局默认（在代码中声明敏感字段清单，默认不可见）。这样新增敏感字段时不会因为忘记配置而泄露。
+
+> **当前实现说明（v1.0）**：字段级权限走的是 `sys_permissions` 里 `type=5` 的权限点
+> （如 `sys:field:user:phone`），跟功能权限一起在角色授权时勾选，服务端在接口返回前脱敏。
+> **本表暂未使用**，保留结构是为了将来需要「按对象×字段精细配置」时不用改表。
+> 两套机制并存只会让人搞不清哪个说了算，所以现阶段只保留权限点这一套。
 
 ### 3.10 sys_dict_types / sys_dict_items 数据字典
 
