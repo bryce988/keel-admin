@@ -31,11 +31,20 @@ if [ ! -f start.php ]; then
 fi
 
 # ------------------------------------------------------------------
-# 依赖：vendor 缺失或 autoload 依赖的文件缺失时重新安装
+# 依赖
+#
+# ⚠️ 判断条件里的 composer.lock 指纹不能省。
+# 只判断「vendor 存在与否」的话，生产上 vendor 早就在了，
+# 新加的依赖会被**静默跳过**——代码引用了却装不上，直到运行时才炸。
+# 升级到 PHP 8.4 那次就是这么发现的：本地装好了 openspout，线上根本没装。
 # ------------------------------------------------------------------
-if [ ! -f vendor/autoload.php ]; then
-  echo "▸ 安装依赖..."
+LOCK_FINGERPRINT="$(md5sum composer.lock 2>/dev/null | cut -d' ' -f1)"
+INSTALLED_FINGERPRINT="$(cat vendor/.lock-fingerprint 2>/dev/null || true)"
+
+if [ ! -f vendor/autoload.php ] || [ "$LOCK_FINGERPRINT" != "$INSTALLED_FINGERPRINT" ]; then
+  echo "▸ 安装依赖（composer.lock 有变化或首次启动）..."
   composer install --no-interaction
+  printf '%s' "$LOCK_FINGERPRINT" > vendor/.lock-fingerprint
 elif [ ! -f vendor/composer/autoload_files.php ] || ! php -r 'require "vendor/autoload.php";' 2>/dev/null; then
   echo "▸ 重建 autoload..."
   composer dump-autoload --no-interaction
