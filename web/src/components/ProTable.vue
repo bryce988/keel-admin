@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Refresh, Setting, Sort } from '@element-plus/icons-vue'
 import DictTag from './DictTag.vue'
 
@@ -54,8 +55,20 @@ const props = withDefaults(
   defineProps<{
     request: (params: TableQuery) => Promise<PageResult>
     columns: ProColumn[]
-    /** 筛选条件，变化时不自动请求，由页面显式调用 reload() */
+    /**
+     * 筛选条件，变化时不自动请求，由页面显式调用 reload()。
+     * 用 `v-model:params` 绑定才能在刷新后把 URL 里的条件还原回页面
+     */
     params?: Record<string, unknown>
+    /**
+     * 从 URL 还原筛选值时的类型转换。
+     * URL 里的东西**永远是字符串**，而 el-select 的选项常常是数字，
+     * 不转的话下拉框会显示空白——所以数字型字段必须在这里登记：
+     *   :param-parsers="{ status: Number, dept_id: Number }"
+     */
+    paramParsers?: Record<string, (raw: string) => unknown>
+    /** 把分页、排序、筛选同步到 URL，刷新与页签切换后可还原 */
+    syncUrl?: boolean
     rowKey?: string
     selection?: boolean
     /** 挂载时是否立即取数 */
@@ -64,13 +77,25 @@ const props = withDefaults(
     /** 序号列 */
     index?: boolean
   }>(),
-  { rowKey: 'id', selection: false, immediate: true, pageSize: 20, index: false }
+  { rowKey: 'id', selection: false, immediate: true, pageSize: 20, index: false, syncUrl: true }
 )
 
 const emit = defineEmits<{
   'selection-change': [rows: Record<string, any>[]]
   loaded: [result: PageResult]
+  'update:params': [value: Record<string, unknown>]
 }>()
+
+const route = useRoute()
+const router = useRouter()
+
+/**
+ * keep-alive 下组件失活后仍然活着，此时**绝不能写 URL**——
+ * 那会把当前正在看的另一个页签的地址栏改掉。
+ */
+let alive = true
+onActivated(() => (alive = true))
+onDeactivated(() => (alive = false))
 
 const loading = ref(false)
 const rows = ref<Record<string, any>[]>([])
@@ -100,11 +125,25 @@ watch(
 
 const shownColumns = computed(() => props.columns.filter((col) => visibleMap[col.prop] !== false))
 
+/**
+ * 首次取数用的筛选值
+ *
+ * 从 URL 还原时会 emit 给父组件，但 prop 回流要等父组件重新渲染，
+ * 而首次 fetch 就在下一个 tick——直接读 props.params 会读到还没更新的旧值。
+ * 所以把还原结果先留在这里，第一次请求用完即弃。
+ */
+let pendingParams: Record<string, unknown> | null = null
+
 async function fetch() {
   loading.value = true
+  const filters = pendingParams ?? props.params ?? {}
+  pendingParams = null
+
   try {
+    writeUrlFromState(filters)
+
     const result = await props.request({
-      ...(props.params ?? {}),
+      ...filters,
       page_num: pager.pageNum,
       page_size: pager.pageSize,
       sort_field: pager.sortField || undefined,
@@ -123,9 +162,25 @@ async function fetch() {
   }
 }
 
-/** 回到第 1 页重新取数：筛选条件变化时用 */
-function reload() {
+/**
+ * 回到第 1 页重新取数：筛选条件变化时用
+ *
+ * ⚠️ 这里的 `await nextTick()` 不能删。
+ * 调用方通常是「改完 params 紧接着 reload()」：
+ *
+ *   query.value = { ...query.value, dept_id: 2 }
+ *   tableRef.value?.reload()
+ *
+ * 而 params 是 prop，整体赋值后要等父组件重新渲染才会传进来。
+ * 少了这一拍，fetch() 读到的是**上一次**的筛选值——
+ * 表现为点部门树时数据总慢一拍，来回点两个部门就完全对调了。
+ *
+ * 修在这里而不是让每个页面自己 await：七个模块每个都记着这件事，迟早有人忘。
+ */
+async function reload() {
   pager.pageNum = 1
+  await nextTick()
+
   return fetch()
 }
 
@@ -151,7 +206,71 @@ function cellText(row: Record<string, any>, col: ProColumn): string {
   return value === null || value === undefined || value === '' ? '-' : String(value)
 }
 
+/** URL → 组件状态。只认页面在 params 里声明过的筛选键，其余 query 一概不管 */
+function restoreFromUrl() {
+  if (!props.syncUrl) return
+
+  const q = route.query
+
+  pager.pageNum  = Math.max(1, Number(q.page_num) || 1)
+  pager.pageSize = Number(q.page_size) || props.pageSize
+  pager.sortField = (q.sort_field as string) || undefined
+  pager.sortOrder = q.sort_order === 'asc' ? 'asc' : q.sort_order === 'desc' ? 'desc' : undefined
+
+  if (!props.params) return
+
+  const restored: Record<string, unknown> = {}
+  let hit = false
+
+  for (const key of Object.keys(props.params)) {
+    const raw = q[key]
+    if (raw === undefined) continue
+    const parser = props.paramParsers?.[key]
+    restored[key] = parser ? parser(String(raw)) : raw
+    hit = true
+  }
+
+  if (hit) {
+    pendingParams = { ...props.params, ...restored }
+    emit('update:params', pendingParams)
+  }
+}
+
+/** 组件状态 → URL。默认值不写进去，保持地址栏干净 */
+function writeUrlFromState(filters: Record<string, unknown>) {
+  if (!props.syncUrl || !alive) return
+
+  const query: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === '' || value === null || value === undefined) continue
+    if (Array.isArray(value)) {
+      if (value.length) query[key] = value.join(',')
+      continue
+    }
+    query[key] = String(value)
+  }
+
+  if (pager.pageNum > 1) query.page_num = String(pager.pageNum)
+  if (pager.pageSize !== props.pageSize) query.page_size = String(pager.pageSize)
+  if (pager.sortField) {
+    query.sort_field = pager.sortField
+    query.sort_order = pager.sortOrder ?? 'desc'
+  }
+
+  // 没变就不写：replace 会触发路由更新，不加这道判断容易绕成死循环
+  const current = route.query
+  const same =
+    Object.keys(query).length === Object.keys(current).length &&
+    Object.entries(query).every(([k, v]) => String(current[k]) === v)
+  if (same) return
+
+  // 用 replace 而不是 push：翻十页就往历史里塞十条，返回键会变得很难用
+  router.replace({ path: route.path, query })
+}
+
 onMounted(() => {
+  restoreFromUrl()
   if (props.immediate) nextTick(fetch)
 })
 

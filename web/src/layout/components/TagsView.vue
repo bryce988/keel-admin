@@ -22,9 +22,10 @@ const otherCount = computed(
   () => tagsStore.tags.filter((t) => !t.affix && t.path !== ctx.path).length
 )
 
-// 路由变化时登记页签
+// 监听 fullPath 而不是 path：同一个页面改了筛选条件也要更新页签记住的地址，
+// 这样切走再切回来筛选与页码还在
 watch(
-  () => route.path,
+  () => route.fullPath,
   () => {
     tagsStore.open(route)
     if (tagsStore.lastEvicted) {
@@ -66,11 +67,15 @@ function onCommand(cmd: string) {
   closeCtx()
 
   switch (cmd) {
-    case 'refresh':
+    case 'refresh': {
       // 刷新当前页：借助 key 变化重新挂载
-      if (path !== route.path) router.push(path)
+      if (path !== route.path) {
+        const target = tagsStore.tags.find((t) => t.path === path)
+        router.push(target?.fullPath ?? path)
+      }
       window.dispatchEvent(new CustomEvent('keel:refresh-page'))
       break
+    }
     case 'close':
       onClose(path)
       break
@@ -104,7 +109,7 @@ onUnmounted(() => {
       <router-link
         v-for="tag in tagsStore.tags"
         :key="tag.path"
-        :to="tag.path"
+        :to="tag.fullPath"
         class="tag"
         :class="{ 'is-active': tag.path === route.path, 'is-affix': tag.affix }"
         @contextmenu.prevent="openCtx($event, tag.path)"

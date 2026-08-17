@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { fetchDeptTree, fetchUsers, type DeptNode } from '@/api/system'
@@ -17,11 +17,21 @@ const dictStore = useDictStore()
 
 const tableRef = ref<{ reload: () => void; refresh: () => void } | null>(null)
 
-const query = reactive<Record<string, unknown>>({
+/**
+ * 用 ref 而不是 reactive：SearchForm 与 ProTable 都用 v-model 绑它，
+ * v-model 会整体赋值，reactive 声明的 const 赋不了值（点「重置」直接报错）。
+ */
+const query = ref<Record<string, unknown>>({
   keyword: '',
   status: '',
   dept_id: ''
 })
+
+/** URL 里取回来的是字符串，这两个字段要转成数字，否则下拉框与树选中态对不上 */
+const paramParsers = {
+  status: Number,
+  dept_id: Number
+}
 
 const searchFields: SearchField[] = [
   { prop: 'keyword', label: '关键词', placeholder: '账号 / 姓名 / 手机号' },
@@ -56,7 +66,10 @@ async function loadDeptTree() {
 
 function onDeptClick(node: DeptNode) {
   // 再点一次已选中的部门 = 取消筛选
-  query.dept_id = query.dept_id === node.id ? '' : node.id
+  query.value = {
+    ...query.value,
+    dept_id: query.value.dept_id === node.id ? '' : node.id
+  }
   tableRef.value?.reload()
 }
 
@@ -81,7 +94,7 @@ function notImplemented(action: string) {
         node-key="id"
         default-expand-all
         :expand-on-click-node="false"
-        :current-node-key="query.dept_id || undefined"
+        :current-node-key="(query.dept_id as number) || undefined"
         highlight-current
         @node-click="onDeptClick"
       />
@@ -96,7 +109,14 @@ function notImplemented(action: string) {
         @reset="tableRef?.reload()"
       />
 
-      <ProTable ref="tableRef" :request="fetchUsers" :params="query" :columns="columns" index>
+      <ProTable
+        ref="tableRef"
+        v-model:params="query"
+        :request="fetchUsers"
+        :param-parsers="paramParsers"
+        :columns="columns"
+        index
+      >
         <template #toolbar>
           <el-button
             v-permission="'sys:user:create'"
