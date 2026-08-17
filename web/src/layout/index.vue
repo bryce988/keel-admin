@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Expand, Fold, Moon, Search, Sunny } from '@element-plus/icons-vue'
 import SidebarMenu from './components/SidebarMenu.vue'
@@ -33,6 +33,18 @@ const breadcrumb = computed(() => {
 const viewKey = ref(0)
 function onRefresh() {
   viewKey.value++
+}
+
+/**
+ * keep-alive 的缓存键**必须带路由**
+ *
+ * 只用 viewKey 的话所有页面共用一个键，keep-alive 会把第一个缓存的组件
+ * 一直还给你——表现为点菜单页签加上了、地址栏也变了，但内容区纹丝不动。
+ * 带上 path 之后每个页面各缓存一份，正是多页签工作区想要的行为；
+ * viewKey 递增则让「刷新当前」能强制重新挂载。
+ */
+function cacheKey(current: RouteLocationNormalizedLoaded): string {
+  return `${current.path}#${viewKey.value}`
 }
 onMounted(() => window.addEventListener('keel:refresh-page', onRefresh))
 onUnmounted(() => window.removeEventListener('keel:refresh-page', onRefresh))
@@ -114,10 +126,12 @@ async function onUserCommand(cmd: string) {
 
       <!-- 内容区 -->
       <main class="content">
-        <router-view v-slot="{ Component }">
-          <keep-alive>
-            <component :is="Component" :key="viewKey" />
+        <router-view v-slot="{ Component, route: current }">
+          <!-- 是否缓存由后端菜单的 keep_alive 字段决定，默认缓存 -->
+          <keep-alive v-if="current.meta.keepAlive !== false" :max="12">
+            <component :is="Component" :key="cacheKey(current)" />
           </keep-alive>
+          <component v-else :is="Component" :key="cacheKey(current)" />
         </router-view>
       </main>
     </div>
