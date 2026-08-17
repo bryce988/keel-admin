@@ -51,12 +51,6 @@ function registerDynamicRoutes(): void {
 
   removers = buildRoutes(userStore.menus).map((route) => router.addRoute('layout', route))
 
-  // 首页重定向指向该账号第一个有权访问的页面，而不是写死 /dashboard
-  const home = firstMenuPath(userStore.menus)
-  if (home) {
-    removers.push(router.addRoute({ path: '/', redirect: home }))
-  }
-
   userStore.routesLoaded = true
 }
 
@@ -94,6 +88,16 @@ router.beforeEach(async (to) => {
     registerDynamicRoutes()
     // replace 避免在历史里留下 404 那一跳
     return { path: to.fullPath, replace: true }
+  }
+
+  /**
+   * 落地页在这里算，而不是注册一条 { path: '/', redirect } 路由：
+   * 布局路由本身就占着 '/'，两条同路径记录里先注册的赢，重定向永远不会生效，
+   * 表现为访问根路径只有空白的内容区。
+   */
+  if (to.path === '/') {
+    const home = firstMenuPath(userStore.menus)
+    return home ? { path: home, replace: true } : { name: 'notFound' }
   }
 
   return true

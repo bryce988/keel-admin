@@ -47,7 +47,9 @@ async function onSubmit() {
       ElMessage.warning('您还未修改过初始密码，建议尽快修改')
     }
     ElMessage.success('登录成功')
-    router.replace((route.query.redirect as string) || '/dashboard')
+    // 不写死 /dashboard：落地页由守卫按该账号的菜单决定，
+    // 否则没有概览权限的账号一登录就撞 404
+    router.replace((route.query.redirect as string) || '/')
   } catch (e) {
     // 422 的字段级错误由拦截器放行到这里，回填到表单
     if (e instanceof BizError) {

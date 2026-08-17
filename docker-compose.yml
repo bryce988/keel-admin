@@ -94,6 +94,8 @@ services:
     working_dir: /app
     environment:
       TZ: Asia/Shanghai
+      # bind mount 下 inotify 不可靠，新建文件不触发 glob 重算（见 vite.config.ts）
+      VITE_USE_POLLING: "1"
     ports:
       - "${PORT_WEB:-5173}:5173"
     volumes:
