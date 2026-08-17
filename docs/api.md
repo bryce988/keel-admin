@@ -246,9 +246,10 @@ instance.interceptors.response.use(undefined, (err) => {
 | 409 | `20401` | 权限标识已存在 | |
 | 409 | `20402` | 权限点被角色引用，请改为停用 | |
 | 400 | `20403` | 上级菜单不能是自己或其子节点 | |
-| 409 | `20501` | 字典编码已存在 | |
-| 409 | `20502` | 字典项已被引用，不可修改其值 | |
+| 409 | `20501` | 字典编码已存在 | 同字典内字典项的值重复也用这个码 |
+| 409 | `20502` | 字典项已被引用，不可修改其值 | 也用于「类型下有项时不许改编码 / 不许删类型」 |
 | 403 | `20601` | 内置参数不可删除 | |
+| 409 | `20602` | 参数键已存在 | |
 | 400 | `20701` | 导出数据量超过上限 | 提示缩小筛选范围 |
 
 前端针对大类的处理看状态码即可；**只有需要特殊交互时才判断 `code`**（如 409 + `20101` 时聚焦到用户名输入框）。文案一律用后端返回的 `message`，前端不维护第二份。
@@ -439,7 +440,9 @@ PUT /admin/roles/3/data-scope
 | GET | `/admin/dicts` | `sys:dict:list` | 字典类型列表（维护界面用） |
 | POST/PUT/DELETE | `/admin/dicts/{id}` | `sys:dict:create` / `update` / `delete` | 类型增改删 |
 | GET | `/admin/dicts/{code}/items/all` | `sys:dict:list` | 字典项（含停用，维护界面用） |
-| POST/PUT/DELETE | `/admin/dict-items/{id}` | `sys:dict:create` / `update` / `delete` | 字典项增改删（改已引用的 value 时 409 + `20502`） |
+| POST | `/admin/dict-items` | `sys:dict:create` | 新增字典项 |
+| PUT/DELETE | `/admin/dict-items/{id}` | `sys:dict:update` / `delete` | 字典项改删（改已引用的 value 时 409 + `20502`） |
+| POST | `/admin/dict-items/batch-delete` | `sys:dict:delete` | 批量删除，逐条尽力执行 |
 
 ```json
 GET /admin/dicts/common_status/items → 200 OK
@@ -456,17 +459,66 @@ GET /admin/dicts/common_status/items → 200 OK
 `<DictTag code="common_status" :value="row.status" />` 直接渲染，颜色由 `tag_type` 驱动。
 服务端缓存 5 分钟，字典维护接口写入后主动 `DictService::forget()`。
 
+### 8.1 值不可改的判定
+
+维护界面的 `items/all` 每行多一个 `ref_count`：这个字典值被业务表引用的行数。
+
+```json
+{ "id": 8, "type_code": "user_status", "label": "在职", "value": "1",
+  "tag_type": "success", "sort": 1, "status": 1, "ref_count": 5 }
+```
+
+`ref_count > 0` 时改值或删除都是 409 + `20502`——改了等于把已有数据的含义换掉，
+而旧值不会被回溯更新。`label` / `tag_type` / `sort` / `status` 不受限制，那些只影响展示。
+
+引用关系没有外键可查（字典值就是散落在各表的 TINYINT），
+所以在 `DictService::USAGE` 里显式登记「哪张表的哪一列消费了哪个字典」。
+**没登记的字典默认放行**：宁可漏拦也不能误拦，误拦会让人改不了一个其实没人用的字典项。
+新增业务表消费了某个字典时记得补一行。
+
+同理，已经有字典项的**类型**不允许改 `code`（409 + `20502`）：
+`code` 是字典项的关联键，改了所有项都会成为孤儿。
+
 ---
 
 ## 9. 参数配置
 
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
-| GET | `/admin/params?group=security` | `sys:param:list` | 按分组查询 |
-| PUT | `/admin/params` | `sys:param:update` | 批量保存 `[{key, value}]` |
+| GET | `/admin/params?group=security` | `sys:param:list` | 按分组查询，不分页 |
+| GET | `/admin/params/groups` | `sys:param:list` | 分组元信息，前端据此渲染 tab |
+| PUT | `/admin/params` | `sys:param:update` | **批量保存**，见下 |
+| GET | `/admin/params/{id}` | `sys:param:list` | 单条详情 |
+| POST/PUT/DELETE | `/admin/params/{id}` | `sys:param:create` / `update` / `delete` | 自定义参数增改删（删内置 403 + `20601`，键重复 409 + `20602`） |
 | GET | `/admin/params/public` | 公开 | 登录页需要的少量参数（系统名、Logo、页脚） |
 
-`is_secret = 1` 的参数**只写不读**：查询时返回掩码 `******`，保存时值为掩码则跳过更新。
+分组固定四个：`basic` 基础设置 · `security` 安全策略 · `integration` 第三方集成 · `advanced` 高级选项。
+
+批量保存整组提交，一个事务：同组参数彼此相关（失败次数与锁定时长），
+逐条保存会留下半新半旧的中间态。
+
+```json
+PUT /admin/params
+{ "items": [
+    { "param_key": "sys.login.failLimit", "param_value": "3" },
+    { "param_key": "sys.sms.accessKey",   "param_value": "******" }
+] }
+→ 200 OK  { "saved_count": 1 }
+```
+
+`saved_count` 是**实际写入**的条数：值没变的、以及密钥回填掩码的都不算。
+请求里的未知键静默跳过而不是报错——前端提交的是整组表单，
+其中某条刚被别人删掉，不该因此把其余改动一起回滚。
+
+`is_secret = 1` 的参数**只写不读**：所有读接口（含 POST/PUT 的响应体）一律返回掩码 `******`，
+保存时值等于掩码就跳过更新。操作日志里也只记掩码，不记明文。
+
+内置参数（`is_builtin = 1`）只能改**值与备注**：
+键、类型、分组都被后端按名字读取（`ParamService::value('sys.pwd.minLength')`），
+改了会让代码读到 null，而调用点都有默认值兜底，故障会以「配置怎么不生效」的形式出现。
+
+⚠️ 参数只落库 + 走缓存，**不热改 webman 配置**：常驻内存多进程下运行期改配置
+只影响当前 worker，进程间立刻不一致（PROJECT.md §14）。
 
 ---
 

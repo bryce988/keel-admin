@@ -270,8 +270,11 @@ foreach ($dicts as $code => [$name, $items]) {
 echo '  ✓ 字典 ' . count($dicts) . " 类\n";
 
 // ─────────────────────────────────────────── 系统参数
+// 第 6 位是 is_secret：密钥类参数只写不读，接口返回掩码（docs/api.md §9）
 $params = [
     ['sys.name',             'Keel Admin', 'basic',    'string', '系统名称'],
+    ['sys.logo',             '',           'basic',    'string', '登录页 Logo 地址'],
+    ['sys.footer',           'Powered by Keel', 'basic', 'string', '页脚文案'],
     ['sys.page.size',        '20',         'basic',    'int',    '默认分页条数'],
     ['sys.upload.maxSize',   '20971520',   'advanced', 'int',    '单文件上传上限（字节）'],
     ['sys.export.maxRows',   '50000',      'advanced', 'int',    '单次导出最大行数'],
@@ -283,20 +286,29 @@ $params = [
     ['sys.login.failLimit',  '5',          'security', 'int',    '连续失败锁定次数'],
     ['sys.login.lockMinutes','30',         'security', 'int',    '锁定时长（分钟）'],
     ['sys.session.timeout',  '1800',       'security', 'int',    '无操作登出秒数'],
+    // 集成组给的是空壳：脚手架不预置任何真实凭据，
+    // 但要留出 is_secret 的样例，否则「只写不读」这条链路没人走
+    ['sys.sms.provider',     'aliyun',     'integration', 'string', '短信服务商'],
+    ['sys.sms.accessKey',    '',           'integration', 'string', '短信 AccessKey', 1],
+    ['sys.oss.endpoint',     '',           'integration', 'string', '对象存储 Endpoint'],
+    ['sys.oss.accessSecret', '',           'integration', 'string', '对象存储 AccessSecret', 1],
 ];
-foreach ($params as [$key, $value, $group, $type, $name]) {
+foreach ($params as $row) {
+    [$key, $value, $group, $type, $name] = $row;
+    $isSecret = (int) ($row[5] ?? 0);
+
     $exists = Db::table('sys_params')->where('param_key', $key)->first();
     if ($exists) {
         // 只补齐元信息，**不覆盖已改过的值**
         Db::table('sys_params')->where('id', $exists->id)->update([
             'name' => $name, 'group' => $group, 'value_type' => $type,
-            'is_builtin' => 1, 'updated_at' => $now,
+            'is_builtin' => 1, 'is_secret' => $isSecret, 'updated_at' => $now,
         ]);
         continue;
     }
     Db::table('sys_params')->insert([
         'group' => $group, 'name' => $name, 'param_key' => $key, 'param_value' => $value,
-        'value_type' => $type, 'is_builtin' => 1, 'is_secret' => 0, 'remark' => '',
+        'value_type' => $type, 'is_builtin' => 1, 'is_secret' => $isSecret, 'remark' => '',
         'created_at' => $now, 'updated_at' => $now,
     ]);
 }

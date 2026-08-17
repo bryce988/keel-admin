@@ -4,21 +4,68 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\exception\ConflictException;
 use app\common\exception\NotFoundException;
+use app\common\model\SysDeptModel;
 use app\common\model\SysDictItemModel;
 use app\common\model\SysDictTypeModel;
+use app\common\model\SysLoginLogModel;
+use app\common\model\SysOperationLogModel;
+use app\common\model\SysPermissionModel;
+use app\common\model\SysPostModel;
+use app\common\model\SysRoleModel;
+use app\common\model\SysUserModel;
 use app\common\support\Cache;
+use app\common\support\Db;
+use app\common\support\Guard;
+use app\common\support\OpLog;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
- * 数据字典读取
+ * 数据字典
  *
  * 字典是全站高频只读数据，走 Redis 缓存；
- * 字典维护接口（M2）在写入后必须调 forget()，否则改了不生效。
+ * **所有写入路径都必须 forget()**，否则改了要等 5 分钟才生效——
+ * 表现为「明明改了标签颜色，界面就是老样子」，而且过一会儿又好了。
+ * 为了不漏，缓存失效统一收口在本类的 create/update/delete 里，
+ * 控制器与前端都不需要知道缓存的存在。
  */
 class DictService
 {
     private const TTL = 300;
     private const KEY = 'dict:items:';
+
+    public const TYPE_SORTABLE = ['id', 'code', 'status', 'created_at'];
+    public const ITEM_SORTABLE = ['id', 'sort', 'value', 'status', 'created_at'];
+
+    /**
+     * 字典项被哪些业务列引用
+     *
+     * 判断「这个 value 还能不能改」需要知道谁在用它。数据库里没有外键——
+     * 字典值是散落在各表的 TINYINT，靠约定关联，查不出来。所以这里做一份显式登记：
+     * 没登记的字典（如 common_status、yes_no 这类给业务表自由取用的）**默认放行**，
+     * 登记了的就按行数拦。
+     *
+     * 新增业务表若消费了某个字典，记得往这里补一行，否则改值不会被拦住。
+     *
+     * @var array<string, list<array{0: class-string, 1: string}>>
+     */
+    private const USAGE = [
+        'enable_status' => [
+            [SysDeptModel::class, 'status'],
+            [SysPostModel::class, 'status'],
+            [SysRoleModel::class, 'status'],
+            [SysPermissionModel::class, 'status'],
+        ],
+        'user_status'   => [[SysUserModel::class, 'status']],
+        'data_scope'    => [[SysRoleModel::class, 'data_scope']],
+        'perm_type'     => [[SysPermissionModel::class, 'type']],
+        'log_action'    => [[SysOperationLogModel::class, 'action']],
+        'log_status'    => [[SysOperationLogModel::class, 'status']],
+        'login_type'    => [[SysLoginLogModel::class, 'type']],
+    ];
+
+    // ------------------------------------------------------------ 读取（全站）
 
     /** 某个字典的启用项，按 sort 排序 */
     public static function items(string $code): array
@@ -66,5 +113,270 @@ class DictService
     public static function forget(string $code): void
     {
         Cache::del(self::KEY . $code);
+    }
+
+    // ------------------------------------------------------------ 类型维护
+
+    public static function typeQuery(array $filters): Builder
+    {
+        $query = SysDictTypeModel::query();
+
+        $keyword = trim((string) ($filters['keyword'] ?? ''));
+        if ($keyword !== '') {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', "%{$keyword}%")->orWhere('code', 'like', "%{$keyword}%");
+            });
+        }
+
+        if (($filters['status'] ?? '') !== '') {
+            $query->where('status', (int) $filters['status']);
+        }
+
+        return $query;
+    }
+
+    public static function typeRowMapper(): callable
+    {
+        // 字典类型不多（十几个），逐行 count 比先聚合再拼装更直白，
+        // 真正的量级问题在字典项那侧，而那边是按 type_code 过滤后分页的
+        return fn (SysDictTypeModel $row): array => [
+            'id'         => $row->id,
+            'name'       => $row->name,
+            'code'       => $row->code,
+            'status'     => $row->status,
+            'remark'     => $row->remark,
+            'item_count' => SysDictItemModel::where('type_code', $row->code)->count(),
+            'created_at' => $row->created_at?->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    public static function createType(array $data): SysDictTypeModel
+    {
+        Guard::unique(SysDictTypeModel::class, 'code', $data['code'], null, '字典编码已存在', 20501);
+
+        return Db::transaction(function () use ($data) {
+            $type = new SysDictTypeModel();
+            $type->fill($data);
+            $type->save();
+
+            OpLog::target("字典 {$type->name}({$type->code})");
+            self::forget($type->code);
+
+            return $type;
+        });
+    }
+
+    /**
+     * 编辑字典类型
+     *
+     * `code` 是字典项的关联键（sys_dict_items.type_code），改了就等于把所有项孤儿化，
+     * 所以有项的类型不许改编码——这跟字典项 value 不可改是同一类约束。
+     */
+    public static function updateType(int $id, array $data): SysDictTypeModel
+    {
+        /** @var SysDictTypeModel $type */
+        $type = Guard::found(SysDictTypeModel::find($id));
+
+        Guard::unique(SysDictTypeModel::class, 'code', $data['code'], $id, '字典编码已存在', 20501);
+
+        $oldCode = $type->code;
+        if ($data['code'] !== $oldCode && SysDictItemModel::where('type_code', $oldCode)->exists()) {
+            throw new ConflictException('该字典下已有字典项，编码不可修改', 20502);
+        }
+
+        $before = $type->toArray();
+
+        return Db::transaction(function () use ($type, $data, $before, $oldCode) {
+            $type->fill($data);
+            $type->save();
+
+            OpLog::target("字典 {$type->name}({$type->code})");
+            OpLog::diff($before, $type->toArray());
+
+            // 停用类型会让 items() 抛 404，缓存里的旧数据必须一起清掉；
+            // 改了编码时新旧两个键都清，否则旧键会一直命中到过期
+            self::forget($oldCode);
+            self::forget($type->code);
+
+            return $type;
+        });
+    }
+
+    public static function deleteType(int $id): void
+    {
+        /** @var SysDictTypeModel $type */
+        $type = Guard::found(SysDictTypeModel::find($id));
+
+        Guard::notReferenced(
+            SysDictItemModel::class,
+            'type_code',
+            $type->code,
+            '该字典下还有字典项，请先删除字典项',
+            20502
+        );
+
+        OpLog::target("字典 {$type->name}({$type->code})");
+
+        $type->delete();
+        self::forget($type->code);
+    }
+
+    // ------------------------------------------------------------ 字典项维护
+
+    /** 维护界面用：含停用项，且带上被引用次数 */
+    public static function itemQuery(string $typeCode, array $filters): Builder
+    {
+        $query = SysDictItemModel::query()->where('type_code', $typeCode);
+
+        $keyword = trim((string) ($filters['keyword'] ?? ''));
+        if ($keyword !== '') {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('label', 'like', "%{$keyword}%")->orWhere('value', 'like', "%{$keyword}%");
+            });
+        }
+
+        if (($filters['status'] ?? '') !== '') {
+            $query->where('status', (int) $filters['status']);
+        }
+
+        return $query;
+    }
+
+    public static function itemRowMapper(): callable
+    {
+        return fn (SysDictItemModel $row): array => [
+            'id'        => $row->id,
+            'type_code' => $row->type_code,
+            'label'     => $row->label,
+            'value'     => $row->value,
+            'tag_type'  => $row->tag_type,
+            'sort'      => $row->sort,
+            'status'    => $row->status,
+            'remark'    => $row->remark,
+            // 界面据此把「值」输入框置灰，用户在提交前就知道改不了，
+            // 而不是填完点保存才收到 409
+            'ref_count' => self::refCount($row->type_code, $row->value),
+            'created_at' => $row->created_at?->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    public static function createItem(array $data): SysDictItemModel
+    {
+        $typeCode = (string) $data['type_code'];
+        Guard::found(
+            SysDictTypeModel::where('code', $typeCode)->first(),
+            '字典不存在或已被删除'
+        );
+
+        self::assertValueUnique($typeCode, (string) $data['value'], null);
+
+        return Db::transaction(function () use ($data, $typeCode) {
+            $item = new SysDictItemModel();
+            $item->fill($data);
+            $item->save();
+
+            OpLog::target("字典项 {$typeCode}.{$item->value}({$item->label})");
+            self::forget($typeCode);
+
+            return $item;
+        });
+    }
+
+    /**
+     * 编辑字典项
+     *
+     * `value` 是落在业务表里的那个值，一旦有数据用了它就不能再改——
+     * 改了等于把已有数据的含义偷偷换掉，而且旧值不会被回溯更新。
+     * label / tag_type / sort / status 随便改，那些只影响展示。
+     */
+    public static function updateItem(int $id, array $data): SysDictItemModel
+    {
+        /** @var SysDictItemModel $item */
+        $item = Guard::found(SysDictItemModel::find($id));
+
+        $newValue = (string) $data['value'];
+        if ($newValue !== $item->value) {
+            $refs = self::refCount($item->type_code, $item->value);
+            if ($refs > 0) {
+                throw new ConflictException("该字典项已被 {$refs} 条数据引用，值不可修改", 20502);
+            }
+
+            self::assertValueUnique($item->type_code, $newValue, $id);
+        }
+
+        $before = $item->toArray();
+
+        return Db::transaction(function () use ($item, $data, $before) {
+            // type_code 不跟着表单走：字典项属于哪个字典由列表的上下文决定，
+            // 允许改等于开了一条「把项挪到别的字典」的暗路
+            unset($data['type_code']);
+
+            $item->fill($data);
+            $item->save();
+
+            OpLog::target("字典项 {$item->type_code}.{$item->value}({$item->label})");
+            OpLog::diff($before, $item->toArray());
+
+            self::forget($item->type_code);
+
+            return $item;
+        });
+    }
+
+    public static function deleteItem(int $id): void
+    {
+        /** @var SysDictItemModel $item */
+        $item = Guard::found(SysDictItemModel::find($id));
+
+        $refs = self::refCount($item->type_code, $item->value);
+        if ($refs > 0) {
+            throw new ConflictException("该字典项已被 {$refs} 条数据引用，无法删除", 20502);
+        }
+
+        OpLog::target("字典项 {$item->type_code}.{$item->value}({$item->label})");
+
+        $typeCode = $item->type_code;
+        $item->delete();
+        self::forget($typeCode);
+    }
+
+    /**
+     * 某个字典值被业务表引用了多少行
+     *
+     * 未登记的字典返回 0（放行）：登记表是人工维护的，宁可漏拦也不能误拦——
+     * 误拦会让用户改不了一个其实没人用的字典项，且无从自证。
+     */
+    public static function refCount(string $typeCode, string $value): int
+    {
+        $total = 0;
+
+        foreach (self::USAGE[$typeCode] ?? [] as [$modelClass, $column]) {
+            // 数据权限与软删除都要绕过：这里问的是「库里还有没有数据在用」，
+            // 跟当前登录人看得见什么无关，软删的行也仍然存着这个值
+            $total += $modelClass::query()->withoutGlobalScopes()->where($column, $value)->count();
+        }
+
+        return $total;
+    }
+
+    /**
+     * 字典项的值在同一字典内唯一
+     *
+     * 不能用 Guard::unique：那是单列唯一，这里的唯一键是 (type_code, value) 复合。
+     */
+    private static function assertValueUnique(string $typeCode, string $value, ?int $exceptId): void
+    {
+        $query = SysDictItemModel::query()
+            ->withoutGlobalScopes()
+            ->where('type_code', $typeCode)
+            ->where('value', $value);
+
+        if ($exceptId !== null) {
+            $query->where('id', '<>', $exceptId);
+        }
+
+        if ($query->exists()) {
+            throw new ConflictException('该字典下已存在相同的值', 20501);
+        }
     }
 }

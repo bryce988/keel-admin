@@ -81,13 +81,27 @@ export const useDictStore = defineStore('dict', {
       return this.data[code]?.find((item) => item.value === String(value))
     },
 
-    /** 字典维护后调用，或退出登录时清空 */
+    /** 退出登录时清空；字典维护后请用 refresh() */
     forget(code?: string) {
       if (code) {
         delete this.data[code]
       } else {
         this.data = {}
       }
+    },
+
+    /**
+     * 字典维护后重新拉取
+     *
+     * 只 forget 不够：别的页面被 keep-alive 缓存着，上面的 <DictTag> 仍然挂载在那儿，
+     * 而它只在 onMounted 时 load 一次。清掉数据它会立刻变成兜底的「-」，
+     * 且再也没人去补——所以必须紧接着重新拉一遍，让那些标签直接跟着变色。
+     */
+    async refresh(code: string): Promise<DictItem[]> {
+      delete this.data[code]
+      delete this.pending[code]
+
+      return this.load(code)
     }
   }
 })

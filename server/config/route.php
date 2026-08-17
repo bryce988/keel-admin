@@ -6,6 +6,7 @@ use app\admin\controller\AuthController;
 use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
 use app\admin\controller\MenuController;
+use app\admin\controller\ParamController;
 use app\admin\controller\PostController;
 use app\admin\controller\RoleController;
 use app\admin\controller\UserController;
@@ -46,6 +47,10 @@ Route::group('/admin/auth', function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
 });
+
+// 登录页要用的少量参数（系统名、Logo、页脚）——此时还没有 token，
+// 所以不能放进下面的登录态分组。白名单在 ParamService::PUBLIC_KEYS 里
+Route::get('/admin/params/public', [ParamController::class, 'publicParams']);
 
 // 需要登录的接口
 Route::group('/admin', function () {
@@ -200,6 +205,63 @@ Route::group('/admin', function () {
     Route::put('/users/{id:\d+}/password/reset', [UserController::class, 'resetPassword'])->setParams([
         'perm' => 'sys:user:resetPwd',
         'log'  => ['module' => '系统管理/用户', 'action' => 2, 'title' => '重置密码'],
+    ]);
+
+    // ---------------- 数据字典（维护）----------------
+    // 读接口在上面，登录即可；这里全是维护接口，要 sys:dict:*
+    Route::get('/dicts', [DictController::class, 'index'])->setParams(['perm' => 'sys:dict:list']);
+    Route::post('/dicts', [DictController::class, 'store'])->setParams([
+        'perm' => 'sys:dict:create',
+        'log'  => ['module' => '系统管理/字典', 'action' => 1, 'title' => '新增字典'],
+    ]);
+    Route::put('/dicts/{id:\d+}', [DictController::class, 'update'])->setParams([
+        'perm' => 'sys:dict:update',
+        'log'  => ['module' => '系统管理/字典', 'action' => 2, 'title' => '编辑字典'],
+    ]);
+    Route::delete('/dicts/{id:\d+}', [DictController::class, 'destroy'])->setParams([
+        'perm' => 'sys:dict:delete',
+        'log'  => ['module' => '系统管理/字典', 'action' => 3, 'title' => '删除字典'],
+    ]);
+    // {code} 段限定为编码字符，否则会把 /dicts/12 这样的 id 路径一起吃掉
+    Route::get('/dicts/{code:[A-Za-z0-9_.-]+}/items/all', [DictController::class, 'allItems'])
+        ->setParams(['perm' => 'sys:dict:list']);
+
+    Route::post('/dict-items', [DictController::class, 'storeItem'])->setParams([
+        'perm' => 'sys:dict:create',
+        'log'  => ['module' => '系统管理/字典', 'action' => 1, 'title' => '新增字典项'],
+    ]);
+    Route::put('/dict-items/{id:\d+}', [DictController::class, 'updateItem'])->setParams([
+        'perm' => 'sys:dict:update',
+        'log'  => ['module' => '系统管理/字典', 'action' => 2, 'title' => '编辑字典项'],
+    ]);
+    Route::delete('/dict-items/{id:\d+}', [DictController::class, 'destroyItem'])->setParams([
+        'perm' => 'sys:dict:delete',
+        'log'  => ['module' => '系统管理/字典', 'action' => 3, 'title' => '删除字典项'],
+    ]);
+    Route::post('/dict-items/batch-delete', [DictController::class, 'batchDestroyItem'])->setParams([
+        'perm' => 'sys:dict:delete',
+        'log'  => ['module' => '系统管理/字典', 'action' => 3, 'title' => '批量删除字典项'],
+    ]);
+
+    // ---------------- 参数配置 ----------------
+    Route::get('/params', [ParamController::class, 'index'])->setParams(['perm' => 'sys:param:list']);
+    Route::get('/params/groups', [ParamController::class, 'groups'])->setParams(['perm' => 'sys:param:list']);
+    Route::put('/params', [ParamController::class, 'batchUpdate'])->setParams([
+        'perm' => 'sys:param:update',
+        'log'  => ['module' => '系统管理/参数', 'action' => 2, 'title' => '保存参数'],
+    ]);
+    Route::get('/params/{id:\d+}', [ParamController::class, 'show'])->setParams(['perm' => 'sys:param:list']);
+    Route::post('/params', [ParamController::class, 'store'])->setParams([
+        'perm' => 'sys:param:create',
+        'log'  => ['module' => '系统管理/参数', 'action' => 1, 'title' => '新增参数'],
+    ]);
+    Route::put('/params/{id:\d+}', [ParamController::class, 'update'])->setParams([
+        'perm' => 'sys:param:update',
+        'log'  => ['module' => '系统管理/参数', 'action' => 2, 'title' => '编辑参数'],
+    ]);
+    Route::delete('/params/{id:\d+}', [ParamController::class, 'destroy'])->setParams([
+        'perm' => 'sys:param:delete',
+        'log'  => ['module' => '系统管理/参数', 'action' => 3, 'title' => '删除参数'],
     ]);
 })->middleware([
     AdminAuthMiddleware::class,       // 认证：你是谁
