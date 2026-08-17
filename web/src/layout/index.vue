@@ -11,6 +11,7 @@ import { useUserStore } from '@/stores/user'
 import { useTagsViewStore } from '@/stores/tagsView'
 import { useDictStore } from '@/stores/dict'
 import { resetDynamicRoutes } from '@/router'
+import type { FormDrawerInstance } from '@/components'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,9 +61,7 @@ async function signOut() {
 }
 
 // ---------------------------------------------------------------- 修改密码
-const pwdDialog = ref<{ open: (o: { title: string; data?: Record<string, any> }) => void } | null>(
-  null
-)
+const pwdDrawer = ref<FormDrawerInstance | null>(null)
 
 const pwdRules: FormRules = {
   old_password: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
@@ -75,7 +74,7 @@ const pwdRules: FormRules = {
     {
       trigger: 'blur',
       validator: (_rule, value, callback) => {
-        const form = (pwdDialog.value as unknown as { form?: Record<string, any> })?.form
+        const form = (pwdDrawer.value as unknown as { form?: Record<string, any> })?.form
         callback(value && value !== form?.new_password ? new Error('两次输入的密码不一致') : undefined)
       }
     }
@@ -102,7 +101,7 @@ async function onUserCommand(cmd: string) {
   }
 
   if (cmd === 'password') {
-    pwdDialog.value?.open({
+    pwdDrawer.value?.open({
       title: '修改密码',
       data: { old_password: '', new_password: '', confirm_password: '' }
     })
@@ -174,12 +173,12 @@ async function onUserCommand(cmd: string) {
       <TagsView />
 
       <!-- 修改密码 -->
-      <FormDialog
-        ref="pwdDialog"
+      <FormDrawer
+        ref="pwdDrawer"
         :submit="submitPassword"
         :rules="pwdRules"
         :error-fields="pwdErrorFields"
-        width="440px"
+        size="420px"
         label-width="80px"
         success-message="密码已修改，请重新登录"
         @success="onPasswordChanged"
@@ -200,7 +199,7 @@ async function onUserCommand(cmd: string) {
             />
           </el-form-item>
         </template>
-      </FormDialog>
+      </FormDrawer>
 
       <!-- 内容区 -->
       <main class="content">

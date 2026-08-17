@@ -53,7 +53,8 @@ export interface TableQuery {
 
 const props = withDefaults(
   defineProps<{
-    request: (params: TableQuery) => Promise<PageResult>
+    /** 取数函数。列表模式返回分页结构，树形模式返回数组 */
+    request: (params: TableQuery) => Promise<PageResult | Record<string, any>[]>
     columns: ProColumn[]
     /**
      * 筛选条件，变化时不自动请求，由页面显式调用 reload()。
@@ -76,8 +77,25 @@ const props = withDefaults(
     pageSize?: number
     /** 序号列 */
     index?: boolean
+    /**
+     * 树形模式：不分页，request 直接返回数组
+     *
+     * 树必须一次给全——只给一页的树是断的，父节点被翻到下一页就成了孤儿。
+     * 部门、菜单这类数据量本来就有限，全量返回反而更简单。
+     */
+    tree?: boolean
+    defaultExpandAll?: boolean
   }>(),
-  { rowKey: 'id', selection: false, immediate: true, pageSize: 20, index: false, syncUrl: true }
+  {
+    rowKey: 'id',
+    selection: false,
+    immediate: true,
+    pageSize: 20,
+    index: false,
+    syncUrl: true,
+    tree: false,
+    defaultExpandAll: true
+  }
 )
 
 const emit = defineEmits<{
@@ -142,13 +160,23 @@ async function fetch() {
   try {
     writeUrlFromState(filters)
 
-    const result = await props.request({
+    const raw = await props.request({
       ...filters,
-      page_num: pager.pageNum,
-      page_size: pager.pageSize,
-      sort_field: pager.sortField || undefined,
-      sort_order: pager.sortOrder
-    })
+      // 树形模式不传分页参数，后端也不该按分页处理
+      ...(props.tree
+        ? {}
+        : {
+            page_num: pager.pageNum,
+            page_size: pager.pageSize,
+            sort_field: pager.sortField || undefined,
+            sort_order: pager.sortOrder
+          })
+    } as TableQuery)
+
+    // 树接口直接返回数组，列表接口返回分页结构，在这里抹平差异
+    const result: PageResult = Array.isArray(raw)
+      ? { list: raw, total: raw.length, page_num: 1, page_size: raw.length }
+      : raw
 
     rows.value = result.list ?? []
     total.value = result.total ?? 0
@@ -322,6 +350,8 @@ defineExpose({ reload, refresh, selected, loading })
       :data="rows"
       :row-key="rowKey"
       :size="size"
+      :default-expand-all="tree && defaultExpandAll"
+      :tree-props="{ children: 'children' }"
       border
       stripe
       @sort-change="onSortChange"
@@ -354,7 +384,7 @@ defineExpose({ reload, refresh, selected, loading })
       </template>
     </el-table>
 
-    <div class="pagination">
+    <div v-if="!tree" class="pagination">
       <el-pagination
         v-model:current-page="pager.pageNum"
         v-model:page-size="pager.pageSize"

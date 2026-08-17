@@ -1,32 +1,60 @@
+<script lang="ts">
+/**
+ * 打开抽屉的参数与实例类型
+ *
+ * 单独导出，页面统一 `ref<FormDrawerInstance | null>(null)`。
+ * 每个页面各写一遍内联注解的话，组件加了参数就会有一半页面的类型对不上，
+ * 而 TS 只会在用到新参数的那个页面报错，别的地方悄悄过。
+ */
+export interface FormDrawerOptions {
+  title: string
+  data?: Record<string, any>
+  /** edit 可提交；view 只读，隐藏确定按钮 */
+  mode?: 'edit' | 'view'
+}
+
+export interface FormDrawerInstance {
+  open: (options: FormDrawerOptions) => void
+  close: () => void
+  form: Record<string, any>
+}
+</script>
+
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { BizError } from '@/utils/request'
 
 /**
- * 表单弹窗
+ * 表单抽屉
+ *
+ * 新增、编辑、详情三种场景统一走它。用抽屉而不是弹窗：
+ * 后台表单字段普遍偏多，弹窗撑不下就得在内部再套一层滚动，
+ * 而抽屉天然是整列高度，长表单不用二次滚动，也不会把列表整个盖住。
  *
  * 统一的是**壳**——打开、深拷贝、校验、提交、loading、服务端错误回填、关闭；
  * 字段本身由调用方用插槽自由写。七个模块的表单字段差异很大
  * （菜单表单光 type 就有五种形态），做成 schema 驱动会变成一个没人愿意读的小框架。
  *
- *   <FormDialog ref="dlg" :submit="save" :rules="rules" @success="tableRef?.refresh()">
- *     <template #default="{ form, errors }">
+ *   <FormDrawer ref="drawer" :submit="save" :rules="rules" @success="tableRef?.refresh()">
+ *     <template #default="{ form, errors, readonly }">
  *       <el-form-item label="账号" prop="username" :error="errors.username">
- *         <el-input v-model="form.username" />
+ *         <el-input v-model="form.username" :disabled="readonly" />
  *       </el-form-item>
  *     </template>
- *   </FormDialog>
+ *   </FormDrawer>
  *
- *   dlg.value.open({ title: '新增用户' })          // 新增
- *   dlg.value.open({ title: '编辑用户', data: row }) // 编辑
+ *   drawer.value.open({ title: '新增用户' })                        // 新增
+ *   drawer.value.open({ title: '编辑用户', data: row })              // 编辑
+ *   drawer.value.open({ title: '岗位详情', data: row, mode: 'view' }) // 详情（只读）
  */
 const props = withDefaults(
   defineProps<{
-    /** 提交函数，由页面提供；抛异常即视为失败，弹窗不关 */
-    submit: (form: Record<string, any>) => Promise<unknown>
+    /** 提交函数，由页面提供；抛异常即视为失败，抽屉不关。详情模式下不会被调用 */
+    submit?: (form: Record<string, any>) => Promise<unknown>
     rules?: FormRules
-    width?: string
+    /** 抽屉宽度，字段多的表单可以调大 */
+    size?: string
     labelWidth?: string
     successMessage?: string
     confirmText?: string
@@ -37,7 +65,7 @@ const props = withDefaults(
      */
     errorFields?: Record<number, string>
   }>(),
-  { width: '560px', labelWidth: '96px', confirmText: '确 定' }
+  { size: '560px', labelWidth: '96px', confirmText: '确 定' }
 )
 
 const emit = defineEmits<{ success: [result: unknown]; closed: [] }>()
@@ -45,10 +73,13 @@ const emit = defineEmits<{ success: [result: unknown]; closed: [] }>()
 const visible = ref(false)
 const title = ref('')
 const loading = ref(false)
+const mode = ref<'edit' | 'view'>('edit')
 const formRef = ref<FormInstance>()
 const form = ref<Record<string, any>>({})
 /** 服务端返回的字段级错误，插槽里绑到 el-form-item 的 :error 上 */
 const errors = ref<Record<string, string>>({})
+
+const readonly = computed(() => mode.value === 'view')
 
 /**
  * 深拷贝一份再编辑
@@ -61,13 +92,14 @@ function clone(value?: Record<string, any> | null): Record<string, any> {
   return value ? JSON.parse(JSON.stringify(value)) : {}
 }
 
-function open(options: { title: string; data?: Record<string, any> }) {
+function open(options: FormDrawerOptions) {
   title.value = options.title
+  mode.value = options.mode ?? 'edit'
   form.value = clone(options.data)
   errors.value = {}
   visible.value = true
 
-  // 弹窗内容是 destroy-on-close 的，等它挂好再清校验状态
+  // 抽屉内容是 destroy-on-close 的，等它挂好再清校验状态
   nextTick(() => formRef.value?.clearValidate())
 }
 
@@ -76,7 +108,7 @@ function close() {
 }
 
 async function onConfirm() {
-  if (loading.value) return
+  if (loading.value || readonly.value || !props.submit) return
 
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -100,7 +132,7 @@ async function onConfirm() {
   }
 }
 
-/** 把服务端错误落到具体字段上，失败时弹窗保持打开，用户可以直接改 */
+/** 把服务端错误落到具体字段上，失败时抽屉保持打开，用户可以直接改 */
 function applyServerErrors(e: BizError) {
   // 422：details 里是字段级明细，直接对号入座
   if (e.status === 422 && e.details) {
@@ -130,11 +162,11 @@ defineExpose({ open, close, form })
 </script>
 
 <template>
-  <el-dialog
+  <el-drawer
     v-model="visible"
     :title="title"
-    :width="width"
-    append-to-body
+    :size="size"
+    direction="rtl"
     destroy-on-close
     :close-on-click-modal="false"
     @closed="onClosed"
@@ -142,16 +174,29 @@ defineExpose({ open, close, form })
     <el-form
       ref="formRef"
       :model="form"
-      :rules="rules"
+      :rules="readonly ? undefined : rules"
       :label-width="labelWidth"
+      :disabled="readonly"
       @submit.prevent="onConfirm"
     >
-      <slot :form="form" :errors="errors" />
+      <slot :form="form" :errors="errors" :readonly="readonly" />
     </el-form>
 
     <template #footer>
-      <el-button @click="close">取 消</el-button>
-      <el-button type="primary" :loading="loading" @click="onConfirm">{{ confirmText }}</el-button>
+      <div class="drawer-footer">
+        <el-button @click="close">{{ readonly ? '关 闭' : '取 消' }}</el-button>
+        <el-button v-if="!readonly" type="primary" :loading="loading" @click="onConfirm">
+          {{ confirmText }}
+        </el-button>
+      </div>
     </template>
-  </el-dialog>
+  </el-drawer>
 </template>
+
+<style scoped>
+.drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+</style>
