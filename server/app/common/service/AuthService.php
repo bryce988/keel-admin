@@ -6,6 +6,7 @@ namespace app\common\service;
 
 use app\common\exception\BusinessException;
 use app\common\exception\UnauthorizedException;
+use app\common\exception\ValidationException;
 use app\common\support\Cache;
 use app\common\support\Db;
 use app\common\support\Env;
@@ -191,8 +192,22 @@ class AuthService
         if (!password_verify($oldPassword, $hash)) {
             throw new BusinessException('原密码错误', 20005);
         }
-        if (strlen($newPassword) < 8) {
-            throw new BusinessException('新密码长度不能少于 8 位', 20006);
+
+        // 密码强度是**字段级**校验，返回 422 + details 让前端标在输入框上，
+        // 而不是笼统弹一句（docs/api.md §2.2 把 20006 定为 422）
+        if (mb_strlen($newPassword) < 8) {
+            throw new ValidationException(
+                ['new_password' => ['新密码长度不能少于 8 位']],
+                '新密码不符合安全策略',
+                20006
+            );
+        }
+        if ($newPassword === $oldPassword) {
+            throw new ValidationException(
+                ['new_password' => ['新密码不能与原密码相同']],
+                '新密码不符合安全策略',
+                20006
+            );
         }
 
         Db::table('sys_users')->where('id', $user['id'])->update([

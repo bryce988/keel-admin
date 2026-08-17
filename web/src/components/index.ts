@@ -1,10 +1,11 @@
 import type { App } from 'vue'
 import ProTable from './ProTable.vue'
 import SearchForm from './SearchForm.vue'
+import FormDialog from './FormDialog.vue'
 import DictSelect from './DictSelect.vue'
 import DictTag from './DictTag.vue'
 
-export { ProTable, SearchForm, DictSelect, DictTag }
+export { ProTable, SearchForm, FormDialog, DictSelect, DictTag }
 export type { ProColumn, PageResult, TableQuery } from './ProTable.vue'
 export type { SearchField } from './SearchForm.vue'
 
@@ -18,6 +19,7 @@ export default {
   install(app: App) {
     app.component('ProTable', ProTable)
     app.component('SearchForm', SearchForm)
+    app.component('FormDialog', FormDialog)
     app.component('DictSelect', DictSelect)
     app.component('DictTag', DictTag)
   }

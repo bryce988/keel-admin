@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
+import { changePassword } from '@/api/profile'
 import { Expand, Fold, Moon, Search, Sunny } from '@element-plus/icons-vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import TagsView from './components/TagsView.vue'
@@ -49,18 +50,66 @@ function cacheKey(current: RouteLocationNormalizedLoaded): string {
 onMounted(() => window.addEventListener('keel:refresh-page', onRefresh))
 onUnmounted(() => window.removeEventListener('keel:refresh-page', onRefresh))
 
+/** 退出登录：清干净再跳，否则换账号后会残留上个账号的页签、字典与动态路由 */
+async function signOut() {
+  await userStore.logout()
+  tagsStore.reset()
+  dictStore.forget()
+  resetDynamicRoutes()
+  router.replace('/login')
+}
+
+// ---------------------------------------------------------------- 修改密码
+const pwdDialog = ref<{ open: (o: { title: string; data?: Record<string, any> }) => void } | null>(
+  null
+)
+
+const pwdRules: FormRules = {
+  old_password: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  new_password: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 8, message: '密码长度不能少于 8 位', trigger: 'blur' }
+  ],
+  confirm_password: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    {
+      trigger: 'blur',
+      validator: (_rule, value, callback) => {
+        const form = (pwdDialog.value as unknown as { form?: Record<string, any> })?.form
+        callback(value && value !== form?.new_password ? new Error('两次输入的密码不一致') : undefined)
+      }
+    }
+  ]
+}
+
+/** 原密码错误是 400 + 20005，映射到输入框上，用户不用自己找是哪一项错了 */
+const pwdErrorFields = { 20005: 'old_password' }
+
+function submitPassword(form: Record<string, any>) {
+  return changePassword({ old_password: form.old_password, new_password: form.new_password })
+}
+
+/** 服务端改密后会把当前 token 拉黑，必须马上重新登录 */
+async function onPasswordChanged() {
+  await signOut()
+}
+
 async function onUserCommand(cmd: string) {
   if (cmd === 'logout') {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', { type: 'warning' })
-    await userStore.logout()
-    tagsStore.reset()
-    dictStore.forget()
-    // 卸载上个账号的动态路由，否则换账号登录会残留他看得见的页面
-    resetDynamicRoutes()
-    router.replace('/login')
+    await signOut()
     return
   }
-  // 个人中心与修改密码属于 M2 范围，先给出明确反馈而不是静默无响应
+
+  if (cmd === 'password') {
+    pwdDialog.value?.open({
+      title: '修改密码',
+      data: { old_password: '', new_password: '', confirm_password: '' }
+    })
+    return
+  }
+
+  // 个人中心属于 M2 范围，先给出明确反馈而不是静默无响应
   ElMessage.info('该功能将在「个人中心」模块中实现')
 }
 </script>
@@ -123,6 +172,35 @@ async function onUserCommand(cmd: string) {
 
       <!-- 多页签 -->
       <TagsView />
+
+      <!-- 修改密码 -->
+      <FormDialog
+        ref="pwdDialog"
+        :submit="submitPassword"
+        :rules="pwdRules"
+        :error-fields="pwdErrorFields"
+        width="440px"
+        label-width="80px"
+        success-message="密码已修改，请重新登录"
+        @success="onPasswordChanged"
+      >
+        <template #default="{ form, errors }">
+          <el-form-item label="原密码" prop="old_password" :error="errors.old_password">
+            <el-input v-model="form.old_password" type="password" show-password autocomplete="off" />
+          </el-form-item>
+          <el-form-item label="新密码" prop="new_password" :error="errors.new_password">
+            <el-input v-model="form.new_password" type="password" show-password autocomplete="off" />
+          </el-form-item>
+          <el-form-item label="确认密码" prop="confirm_password">
+            <el-input
+              v-model="form.confirm_password"
+              type="password"
+              show-password
+              autocomplete="off"
+            />
+          </el-form-item>
+        </template>
+      </FormDialog>
 
       <!-- 内容区 -->
       <main class="content">
