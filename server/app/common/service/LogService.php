@@ -163,7 +163,11 @@ class LogService
         $keyword = trim((string) ($filters['keyword'] ?? ''));
         if ($keyword !== '') {
             $query->where(function ($q) use ($keyword) {
-                $q->where('username', 'like', "%{$keyword}%")->orWhere('ip', 'like', "%{$keyword}%");
+                $q->where('username', 'like', "%{$keyword}%")
+                    ->orWhere('ip', 'like', "%{$keyword}%")
+                    // 归属地也进关键词：排查异地登录时「搜一下有没有从外省登过」
+                    // 比按 IP 段找现实得多
+                    ->orWhere('location', 'like', "%{$keyword}%");
             });
         }
 
@@ -201,7 +205,7 @@ class LogService
         $mapper = self::loginRowMapper();
 
         return Spreadsheet::writeXlsx('login-logs', [
-            '时间', '账号', 'IP', '归属地', '浏览器', '操作系统', '类型', '结果', '说明',
+            '时间', '账号', 'IP', '登录地址', '浏览器', '操作系统', '类型', '结果', '说明',
         ], function (callable $emit) use ($query, $mapper) {
             $query->orderByDesc('id')->chunk(500, function ($rows) use ($emit, $mapper) {
                 foreach ($rows as $row) {

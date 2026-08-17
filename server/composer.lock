@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1ec2f7e32b2f025e9c9b62d139eb5fce",
+    "content-hash": "a505ca4d02146a3a274281b5aa37ae1c",
     "packages": [
         {
             "name": "brick/math",
@@ -2158,6 +2158,80 @@
                 }
             ],
             "time": "2026-06-04T07:31:34+00:00"
+        },
+        {
+            "name": "zoujingli/ip2region",
+            "version": "v3.0.15",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/zoujingli/ip2region.git",
+                "reference": "6b49055f5b889299b430a2197fc9c04648884e0e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/zoujingli/ip2region/zipball/6b49055f5b889299b430a2197fc9c04648884e0e",
+                "reference": "6b49055f5b889299b430a2197fc9c04648884e0e",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.1.0"
+            },
+            "suggest": {
+                "ext-opcache": "启用 OPcache 以获得更好的性能"
+            },
+            "bin": [
+                "bin/ip2down"
+            ],
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "3.0.x-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/common.php"
+                ],
+                "psr-4": {
+                    "ip2region\\": "src/ip2region/"
+                },
+                "classmap": [
+                    "src/Ip2Region.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "Anyon",
+                    "email": "zoujingli@qq.com",
+                    "homepage": "https://thinkadmin.top"
+                }
+            ],
+            "description": "ip2region v3.0 for PHP - 企业级 IP 地理位置查询库，支持 IPv4 和 IPv6，多种缓存策略，零依赖，开箱即用",
+            "homepage": "https://github.com/zoujingli/Ip2Region",
+            "keywords": [
+                "IP",
+                "Ip2Region",
+                "composer",
+                "geolocation",
+                "ipv4",
+                "ipv6",
+                "location",
+                "php",
+                "企业级",
+                "智能加载",
+                "缓存策略",
+                "零依赖",
+                "高性能"
+            ],
+            "support": {
+                "issues": "https://github.com/zoujingli/ip2region/issues",
+                "source": "https://github.com/zoujingli/ip2region/tree/v3.0.15"
+            },
+            "time": "2026-05-08T09:15:53+00:00"
         }
     ],
     "packages-dev": [],

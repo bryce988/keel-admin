@@ -6,14 +6,15 @@
     "require": {
         "php": ">=8.4",
         "ext-zip": "*",
-        "workerman/webman-framework": "^2.0",
-        "monolog/monolog": "^3.0",
+        "firebase/php-jwt": "^7.0",
         "illuminate/database": "^11.0",
         "illuminate/events": "^11.0",
         "illuminate/pagination": "^11.0",
-        "firebase/php-jwt": "^7.0",
+        "monolog/monolog": "^3.0",
         "openspout/openspout": "^5.10",
-        "predis/predis": "^2.2"
+        "predis/predis": "^2.2",
+        "workerman/webman-framework": "^2.0",
+        "zoujingli/ip2region": "^3.0"
     },
     "suggest": {
         "ext-event": "更高性能的事件循环",

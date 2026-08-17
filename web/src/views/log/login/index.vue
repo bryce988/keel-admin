@@ -30,7 +30,7 @@ const paramParsers = {
 }
 
 const searchFields: SearchField[] = [
-  { prop: 'keyword', label: '关键词', placeholder: '账号 / IP' },
+  { prop: 'keyword', label: '关键词', placeholder: '账号 / IP / 登录地址' },
   { prop: 'date_range', label: '时间范围', type: 'daterange' },
   { prop: 'type', label: '类型', type: 'dict', dict: 'login_type', numeric: true },
   { prop: 'status', label: '结果', type: 'dict', dict: 'log_status', numeric: true }
@@ -40,13 +40,12 @@ const columns: ProColumn[] = [
   { prop: 'created_at', label: '时间', width: 165, sortable: true },
   { prop: 'username', label: '账号', minWidth: 120 },
   { prop: 'ip', label: 'IP', width: 140 },
+  { prop: 'location', label: '登录地址', minWidth: 170, showOverflowTooltip: true },
   { prop: 'browser', label: '浏览器', width: 110 },
   { prop: 'os', label: '操作系统', width: 110 },
   { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'login_type' },
   { prop: 'status', label: '结果', width: 90, align: 'center', dict: 'log_status' },
-  { prop: 'msg', label: '说明', minWidth: 160, slot: 'msg' },
-  // 归属地要接 IP 库才有值，现在恒为空，所以默认藏起来
-  { prop: 'location', label: '归属地', width: 120, hidden: true }
+  { prop: 'msg', label: '说明', minWidth: 160, slot: 'msg' }
 ]
 
 function requestLogs(params: TableQuery) {
