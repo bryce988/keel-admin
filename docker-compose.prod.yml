@@ -25,7 +25,7 @@ services:
       - --innodb-buffer-pool-size=256M
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./server/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD}"]
       interval: 10s
@@ -76,6 +76,7 @@ services:
       CAPTCHA_TTL: ${CAPTCHA_TTL:-120}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须在 .env 中设置}
+      SEED_DEMO: ${SEED_DEMO:-}           # 生产默认不播演示账号，预览站在 .env 里显式打开
       TZ: Asia/Shanghai
       COMPOSER_ALLOW_SUPERUSER: 1
     volumes:

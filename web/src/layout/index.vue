@@ -8,12 +8,15 @@ import TagsView from './components/TagsView.vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useTagsViewStore } from '@/stores/tagsView'
+import { useDictStore } from '@/stores/dict'
+import { resetDynamicRoutes } from '@/router'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const tagsStore = useTagsViewStore()
+const dictStore = useDictStore()
 
 /** 面包屑：一级分组 / 当前页 */
 const breadcrumb = computed(() => {
@@ -39,6 +42,9 @@ async function onUserCommand(cmd: string) {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', { type: 'warning' })
     await userStore.logout()
     tagsStore.reset()
+    dictStore.forget()
+    // 卸载上个账号的动态路由，否则换账号登录会残留他看得见的页面
+    resetDynamicRoutes()
     router.replace('/login')
     return
   }

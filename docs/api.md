@@ -298,15 +298,18 @@ POST /admin/auth/login
 |---|---|---|---|
 | GET | `/admin/users` | `sys:user:list` | 列表，支持 `deptId` `includeChildDept` `status` `roleId` `keyword` |
 | GET | `/admin/users/{id}` | `sys:user:list` | 详情 |
-| POST | `/admin/users` | `sys:user:edit` | 新建 |
-| PUT | `/admin/users/{id}` | `sys:user:edit` | 编辑 |
+| POST | `/admin/users` | `sys:user:create` | 新建 |
+| PUT | `/admin/users/{id}` | `sys:user:update` | 编辑 |
 | DELETE | `/admin/users/{id}` | `sys:user:delete` | 删除（软删） |
-| PUT | `/admin/users/{id}/status` | `sys:user:edit` | 启用 / 停用 |
-| PUT | `/admin/users/{id}/roles` | `sys:role:grant` | 分配角色 |
-| PUT | `/admin/users/{id}/password/reset` | `sys:user:edit` | 重置密码 |
+| PUT | `/admin/users/{id}/status` | `sys:user:update` | 启用 / 停用 |
+| PUT | `/admin/users/{id}/roles` | `sys:user:grantRole` | 分配角色 |
+| PUT | `/admin/users/{id}/password/reset` | `sys:user:resetPwd` | 重置密码 |
 | POST | `/admin/users/import` | `sys:user:import` | 批量导入 |
 | GET | `/admin/users/export` | `sys:user:export` | 导出 |
 | GET | `/admin/users/stats` | `sys:user:list` | 顶部四个指标卡 |
+
+**敏感字段**：`phone` `email` 受字段级权限（`sys:field:user:phone` / `sys:field:user:email`）控制。
+无权限时接口返回的**就是脱敏值**（`138****8000`），不是前端拿到明文再打码。
 
 **列表关键参数**
 
@@ -331,13 +334,16 @@ PUT /admin/users/12/roles
 
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
-| GET | `/admin/depts/tree` | `sys:dept:list` | 部门树，含每个节点的用户数 |
+| GET | `/admin/depts/tree` | `sys:dept:list` 或 `sys:user:list` | 部门树，含每个节点的用户数 |
 | GET | `/admin/depts/{id}` | `sys:dept:list` | 详情 |
-| POST | `/admin/depts` | `sys:dept:edit` | 新建 |
-| PUT | `/admin/depts/{id}` | `sys:dept:edit` | 编辑（移动时同步更新子孙 `ancestors`） |
-| DELETE | `/admin/depts/{id}` | `sys:dept:edit` | 删除（有用户或子部门时 409 + `20203`） |
-| GET | `/admin/posts` | `sys:dept:list` | 岗位列表 |
-| POST/PUT/DELETE | `/admin/posts/{id}` | `sys:dept:edit` | 岗位增改删 |
+| POST | `/admin/depts` | `sys:dept:create` | 新建 |
+| PUT | `/admin/depts/{id}` | `sys:dept:update` | 编辑（移动时同步更新子孙 `ancestors`） |
+| DELETE | `/admin/depts/{id}` | `sys:dept:delete` | 删除（有用户或子部门时 409 + `20203`） |
+| GET | `/admin/posts` | `sys:post:list` | 岗位列表 |
+| POST/PUT/DELETE | `/admin/posts/{id}` | `sys:post:create` / `update` / `delete` | 岗位增改删 |
+
+部门树是用户列表筛选面板的数据源，因此**任一权限满足即可**读取——
+只有用户管理权限、没有部门管理权限的账号也要能按部门筛人。
 
 ---
 
@@ -347,16 +353,16 @@ PUT /admin/users/12/roles
 |---|---|---|---|
 | GET | `/admin/roles` | `sys:role:list` | 列表（内置/自定义分组） |
 | GET | `/admin/roles/{id}` | `sys:role:list` | 详情，含继承与约束 |
-| POST | `/admin/roles` | `sys:role:edit` | 新建 |
-| PUT | `/admin/roles/{id}` | `sys:role:edit` | 编辑 |
-| DELETE | `/admin/roles/{id}` | `sys:role:edit` | 删除（内置 403 + `20302`，有成员 409 + `20303`） |
+| POST | `/admin/roles` | `sys:role:create` | 新建 |
+| PUT | `/admin/roles/{id}` | `sys:role:update` | 编辑 |
+| DELETE | `/admin/roles/{id}` | `sys:role:delete` | 删除（内置 403 + `20302`，有成员 409 + `20303`） |
 | GET | `/admin/roles/{id}/permissions` | `sys:role:list` | 已授权的权限点 ID 列表 + 继承来的 ID 列表 |
-| PUT | `/admin/roles/{id}/permissions` | `sys:role:grant` | 保存功能权限 |
-| PUT | `/admin/roles/{id}/data-scope` | `sys:role:grant` | 保存数据权限 |
-| PUT | `/admin/roles/{id}/fields` | `sys:role:grant` | 保存字段级权限 |
+| PUT | `/admin/roles/{id}/permissions` | `sys:role:grantPerm` | 保存功能权限 |
+| PUT | `/admin/roles/{id}/data-scope` | `sys:role:grantData` | 保存数据权限 |
+| PUT | `/admin/roles/{id}/fields` | `sys:role:grantData` | 保存字段级权限 |
 | GET | `/admin/roles/{id}/users` | `sys:role:list` | 角色成员 |
-| POST | `/admin/roles/{id}/users` | `sys:role:grant` | 添加成员 |
-| DELETE | `/admin/roles/{id}/users/{userId}` | `sys:role:grant` | 移除成员 |
+| POST | `/admin/roles/{id}/users` | `sys:user:grantRole` | 添加成员 |
+| DELETE | `/admin/roles/{id}/users/{userId}` | `sys:user:grantRole` | 移除成员 |
 
 **功能权限**
 
@@ -389,9 +395,9 @@ PUT /admin/roles/3/data-scope
 |---|---|---|---|
 | GET | `/admin/menus/tree` | `sys:menu:list` | 菜单与权限点树（全量，含停用） |
 | GET | `/admin/menus/{id}` | `sys:menu:list` | 节点详情 |
-| POST | `/admin/menus` | `sys:menu:edit` | 新建节点 |
-| PUT | `/admin/menus/{id}` | `sys:menu:edit` | 编辑 |
-| DELETE | `/admin/menus/{id}` | `sys:menu:edit` | 删除（被引用 409 + `20402`） |
+| POST | `/admin/menus` | `sys:menu:create` | 新建节点 |
+| PUT | `/admin/menus/{id}` | `sys:menu:update` | 编辑 |
+| DELETE | `/admin/menus/{id}` | `sys:menu:delete` | 删除（被引用 409 + `20402`） |
 | GET | `/admin/menus/matrix` | `sys:menu:list` | 角色 × 权限矩阵（只读审计视图） |
 
 **本模块只定义权限点，不做授权**。`GET /admin/menus/tree` 返回的每个节点带 `grantedRoleCount`，仅供展示。
@@ -402,24 +408,27 @@ PUT /admin/roles/3/data-scope
 
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
-| GET | `/admin/dict/types` | `sys:dict:list` | 字典类型列表 |
-| POST/PUT/DELETE | `/admin/dict/types/{id}` | `sys:dict:edit` | 类型增改删 |
-| GET | `/admin/dict/items?typeCode=common_status` | `sys:dict:list` | 字典项 |
-| POST/PUT/DELETE | `/admin/dict/items/{id}` | `sys:dict:edit` | 字典项增改删（改已引用的 value 时 409 + `20502`） |
-| GET | `/admin/dict/all` | 登录态 | **前端启动时一次性拉取全部启用字典** |
-| POST | `/admin/dict/refresh` | `sys:dict:edit` | 刷新服务端缓存 |
+| GET | `/admin/dicts/{code}/items` | 登录态 | **某个字典的启用项**，页面按需取 |
+| GET | `/admin/dicts/batch?codes=a,b,c` | 登录态 | 批量预热，一个列表页一次拉齐 |
+| GET | `/admin/dicts` | `sys:dict:list` | 字典类型列表（维护界面用） |
+| POST/PUT/DELETE | `/admin/dicts/{id}` | `sys:dict:create` / `update` / `delete` | 类型增改删 |
+| GET | `/admin/dicts/{code}/items/all` | `sys:dict:list` | 字典项（含停用，维护界面用） |
+| POST/PUT/DELETE | `/admin/dict-items/{id}` | `sys:dict:create` / `update` / `delete` | 字典项增改删（改已引用的 value 时 409 + `20502`） |
 
 ```json
-GET /admin/dict/all → 200 OK
-{
-  "common_status": [
-    { "label": "正常", "value": "normal", "tagType": "success" },
-    { "label": "异常", "value": "error",  "tagType": "danger" }
-  ]
-}
+GET /admin/dicts/common_status/items → 200 OK
+[
+  { "label": "正常", "value": "1", "tagType": "success" },
+  { "label": "异常", "value": "3", "tagType": "danger" }
+]
 ```
 
-前端存入 Pinia，`<DictTag type="common_status" value="normal" />` 直接渲染，颜色由 `tagType` 驱动。
+读取接口只要**登录态**：字典是全站下拉与状态色的基础数据，
+要求 `sys:dict:list` 会让没有字典管理权限的账号连状态标签都渲染不出来。
+
+前端存入 Pinia（`stores/dict.ts`，带缓存与并发去重），
+`<DictTag code="common_status" :value="row.status" />` 直接渲染，颜色由 `tagType` 驱动。
+服务端缓存 5 分钟，字典维护接口写入后主动 `DictService::forget()`。
 
 ---
 
@@ -427,8 +436,8 @@ GET /admin/dict/all → 200 OK
 
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
-| GET | `/admin/params?group=security` | `sys:param:edit` | 按分组查询 |
-| PUT | `/admin/params` | `sys:param:edit` | 批量保存 `[{key, value}]` |
+| GET | `/admin/params?group=security` | `sys:param:list` | 按分组查询 |
+| PUT | `/admin/params` | `sys:param:update` | 批量保存 `[{key, value}]` |
 | GET | `/admin/params/public` | 公开 | 登录页需要的少量参数（系统名、Logo、页脚） |
 
 `is_secret = 1` 的参数**只写不读**：查询时返回掩码 `******`，保存时值为掩码则跳过更新。
@@ -439,10 +448,10 @@ GET /admin/dict/all → 200 OK
 
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
-| GET | `/admin/logs/operation` | `sys:log:list` | 操作日志，必带时间范围 |
-| GET | `/admin/logs/operation/{id}` | `sys:log:list` | 详情，含字段级变更 |
-| GET | `/admin/logs/login` | `sys:log:list` | 登录日志 |
-| GET | `/admin/logs/operation/export` | `sys:log:export` | 导出（导出行为本身也记日志） |
+| GET | `/admin/logs/operation` | `sys:log:operation:list` | 操作日志，必带时间范围 |
+| GET | `/admin/logs/operation/{id}` | `sys:log:operation:list` | 详情，含字段级变更 |
+| GET | `/admin/logs/login` | `sys:log:login:list` | 登录日志 |
+| GET | `/admin/logs/operation/export` | `sys:log:operation:export` | 导出（导出行为本身也记日志） |
 
 时间范围为**必填**，未传时后端默认最近 7 天，避免全表扫描。
 

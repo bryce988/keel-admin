@@ -20,8 +20,8 @@ services:
       - "${PORT_MYSQL:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      # 首次启动自动执行，建表 + 基础数据（不含管理员，由 install 脚本创建）
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+      # 首次启动自动建表；已有数据卷时由 server 的 scripts/migrate.php 兜底对齐
+      - ./server/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD:-root123456}"]
       interval: 5s
@@ -73,6 +73,7 @@ services:
       CAPTCHA_TTL: ${CAPTCHA_TTL:-120}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      SEED_DEMO: ${SEED_DEMO:-1}          # 开发环境默认播演示账号，用于验证数据权限
       TZ: Asia/Shanghai
       COMPOSER_ALLOW_SUPERUSER: 1
     ports:

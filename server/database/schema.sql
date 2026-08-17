@@ -126,11 +126,126 @@ CREATE TABLE IF NOT EXISTS `sys_login_logs` (
   KEY `idx_username_time` (`username`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录日志';
 
+
+-- ---------------------------------------------------------------- 岗位
+CREATE TABLE IF NOT EXISTS `sys_posts` (
+  `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`            VARCHAR(64)     NOT NULL                COMMENT '名称',
+  `code`            VARCHAR(64)     NOT NULL                COMMENT '编码',
+  `dept_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '所属部门，0=全公司通用',
+  `default_role_id` BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '入职时带出的默认角色',
+  `sort`            INT             NOT NULL DEFAULT 0      COMMENT '排序，值越小越靠前',
+  `status`          TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1启用',
+  `remark`          VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '备注',
+  `created_at`      DATETIME        NOT NULL                COMMENT '创建时间',
+  `updated_at`      DATETIME        NOT NULL                COMMENT '更新时间',
+  `deleted_at`      DATETIME        NULL                    COMMENT '删除时间，NULL 表示未删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`),
+  KEY `idx_dept` (`dept_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='岗位';
+
+-- ---------------------------------------------------------------- 角色自定义数据范围
+CREATE TABLE IF NOT EXISTS `sys_role_depts` (
+  `role_id` BIGINT UNSIGNED NOT NULL COMMENT '角色 ID',
+  `dept_id` BIGINT UNSIGNED NOT NULL COMMENT '部门 ID',
+  PRIMARY KEY (`role_id`, `dept_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色自定义数据范围（data_scope=5 时生效）';
+
+-- ---------------------------------------------------------------- 字段级权限
+CREATE TABLE IF NOT EXISTS `sys_role_fields` (
+  `id`       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `role_id`  BIGINT UNSIGNED NOT NULL                COMMENT '角色 ID',
+  `object`   VARCHAR(64)     NOT NULL                COMMENT '对象标识，通常为表名，如 sys_users',
+  `field`    VARCHAR(64)     NOT NULL                COMMENT '字段名，如 phone',
+  `visible`  TINYINT(1)      NOT NULL DEFAULT 1      COMMENT '0=接口返回脱敏值或不返回',
+  `editable` TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '是否可编辑，0=只读',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_role_field` (`role_id`, `object`, `field`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='字段级权限';
+
+-- ---------------------------------------------------------------- 数据字典
+CREATE TABLE IF NOT EXISTS `sys_dict_types` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`       VARCHAR(64)     NOT NULL                COMMENT '字典名称，如 通用状态',
+  `code`       VARCHAR(64)     NOT NULL                COMMENT '字典编码，如 common_status',
+  `remark`     VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '备注',
+  `status`     TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1启用',
+  `created_at` DATETIME        NOT NULL                COMMENT '创建时间',
+  `updated_at` DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='字典类型';
+
+CREATE TABLE IF NOT EXISTS `sys_dict_items` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `type_code`  VARCHAR(64)     NOT NULL                COMMENT '关联 sys_dict_types.code',
+  `label`      VARCHAR(64)     NOT NULL                COMMENT '显示文案',
+  `value`      VARCHAR(64)     NOT NULL                COMMENT '存储值，一经使用不可修改',
+  `tag_type`   VARCHAR(16)     NOT NULL DEFAULT ''     COMMENT 'success/warning/danger/primary/info，驱动标签颜色',
+  `sort`       INT             NOT NULL DEFAULT 0      COMMENT '排序，值越小越靠前',
+  `status`     TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1启用',
+  `remark`     VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '备注',
+  `created_at` DATETIME        NOT NULL                COMMENT '创建时间',
+  `updated_at` DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_type_value` (`type_code`, `value`),
+  KEY `idx_type` (`type_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='字典项';
+
+-- ---------------------------------------------------------------- 系统参数
+CREATE TABLE IF NOT EXISTS `sys_params` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `group`       VARCHAR(32)     NOT NULL DEFAULT 'basic' COMMENT 'basic/security/integration/advanced',
+  `name`        VARCHAR(64)     NOT NULL                COMMENT '名称',
+  `param_key`   VARCHAR(128)    NOT NULL                COMMENT '参数键，如 sys.upload.maxSize',
+  `param_value` TEXT            NOT NULL                COMMENT '参数值',
+  `value_type`  VARCHAR(16)     NOT NULL DEFAULT 'string' COMMENT 'string/int/bool/json',
+  `is_builtin`  TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '内置参数不可删除，只可改值',
+  `is_secret`   TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '密钥类，只写不读，界面显示掩码',
+  `remark`      VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '备注',
+  `updater_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '最后修改人',
+  `created_at`  DATETIME        NOT NULL                COMMENT '创建时间',
+  `updated_at`  DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_param_key` (`param_key`),
+  KEY `idx_group` (`group`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统参数';
+
+-- ---------------------------------------------------------------- 操作日志
+CREATE TABLE IF NOT EXISTS `sys_operation_logs` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `trace_id`   VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '链路追踪 ID，与响应体一致',
+  `user_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '用户 ID',
+  `username`   VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '冗余存储，用户改名后日志仍可读',
+  `dept_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '操作人部门，日志本身也受数据权限约束',
+  `module`     VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '模块名，如 系统管理/用户',
+  `action`     TINYINT         NOT NULL                COMMENT '1新增 2修改 3删除 4导出 5授权 6其他',
+  `title`      VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '操作描述',
+  `target`     VARCHAR(128)    NOT NULL DEFAULT ''     COMMENT '操作对象标识',
+  `api_method` VARCHAR(10)     NOT NULL DEFAULT ''     COMMENT '请求方法',
+  `api_path`   VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '请求路径',
+  `ip`         VARCHAR(45)     NOT NULL DEFAULT ''     COMMENT '来源 IP',
+  `user_agent` VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '客户端标识',
+  `params`     JSON            NULL                    COMMENT '请求参数，密码等字段已脱敏',
+  `changes`    JSON            NULL                    COMMENT '字段级变更 [{field,old,new}]，只记变化的字段',
+  `status`     TINYINT(1)      NOT NULL DEFAULT 1      COMMENT '1成功 0失败',
+  `error_msg`  VARCHAR(500)    NOT NULL DEFAULT ''     COMMENT '失败原因',
+  `duration`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '耗时毫秒',
+  `created_at` DATETIME        NOT NULL                COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_time` (`user_id`, `created_at`),
+  KEY `idx_trace` (`trace_id`),
+  KEY `idx_created` (`created_at`),
+  KEY `idx_module` (`module`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志';
+
 -- ---------------------------------------------------------------- 基础数据
+-- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）
 INSERT INTO `sys_depts` (`id`,`parent_id`,`ancestors`,`name`,`code`,`sort`,`created_at`,`updated_at`) VALUES
-  (1, 0, '0',   '总公司',   'DEPT-ROOT', 1, NOW(), NOW()),
-  (2, 1, '0,1', '技术部',   'DEPT-TECH', 1, NOW(), NOW()),
-  (3, 1, '0,1', '运营部',   'DEPT-OPS',  2, NOW(), NOW())
+  (1, 0, '0',   '总公司', 'DEPT-ROOT', 1, NOW(), NOW()),
+  (2, 1, '0,1', '技术部', 'DEPT-TECH', 1, NOW(), NOW()),
+  (3, 1, '0,1', '运营部', 'DEPT-OPS',  2, NOW(), NOW())
 ON DUPLICATE KEY UPDATE `updated_at` = NOW();
 
 INSERT INTO `sys_roles` (`id`,`name`,`code`,`data_scope`,`is_builtin`,`sort`,`remark`,`created_at`,`updated_at`) VALUES
@@ -138,17 +253,3 @@ INSERT INTO `sys_roles` (`id`,`name`,`code`,`data_scope`,`is_builtin`,`sort`,`re
   (2, '部门主管',   'ROLE_DEPT_MGR', 2, 0, 2, '可见本部门及下属部门数据',             NOW(), NOW()),
   (3, '普通员工',   'ROLE_STAFF',    4, 0, 3, '仅可见本人数据',                       NOW(), NOW())
 ON DUPLICATE KEY UPDATE `updated_at` = NOW();
-
--- 菜单：登录后前端据此渲染侧边栏
-INSERT INTO `sys_permissions`
-  (`id`,`parent_id`,`name`,`type`,`perm_code`,`path`,`component`,`icon`,`visible`,`sort`,`created_at`,`updated_at`) VALUES
-  (1, 0, '概览',     1, 'sys:dashboard',      '/',          'Layout',                      'Odometer', 1, 10, NOW(), NOW()),
-  (2, 1, '系统概览', 2, 'sys:dashboard:view', '/dashboard', 'views/dashboard/index.vue',   'Odometer', 1, 10, NOW(), NOW()),
-  (3, 0, '系统管理', 1, 'sys',                '/system',    'Layout',                      'Setting',  1, 90, NOW(), NOW()),
-  (4, 3, '用户管理', 2, 'sys:user:list',      '/system/user', 'views/system/user/index.vue', 'User',   1, 10, NOW(), NOW())
-ON DUPLICATE KEY UPDATE `updated_at` = NOW();
-
--- 部门主管、普通员工先给到概览
-INSERT INTO `sys_role_permissions` (`role_id`,`permission_id`) VALUES
-  (2,1),(2,2),(3,1),(3,2)
-ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);

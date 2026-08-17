@@ -14,4 +14,5 @@
 
 return [
     support\bootstrap\Session::class,
+    app\common\bootstrap\Database::class,   // Eloquent 连接与事件分发器
 ];

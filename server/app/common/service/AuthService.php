@@ -90,7 +90,11 @@ class AuthService
             throw new UnauthorizedException('账号已被停用，请联系管理员', 20002);
         }
 
-        return (array) $user;
+        $row = (array) $user;
+        // 密码哈希不进请求上下文：Ctx 里的东西会被日志、调试面板顺手打印出来
+        unset($row['password']);
+
+        return $row;
     }
 
     /** 当前用户的资料 + 角色 + 权限 + 菜单树 */
@@ -106,8 +110,10 @@ class AuthService
             ->pluck('r.code')
             ->toArray();
 
+        // 权限点走 PermissionService，与鉴权中间件共用同一份缓存，避免两处逻辑漂移
+        $permissions = PermissionService::codesOf($user);
+
         if ($isSuper) {
-            $permissions = ['*'];
             $nodes = Db::table('sys_permissions')->where('status', 1)->orderBy('sort')->get()->toArray();
             $dataScope = 1;
         } else {
@@ -121,11 +127,6 @@ class AuthService
                 ->orderBy('p.sort')
                 ->get()
                 ->toArray();
-
-            $permissions = array_values(array_unique(array_column(
-                array_map(fn ($n) => (array) $n, $nodes),
-                'perm_code'
-            )));
 
             // 多角色取范围最大者（data_scope 数值越小范围越大）
             $dataScope = (int) (Db::table('sys_user_roles as ur')
@@ -185,7 +186,9 @@ class AuthService
 
     public static function changePassword(array $user, string $oldPassword, string $newPassword): void
     {
-        if (!password_verify($oldPassword, $user['password'])) {
+        $hash = (string) Db::table('sys_users')->where('id', $user['id'])->value('password');
+
+        if (!password_verify($oldPassword, $hash)) {
             throw new BusinessException('原密码错误', 20005);
         }
         if (strlen($newPassword) < 8) {

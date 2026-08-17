@@ -11,12 +11,16 @@ import './styles/index.css'
 import App from './App.vue'
 import router from './router'
 import { useAppStore } from './stores/app'
+import directives from './directives/permission'
+import components from './components'
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+app.use(directives) // v-permission / v-role
+app.use(components) // ProTable / SearchForm / DictSelect / DictTag
 
 // 图标全局注册：菜单的 icon 字段由后端下发，需要按名解析
 for (const [name, comp] of Object.entries(ElIcons)) {

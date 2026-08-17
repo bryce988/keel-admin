@@ -36,7 +36,9 @@ export const useUserStore = defineStore('user', {
   state: () => ({
     token: localStorage.getItem(TOKEN_KEY) || '',
     profile: null as Profile | null,
-    loaded: false
+    loaded: false,
+    /** 菜单驱动的动态路由是否已注册，由 router/index.ts 维护 */
+    routesLoaded: false
   }),
 
   getters: {
@@ -87,6 +89,7 @@ export const useUserStore = defineStore('user', {
       this.token = ''
       this.profile = null
       this.loaded = false
+      this.routesLoaded = false
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(REFRESH_KEY)
     },

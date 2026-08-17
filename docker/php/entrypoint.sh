@@ -44,8 +44,14 @@ fi
 # ------------------------------------------------------------------
 # 初始化：建管理员账号（幂等，已存在则跳过）
 # ------------------------------------------------------------------
+echo "▸ 对齐表结构..."
+php scripts/migrate.php || { echo "✗ 建表失败，服务无法启动"; exit 1; }
+
 echo "▸ 检查初始化数据..."
 php scripts/install.php || echo "  初始化脚本执行失败，可稍后手动运行：docker compose exec server php scripts/install.php"
+
+# 权限点、字典、参数等结构性数据（幂等，每次启动都对齐一次）
+php scripts/seed.php ${SEED_DEMO:+--demo} || echo "  播种脚本执行失败，可稍后手动运行：docker compose exec server php scripts/seed.php"
 
 echo "▸ 启动 webman（调试模式，改代码自动 reload）"
 exec php start.php start

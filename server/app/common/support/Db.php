@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace app\common\support;
 
+use Illuminate\Container\Container;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Events\Dispatcher;
 
 /**
  * Eloquent / 查询构造器入口
@@ -43,6 +45,10 @@ class Db
                 // Eloquent 自带断线重连检测，这里只保证超时不过长
             ],
         ]);
+
+        // 模型事件（creating / updating）依赖事件分发器，
+        // 不设置的话 HasAudit 里的回调会静默不执行——审计字段全是 0 且没有任何报错
+        $capsule->setEventDispatcher(new Dispatcher(new Container()));
 
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
