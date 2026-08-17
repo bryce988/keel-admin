@@ -11,22 +11,22 @@ import type { PageResult, TableQuery } from '@/components'
 export interface UserRow {
   id: number
   username: string
-  realName: string
+  real_name: string
   avatar: string
   phone: string
   email: string
-  deptId: number
-  deptName: string
-  postName: string
+  dept_id: number
+  dept_name: string
+  post_name: string
   status: number
-  isSuper: boolean
-  lastLoginAt: string | null
-  createdAt: string
+  is_super: boolean
+  last_login_at: string | null
+  created_at: string
 }
 
 export interface DeptNode {
   id: number
-  parentId: number
+  parent_id: number
   name: string
   code: string
   sort: number

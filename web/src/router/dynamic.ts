@@ -44,13 +44,15 @@ export function buildRoutes(menus: MenuNode[]): RouteRecordRaw[] {
       if (component && node.path) {
         routes.push({
           path: node.path.replace(/^\//, ''),
-          name: node.permCode || node.path,
+          name: node.perm_code || node.path,
           component,
+          // meta 是前端自己的结构，沿用 vue-router 的小驼峰惯例，
+          // 值来自接口的 snake_case 字段
           meta: {
             title: node.name,
             icon: node.icon,
-            permCode: node.permCode,
-            keepAlive: node.keepAlive,
+            permCode: node.perm_code,
+            keepAlive: node.keep_alive,
             // 详情页等 visible=0 的路由，高亮回它所属的分组
             parentTitle: parent?.name ?? ''
           }

@@ -11,7 +11,7 @@ use app\common\model\concern\HasDataScope;
  *
  * 登录失败也要写（含失败原因），连续失败锁定的审计依据就在这里。
  */
-class SysLoginLog extends BaseModel
+class SysLoginLogModel extends BaseModel
 {
     use HasDataScope;
 

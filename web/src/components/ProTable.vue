@@ -34,18 +34,19 @@ export interface ProColumn {
   hidden?: boolean
 }
 
+/** 接口结构，字段名与后端逐字一致（docs/api.md §1.3） */
 export interface PageResult<T = Record<string, any>> {
   list: T[]
   total: number
-  pageNum: number
-  pageSize: number
+  page_num: number
+  page_size: number
 }
 
 export interface TableQuery {
-  pageNum: number
-  pageSize: number
-  sortField?: string
-  sortOrder?: 'asc' | 'desc'
+  page_num: number
+  page_size: number
+  sort_field?: string
+  sort_order?: 'asc' | 'desc'
   [key: string]: unknown
 }
 
@@ -77,6 +78,7 @@ const total = ref(0)
 const selected = ref<Record<string, any>[]>([])
 const size = ref<'large' | 'default' | 'small'>('default')
 
+// 组件内部状态，用小驼峰；发请求时映射成接口的 snake_case
 const pager = reactive({
   pageNum: 1,
   pageSize: props.pageSize,
@@ -103,10 +105,10 @@ async function fetch() {
   try {
     const result = await props.request({
       ...(props.params ?? {}),
-      pageNum: pager.pageNum,
-      pageSize: pager.pageSize,
-      sortField: pager.sortField || undefined,
-      sortOrder: pager.sortOrder
+      page_num: pager.pageNum,
+      page_size: pager.pageSize,
+      sort_field: pager.sortField || undefined,
+      sort_order: pager.sortOrder
     })
 
     rows.value = result.list ?? []

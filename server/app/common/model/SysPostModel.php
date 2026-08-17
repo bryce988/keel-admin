@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * 岗位 ≠ 角色：只在新建用户时带出 default_role_id 作为默认值，之后两者不再联动。
  */
-class SysPost extends BaseModel
+class SysPostModel extends BaseModel
 {
     use SoftDeletes;
     use HasDataScope;

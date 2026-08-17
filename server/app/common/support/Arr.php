@@ -5,59 +5,21 @@ declare(strict_types=1);
 namespace app\common\support;
 
 /**
- * 键名转换
+ * 数组与字符串小工具
  *
- * 数据库用 snake_case，接口契约用 camelCase（docs/api.md §1.4）。
- * 转换只发生在「模型输出」与「入参映射」两个边界上，
- * 中间层一律用数据库的字段名，避免同一个字段出现两种写法。
+ * 这里**没有**驼峰/下划线转换函数：接口契约与数据库字段名统一用 snake_case，
+ * 全链路不做键名转换（docs/api.md §1.4）。要是哪天又冒出转换需求，
+ * 先确认是不是契约被改歪了，而不是在这里加个 helper 绕过去。
  */
 final class Arr
 {
-    /** 递归把数组键转成 camelCase，用于接口输出 */
-    public static function camelKeys(array $row): array
-    {
-        $out = [];
-        foreach ($row as $key => $value) {
-            $newKey = is_string($key) ? self::camel($key) : $key;
-            $out[$newKey] = is_array($value) ? self::camelKeys($value) : $value;
-        }
-
-        return $out;
-    }
-
-    /** 递归把数组键转成 snake_case，用于把前端入参映射到字段名 */
-    public static function snakeKeys(array $row): array
-    {
-        $out = [];
-        foreach ($row as $key => $value) {
-            $newKey = is_string($key) ? self::snake($key) : $key;
-            $out[$newKey] = is_array($value) ? self::snakeKeys($value) : $value;
-        }
-
-        return $out;
-    }
-
-    public static function camel(string $value): string
-    {
-        return lcfirst(str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $value))));
-    }
-
-    public static function snake(string $value): string
-    {
-        if (!preg_match('/[A-Z]/', $value)) {
-            return $value;
-        }
-
-        return strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $value));
-    }
-
-    /** 只取白名单内的键，用于「前端传什么就存什么」之外的显式字段映射 */
+    /** 只取白名单内的键，用于把入参映射到字段名 */
     public static function only(array $row, array $keys): array
     {
         return array_intersect_key($row, array_flip($keys));
     }
 
-    /** 手机号 138****8000 / 邮箱 a***@b.com / 身份证 保留首尾 */
+    /** 手机号 138****8000 / 身份证 保留首尾 */
     public static function mask(string $value, int $head = 3, int $tail = 4): string
     {
         $len = mb_strlen($value);

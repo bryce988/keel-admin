@@ -10,7 +10,7 @@ namespace app\common\model;
  * 菜单、按钮、接口、字段权限合并为一棵树，type 区分节点性质：
  * 1 目录 · 2 菜单 · 3 按钮 · 4 接口 · 5 数据(字段)
  */
-class SysPermission extends BaseModel
+class SysPermissionModel extends BaseModel
 {
     public const TYPE_DIR    = 1;
     public const TYPE_MENU   = 2;

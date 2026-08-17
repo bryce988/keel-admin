@@ -13,26 +13,27 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 const captchaImage = ref('')
 
+// form 直接作为登录接口的请求体，所以键名用 snake_case
 const form = reactive({
   username: 'admin',
   password: 'admin123',
-  captchaKey: '',
-  captchaCode: ''
+  captcha_key: '',
+  captcha_code: ''
 })
 
 const rules: FormRules = {
   username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+  captcha_code: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
 }
 
 async function loadCaptcha() {
-  const data = await request.get<unknown, { captchaKey: string; captchaImage: string }>(
+  const data = await request.get<unknown, { captcha_key: string; captcha_image: string }>(
     '/admin/auth/captcha'
   )
-  form.captchaKey = data.captchaKey
-  form.captchaCode = ''
-  captchaImage.value = data.captchaImage
+  form.captcha_key = data.captcha_key
+  form.captcha_code = ''
+  captchaImage.value = data.captcha_image
 }
 
 async function onSubmit() {
@@ -43,7 +44,7 @@ async function onSubmit() {
     const res = await userStore.login({ ...form })
     await userStore.fetchProfile()
 
-    if (res.mustChangePassword) {
+    if (res.must_change_password) {
       ElMessage.warning('您还未修改过初始密码，建议尽快修改')
     }
     ElMessage.success('登录成功')
@@ -86,9 +87,9 @@ onMounted(loadCaptcha)
           <el-input v-model="form.password" type="password" placeholder="密码" show-password />
         </el-form-item>
 
-        <el-form-item prop="captchaCode">
+        <el-form-item prop="captcha_code">
           <div class="captcha-row">
-            <el-input v-model="form.captchaCode" placeholder="验证码" maxlength="4" />
+            <el-input v-model="form.captcha_code" placeholder="验证码" maxlength="4" />
             <img
               v-if="captchaImage"
               :src="captchaImage"

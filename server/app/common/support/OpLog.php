@@ -28,7 +28,7 @@ final class OpLog
     /**
      * 比对前后快照，只记真正变化的字段
      *
-     * @param  array  $before  修改前（数据库原始键名，用 $model->toRaw()）
+     * @param  array  $before  修改前的快照，用 $model->toArray()
      * @param  array  $after   修改后
      * @param  array  $ignore  不记录的字段，默认排除时间戳与密码
      */

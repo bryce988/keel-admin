@@ -4,7 +4,7 @@ import request from '@/utils/request'
 export interface DictItem {
   label: string
   value: string
-  tagType: string
+  tag_type: string
 }
 
 /**

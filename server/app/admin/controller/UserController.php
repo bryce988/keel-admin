@@ -24,7 +24,7 @@ class UserController
         $filters = Validator::make($request->all(), [
             'keyword' => ['string|max:64', '关键词'],
             'status'  => ['in:0,1,2',      '状态'],
-            'deptId'  => ['int|min:1',     '部门'],
+            'dept_id' => ['int|min:1',     '部门'],
         ])->validated();
 
         return Paginator::response(

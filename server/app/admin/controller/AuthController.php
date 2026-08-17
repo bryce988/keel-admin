@@ -32,19 +32,19 @@ class AuthController
     {
         $username    = trim((string) $request->post('username', ''));
         $password    = (string) $request->post('password', '');
-        $captchaKey  = (string) $request->post('captchaKey', '');
-        $captchaCode = (string) $request->post('captchaCode', '');
+        $captchaKey  = (string) $request->post('captcha_key', '');
+        $captchaCode = (string) $request->post('captcha_code', '');
 
         $errors = [];
         if ($username === '')    { $errors['username'] = ['请输入账号']; }
         if ($password === '')    { $errors['password'] = ['请输入密码']; }
-        if ($captchaCode === '') { $errors['captchaCode'] = ['请输入验证码']; }
+        if ($captchaCode === '') { $errors['captcha_code'] = ['请输入验证码']; }
         if ($errors) {
             throw new ValidationException($errors);
         }
 
         if (!CaptchaService::verify($captchaKey, $captchaCode)) {
-            throw new ValidationException(['captchaCode' => ['验证码错误或已过期']]);
+            throw new ValidationException(['captcha_code' => ['验证码错误或已过期']]);
         }
 
         $tokens = AuthService::login(
@@ -87,9 +87,9 @@ class AuthController
     /** POST /admin/auth/refresh */
     public function refresh(Request $request): Response
     {
-        $refreshToken = (string) $request->post('refreshToken', '');
+        $refreshToken = (string) $request->post('refresh_token', '');
         if ($refreshToken === '') {
-            throw new ValidationException(['refreshToken' => ['缺少刷新凭证']]);
+            throw new ValidationException(['refresh_token' => ['缺少刷新凭证']]);
         }
 
         $payload = JwtService::decode($refreshToken);
@@ -105,8 +105,8 @@ class AuthController
     /** PUT /admin/profile/password */
     public function changePassword(Request $request): Response
     {
-        $old = (string) $request->post('oldPassword', '');
-        $new = (string) $request->post('newPassword', '');
+        $old = (string) $request->post('old_password', '');
+        $new = (string) $request->post('new_password', '');
 
         AuthService::changePassword(Ctx::user() ?? [], $old, $new);
         JwtService::revoke((string) Ctx::get('jti', ''));   // 改密后当前 token 失效

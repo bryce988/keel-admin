@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
-use app\common\model\SysUser;
+use app\common\model\SysUserModel;
 use app\common\support\Arr;
 use app\common\support\Ctx;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * 用户查询
  *
- * ⚠️ 这里**没有**任何 `where dept_id in (...)`——数据权限由 SysUser 的全局 Scope 注入。
+ * ⚠️ 这里**没有**任何 `where dept_id in (...)`——数据权限由 SysUserModel 的全局 Scope 注入。
  * 想验证效果：换个部门主管账号调同一个接口，返回的行数会自己变少。
  */
 class UserService
@@ -28,7 +28,7 @@ class UserService
 
     public static function listQuery(array $filters): Builder
     {
-        $query = SysUser::query()->with(['dept:id,name', 'post:id,name']);
+        $query = SysUserModel::query()->with(['dept:id,name', 'post:id,name']);
 
         $query->keyword($filters['keyword'] ?? null);
 
@@ -37,8 +37,8 @@ class UserService
         }
 
         // 按部门筛选时连同下级一起：树上点父节点却只看到父节点的人不符合直觉
-        if (!empty($filters['deptId'])) {
-            $query->whereIn('dept_id', DeptService::subtreeIds((int) $filters['deptId']));
+        if (!empty($filters['dept_id'])) {
+            $query->whereIn('dept_id', DeptService::subtreeIds((int) $filters['dept_id']));
         }
 
         return $query;
@@ -58,25 +58,21 @@ class UserService
             $allowed[$field] = PermissionService::has($user, $permCode);
         }
 
-        return function (SysUser $row) use ($allowed): array {
-            $item = [
-                'id'          => $row->id,
-                'username'    => $row->username,
-                'realName'    => $row->real_name,
-                'avatar'      => $row->avatar,
-                'phone'       => $allowed['phone'] ? $row->phone : Arr::mask((string) $row->phone),
-                'email'       => $allowed['email'] ? $row->email : self::maskEmail((string) $row->email),
-                'deptId'      => $row->dept_id,
-                'deptName'    => $row->dept?->name ?? '',
-                'postName'    => $row->post?->name ?? '',
-                'status'      => $row->status,
-                'isSuper'     => $row->is_super,
-                'lastLoginAt' => $row->last_login_at?->format('Y-m-d H:i:s'),
-                'createdAt'   => $row->created_at?->format('Y-m-d H:i:s'),
-            ];
-
-            return $item;
-        };
+        return fn (SysUserModel $row): array => [
+            'id'            => $row->id,
+            'username'      => $row->username,
+            'real_name'     => $row->real_name,
+            'avatar'        => $row->avatar,
+            'phone'         => $allowed['phone'] ? $row->phone : Arr::mask((string) $row->phone),
+            'email'         => $allowed['email'] ? $row->email : self::maskEmail((string) $row->email),
+            'dept_id'       => $row->dept_id,
+            'dept_name'     => $row->dept?->name ?? '',
+            'post_name'     => $row->post?->name ?? '',
+            'status'        => $row->status,
+            'is_super'      => $row->is_super,
+            'last_login_at' => $row->last_login_at?->format('Y-m-d H:i:s'),
+            'created_at'    => $row->created_at?->format('Y-m-d H:i:s'),
+        ];
     }
 
     private static function maskEmail(string $email): string

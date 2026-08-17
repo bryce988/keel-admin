@@ -11,8 +11,9 @@ use support\Response;
  *
  * 约定见 docs/api.md §1.2：
  * - 成功只有 2xx，直接返回数据本体，不包 code 信封
- * - 错误返回 4xx/5xx + { code, message, traceId }
- * - 所有响应写入 X-Trace-Id 响应头
+ * - 错误返回 4xx/5xx + { code, message, trace_id }
+ * - 字段名一律 snake_case，与数据库字段名一致
+ * - 所有响应写入 X-Trace-Id 响应头（HTTP 头保持惯用的中划线写法）
  */
 class Result
 {
@@ -38,10 +39,10 @@ class Result
     public static function page(array $list, int $total, int $pageNum, int $pageSize): Response
     {
         return self::json(200, [
-            'list'     => $list,
-            'total'    => $total,
-            'pageNum'  => $pageNum,
-            'pageSize' => $pageSize,
+            'list'      => $list,
+            'total'     => $total,
+            'page_num'  => $pageNum,
+            'page_size' => $pageSize,
         ]);
     }
 
@@ -49,9 +50,9 @@ class Result
     public static function error(int $status, int $code, string $message, ?array $details = null): Response
     {
         $body = [
-            'code'    => $code,
-            'message' => $message,
-            'traceId' => Ctx::traceId(),
+            'code'     => $code,
+            'message'  => $message,
+            'trace_id' => Ctx::traceId(),
         ];
         if ($details !== null) {
             $body['details'] = $details;

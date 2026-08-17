@@ -20,7 +20,7 @@ const tableRef = ref<{ reload: () => void; refresh: () => void } | null>(null)
 const query = reactive<Record<string, unknown>>({
   keyword: '',
   status: '',
-  deptId: ''
+  dept_id: ''
 })
 
 const searchFields: SearchField[] = [
@@ -28,15 +28,16 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'user_status', numeric: true }
 ]
 
+// prop 是接口返回的字段名，因此是 snake_case
 const columns: ProColumn[] = [
   { prop: 'username', label: '账号', minWidth: 120, sortable: true, fixed: 'left' },
-  { prop: 'realName', label: '姓名', minWidth: 100 },
-  { prop: 'deptName', label: '部门', minWidth: 110 },
-  { prop: 'postName', label: '岗位', minWidth: 120 },
+  { prop: 'real_name', label: '姓名', minWidth: 100 },
+  { prop: 'dept_name', label: '部门', minWidth: 110 },
+  { prop: 'post_name', label: '岗位', minWidth: 120 },
   { prop: 'phone', label: '手机号', minWidth: 130 },
   { prop: 'email', label: '邮箱', minWidth: 180, hidden: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'user_status' },
-  { prop: 'lastLoginAt', label: '最后登录', minWidth: 160, sortable: true },
+  { prop: 'last_login_at', label: '最后登录', minWidth: 160, sortable: true },
   { prop: 'actions', label: '操作', width: 160, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -55,7 +56,7 @@ async function loadDeptTree() {
 
 function onDeptClick(node: DeptNode) {
   // 再点一次已选中的部门 = 取消筛选
-  query.deptId = query.deptId === node.id ? '' : node.id
+  query.dept_id = query.dept_id === node.id ? '' : node.id
   tableRef.value?.reload()
 }
 
@@ -80,7 +81,7 @@ function notImplemented(action: string) {
         node-key="id"
         default-expand-all
         :expand-on-click-node="false"
-        :current-node-key="query.deptId || undefined"
+        :current-node-key="query.dept_id || undefined"
         highlight-current
         @node-click="onDeptClick"
       />
@@ -116,7 +117,7 @@ function notImplemented(action: string) {
             v-permission="'sys:user:resetPwd'"
             link
             type="primary"
-            :disabled="row.isSuper"
+            :disabled="row.is_super"
             @click="notImplemented('重置密码')"
           >
             重置密码

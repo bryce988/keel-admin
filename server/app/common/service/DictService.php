@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace app\common\service;
 
 use app\common\exception\NotFoundException;
-use app\common\model\SysDictItem;
-use app\common\model\SysDictType;
+use app\common\model\SysDictItemModel;
+use app\common\model\SysDictTypeModel;
 use app\common\support\Cache;
 
 /**
@@ -28,18 +28,18 @@ class DictService
             return json_decode($cached, true) ?: [];
         }
 
-        if (!SysDictType::where('code', $code)->where('status', 1)->exists()) {
+        if (!SysDictTypeModel::where('code', $code)->where('status', 1)->exists()) {
             throw new NotFoundException('字典不存在或已停用');
         }
 
-        $items = SysDictItem::where('type_code', $code)
+        $items = SysDictItemModel::where('type_code', $code)
             ->where('status', 1)
             ->orderBy('sort')
             ->get()
-            ->map(fn (SysDictItem $item) => [
-                'label'   => $item->label,
-                'value'   => $item->value,
-                'tagType' => $item->tag_type,
+            ->map(fn (SysDictItemModel $item) => [
+                'label'    => $item->label,
+                'value'    => $item->value,
+                'tag_type' => $item->tag_type,
             ])
             ->all();
 

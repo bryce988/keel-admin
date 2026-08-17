@@ -29,8 +29,8 @@ class CaptchaService
         Cache::set($key, strtolower($code), Env::int('CAPTCHA_TTL', 120));
 
         return [
-            'captchaKey'   => $key,
-            'captchaImage' => 'data:image/svg+xml;base64,' . base64_encode(self::render($code)),
+            'captcha_key'   => $key,
+            'captcha_image' => 'data:image/svg+xml;base64,' . base64_encode(self::render($code)),
         ];
     }
 

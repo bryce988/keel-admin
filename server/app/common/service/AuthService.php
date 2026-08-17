@@ -74,7 +74,7 @@ class AuthService
         $tokens = JwtService::issue((int) $user->id, (int) $user->perm_version);
 
         // 密码从未修改过 → 强制首次登录改密
-        $tokens['mustChangePassword'] = $user->pwd_updated_at === null;
+        $tokens['must_change_password'] = $user->pwd_updated_at === null;
 
         return $tokens;
     }
@@ -141,17 +141,17 @@ class AuthService
 
         return [
             'user' => [
-                'id'       => (int) $user['id'],
-                'username' => $user['username'],
-                'realName' => $user['real_name'],
-                'avatar'   => $user['avatar'],
-                'deptId'   => (int) $user['dept_id'],
-                'deptName' => $dept->name ?? '',
-                'isSuper'  => $isSuper,
+                'id'        => (int) $user['id'],
+                'username'  => $user['username'],
+                'real_name' => $user['real_name'],
+                'avatar'    => $user['avatar'],
+                'dept_id'   => (int) $user['dept_id'],
+                'dept_name' => $dept->name ?? '',
+                'is_super'  => $isSuper,
             ],
             'roles'       => $roles,
             'permissions' => $permissions,
-            'dataScope'   => $dataScope,
+            'data_scope'  => $dataScope,
             'menus'       => self::buildMenuTree(array_map(fn ($n) => (array) $n, $nodes)),
         ];
     }
@@ -166,14 +166,14 @@ class AuthService
             }
             $children = self::buildMenuTree($nodes, (int) $node['id']);
             $item = [
-                'id'        => (int) $node['id'],
-                'name'      => $node['name'],
-                'path'      => $node['path'],
-                'component' => $node['component'],
-                'icon'      => $node['icon'],
-                'permCode'  => $node['perm_code'],
-                'visible'   => (bool) $node['visible'],
-                'keepAlive' => (bool) $node['keep_alive'],
+                'id'         => (int) $node['id'],
+                'name'       => $node['name'],
+                'path'       => $node['path'],
+                'component'  => $node['component'],
+                'icon'       => $node['icon'],
+                'perm_code'  => $node['perm_code'],
+                'visible'    => (bool) $node['visible'],
+                'keep_alive' => (bool) $node['keep_alive'],
             ];
             if ($children) {
                 $item['children'] = $children;

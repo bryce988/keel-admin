@@ -6,14 +6,15 @@ import { ElMessage } from 'element-plus'
  *
  * 契约见 docs/api.md §1.2：
  * - 成功只有 2xx，响应体就是数据本体，不含 code 信封
- * - 错误走 4xx/5xx，响应体为 { code, message, traceId, details? }
+ * - 错误走 4xx/5xx，响应体为 { code, message, trace_id, details? }
+ * - 接口字段一律 snake_case；BizError 是前端自己的对象，属性用小驼峰
  * 因此这里的判断顺序是：先看 HTTP 状态码（网络/服务层），再看业务码（细化交互）
  */
 
 export interface ApiError {
   code: number
   message: string
-  traceId: string
+  trace_id: string
   details?: Record<string, string[]>
 }
 
@@ -61,7 +62,7 @@ request.interceptors.response.use(
     }
 
     const { status, data } = err.response
-    const { code = 0, message = '请求失败', traceId = '', details } = data ?? {}
+    const { code = 0, message = '请求失败', trace_id: traceId = '', details } = data ?? {}
 
     switch (status) {
       case 401:

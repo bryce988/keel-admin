@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * ancestors 存祖级路径（如 '0,1,3'），数据权限「本部门及下属」靠它一条 SQL 取整棵子树。
  * 移动部门时必须同步刷新所有子孙的 ancestors。
  */
-class SysDept extends BaseModel
+class SysDeptModel extends BaseModel
 {
     use SoftDeletes;
     use HasDataScope;
@@ -46,7 +46,7 @@ class SysDept extends BaseModel
 
     public function users(): HasMany
     {
-        return $this->hasMany(SysUser::class, 'dept_id');
+        return $this->hasMany(SysUserModel::class, 'dept_id');
     }
 
     /** 本节点作为父级时，子孙的 ancestors 前缀 */

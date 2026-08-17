@@ -1,15 +1,19 @@
 import { defineStore } from 'pinia'
 import request from '@/utils/request'
 
+/**
+ * 接口数据结构一律 snake_case，与后端字段名逐字一致（docs/api.md §1.4）。
+ * 只有 TS 变量、组件 props、store getter 这类**前端自己的标识符**才用小驼峰。
+ */
 export interface MenuNode {
   id: number
   name: string
   path: string
   component: string
   icon: string
-  permCode: string
+  perm_code: string
   visible: boolean
-  keepAlive: boolean
+  keep_alive: boolean
   children?: MenuNode[]
 }
 
@@ -17,15 +21,15 @@ export interface Profile {
   user: {
     id: number
     username: string
-    realName: string
+    real_name: string
     avatar: string
-    deptId: number
-    deptName: string
-    isSuper: boolean
+    dept_id: number
+    dept_name: string
+    is_super: boolean
   }
   roles: string[]
   permissions: string[]
-  dataScope: number
+  data_scope: number
   menus: MenuNode[]
 }
 
@@ -42,8 +46,8 @@ export const useUserStore = defineStore('user', {
   }),
 
   getters: {
-    nickname: (s) => s.profile?.user.realName || s.profile?.user.username || '',
-    isSuper: (s) => s.profile?.user.isSuper ?? false,
+    nickname: (s) => s.profile?.user.real_name || s.profile?.user.username || '',
+    isSuper: (s) => s.profile?.user.is_super ?? false,
     menus: (s) => s.profile?.menus ?? []
   },
 
@@ -51,17 +55,22 @@ export const useUserStore = defineStore('user', {
     async login(payload: {
       username: string
       password: string
-      captchaKey: string
-      captchaCode: string
+      captcha_key: string
+      captcha_code: string
     }) {
       const data = await request.post<
         unknown,
-        { accessToken: string; refreshToken: string; expiresIn: number; mustChangePassword: boolean }
+        {
+          access_token: string
+          refresh_token: string
+          expires_in: number
+          must_change_password: boolean
+        }
       >('/admin/auth/login', payload)
 
-      this.token = data.accessToken
-      localStorage.setItem(TOKEN_KEY, data.accessToken)
-      localStorage.setItem(REFRESH_KEY, data.refreshToken)
+      this.token = data.access_token
+      localStorage.setItem(TOKEN_KEY, data.access_token)
+      localStorage.setItem(REFRESH_KEY, data.refresh_token)
 
       return data
     },

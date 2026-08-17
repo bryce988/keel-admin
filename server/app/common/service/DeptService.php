@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
-use app\common\model\SysDept;
+use app\common\model\SysDeptModel;
 
 /**
  * 部门查询
@@ -14,14 +14,14 @@ class DeptService
     /** 某个部门及其所有下级的 id，走 ancestors 前缀匹配 */
     public static function subtreeIds(int $deptId): array
     {
-        $dept = SysDept::find($deptId);
+        $dept = SysDeptModel::find($deptId);
         if (!$dept) {
             return [$deptId];
         }
 
         $prefix = $dept->descendantPrefix();
 
-        return SysDept::query()
+        return SysDeptModel::query()
             ->where(function ($q) use ($deptId, $prefix) {
                 $q->where('id', $deptId)
                     ->orWhere('ancestors', $prefix)
@@ -35,16 +35,16 @@ class DeptService
     /** 部门树，供筛选面板与表单的级联选择使用 */
     public static function tree(): array
     {
-        $rows = SysDept::query()
+        $rows = SysDeptModel::query()
             ->where('status', 1)
             ->orderBy('sort')
             ->get()
-            ->map(fn (SysDept $d) => [
-                'id'       => $d->id,
-                'parentId' => $d->parent_id,
-                'name'     => $d->name,
-                'code'     => $d->code,
-                'sort'     => $d->sort,
+            ->map(fn (SysDeptModel $d) => [
+                'id'        => $d->id,
+                'parent_id' => $d->parent_id,
+                'name'      => $d->name,
+                'code'      => $d->code,
+                'sort'      => $d->sort,
             ])
             ->all();
 
@@ -55,7 +55,7 @@ class DeptService
     {
         $tree = [];
         foreach ($rows as $row) {
-            if ($row['parentId'] !== $parentId) {
+            if ($row['parent_id'] !== $parentId) {
                 continue;
             }
             $children = self::buildTree($rows, $row['id']);

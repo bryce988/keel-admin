@@ -18,7 +18,7 @@
 | 开放平台（二期） | `/open` |
 | 内容类型 | `application/json; charset=utf-8` |
 | 鉴权头 | `Authorization: Bearer <access_token>` |
-| 追踪 | 每个响应含 `traceId`，报障时提供它即可定位日志 |
+| 追踪 | 每个响应含 `trace_id`，报障时提供它即可定位日志 |
 
 ### 1.2 响应体
 
@@ -31,7 +31,7 @@ HTTP/1.1 200 OK
 X-Trace-Id: TRC-8f21c4d9
 ```
 ```json
-{ "id": 12, "username": "zhangming", "realName": "张明" }
+{ "id": 12, "username": "zhangming", "real_name": "张明" }
 ```
 
 | 场景 | 状态码 | 响应体 |
@@ -50,7 +50,7 @@ X-Trace-Id: TRC-8f21c4d9
 {
   "code": 20101,
   "message": "账号已存在",
-  "traceId": "TRC-8f21c4d9"
+  "trace_id": "TRC-8f21c4d9"
 }
 ```
 
@@ -63,14 +63,14 @@ HTTP/1.1 422 Unprocessable Entity
 {
   "code": 10422,
   "message": "参数校验失败",
-  "traceId": "TRC-...",
+  "trace_id": "TRC-...",
   "details": { "username": ["账号已存在"], "phone": ["格式不正确"] }
 }
 ```
 
 **两层结构**：HTTP 状态码表达**大类**（该重试还是该改参数、该跳登录还是该提权限），业务码表达**具体原因**（同是 409，是账号重复还是部门下有用户）。前端先按状态码分派，再按 `code` 细化提示。
 
-**`traceId` 走响应头 `X-Trace-Id`**，成功与失败都有；错误响应体里再带一份，方便用户直接截图报障。
+**`trace_id` 走响应头 `X-Trace-Id`**，成功与失败都有；错误响应体里再带一份，方便用户直接截图报障。
 
 **为什么不用「全 200 + code」**
 
@@ -86,7 +86,7 @@ HTTP/1.1 422 Unprocessable Entity
 请求（query）：
 
 ```
-?pageNum=1&pageSize=20&keyword=张&status=1&sortField=created_at&sortOrder=desc
+?page_num=1&page_size=20&keyword=张&status=1&sort_field=created_at&sort_order=desc
 ```
 
 响应（`200 OK`，直接返回列表结构，不包信封）：
@@ -95,12 +95,12 @@ HTTP/1.1 422 Unprocessable Entity
 {
   "list": [],
   "total": 248,
-  "pageNum": 1,
-  "pageSize": 20
+  "page_num": 1,
+  "page_size": 20
 }
 ```
 
-- `pageSize` 默认 20，最大 100，超出按 100 处理
+- `page_size` 默认 20，最大 100，超出按 100 处理
 - 排序字段必须在后端白名单内，不接受任意字段（防注入与全表扫描）
 - **C 端列表用游标分页**（`cursor` + `limit`），不用页码
 
@@ -115,7 +115,7 @@ instance.interceptors.response.use(res => res.data)
 // 失败：先按状态码分大类，再按业务码细化
 instance.interceptors.response.use(undefined, (err) => {
   const { status, data } = err.response ?? {}
-  const { code, message, traceId, details } = data ?? {}
+  const { code, message, trace_id, details } = data ?? {}
 
   if (!err.response)  return toast('网络异常，请稍后重试')        // 断网、超时
   switch (status) {
@@ -124,7 +124,7 @@ instance.interceptors.response.use(undefined, (err) => {
     case 404: toast('数据不存在或已被删除'); break
     case 422: showFieldErrors(details); break                    // 表单字段级回填
     case 429: toast(`操作过于频繁，请 ${err.response.headers['retry-after']} 秒后重试`); break
-    default:  toast(status >= 500 ? '服务暂时不可用' : message, traceId)
+    default:  toast(status >= 500 ? '服务暂时不可用' : message, trace_id)
   }
   return Promise.reject(err)
 })
@@ -134,6 +134,19 @@ instance.interceptors.response.use(undefined, (err) => {
 - 需要针对具体原因做特殊交互时（如 409 的"账号已存在"要聚焦到用户名输入框），才判断 `code`
 
 ### 1.4 其他约定
+
+**字段命名一律 `snake_case`**，请求与响应都是，与数据库字段名逐字一致：`is_super` 不写 `isSuper`。
+
+这样全链路只有一个名字——数据库、日志、接口文档、前端类型定义、浏览器 Network 面板里看到的都是同一个词，
+排查问题时不用在两种写法之间换算，也不需要在任何一层做键名转换。
+
+例外只有两类，它们不是接口字段：
+
+- HTTP 头沿用惯用写法：`X-Trace-Id`、`Idempotency-Key`
+- 前端自己的标识符（TS 变量、组件 props、store getter、路由 meta）仍用小驼峰，
+  它们不出现在网络请求里
+
+其余约定：
 
 - 时间统一 `YYYY-MM-DD HH:mm:ss` 字符串，不传时间戳
 - 金额传**分**（整数），前端负责换算展示
@@ -160,7 +173,7 @@ instance.interceptors.response.use(undefined, (err) => {
 | `409 Conflict` | 资源冲突 | 唯一性冲突、被引用、乐观锁 | Message 提示，聚焦冲突字段 |
 | `422 Unprocessable Entity` | 参数校验失败 | 字段格式、必填缺失 | `details` 回填表单 |
 | `429 Too Many Requests` | 触发限流 | 登录、短信、导出 | 提示 `Retry-After` 秒后重试 |
-| `500 Internal Server Error` | 未捕获异常 | 代码 bug、依赖故障 | 提示"服务暂时不可用" + traceId |
+| `500 Internal Server Error` | 未捕获异常 | 代码 bug、依赖故障 | 提示"服务暂时不可用" + trace_id |
 | `503 Service Unavailable` | 服务不可用 | 维护中、依赖不可用 | 提示维护中 |
 
 **关于 404**：查询不存在的资源、和查询存在但超出数据权限的资源，**返回同一个 404**。若前者 404、后者 403，攻击者就能通过状态码差异枚举出哪些 ID 是存在的。
@@ -192,7 +205,7 @@ instance.interceptors.response.use(undefined, (err) => {
 | 409 | `10409` | 数据已被他人修改，请刷新后重试 | 乐观锁冲突 |
 | 422 | `10422` | 参数校验失败 | `details` 含字段级错误 |
 | 429 | `10429` | 操作过于频繁 | 响应头带 `Retry-After` |
-| 500 | `10500` | 服务暂时不可用 | 仅返回 traceId，不返回堆栈 |
+| 500 | `10500` | 服务暂时不可用 | 仅返回 trace_id，不返回堆栈 |
 
 **管理后台**
 
@@ -243,21 +256,21 @@ instance.interceptors.response.use(undefined, (err) => {
 
 ```http
 POST /admin/auth/login
-{ "username": "admin", "password": "******", "captchaKey": "xxx", "captchaCode": "1234" }
+{ "username": "admin", "password": "******", "captcha_key": "xxx", "captcha_code": "1234" }
 ```
 
 ```json
 {
-  "accessToken": "eyJ...",
-  "refreshToken": "eyJ...",
-  "expiresIn": 7200,
-  "mustChangePassword": true
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ...",
+  "expires_in": 7200,
+  "must_change_password": true
 }
 ```
 
-- `accessToken` 有效期 2 小时，`refreshToken` 7 天
+- `access_token` 有效期 2 小时，`refresh_token` 7 天
 - token 内**只放 `uid`、`type`、签发时间**，权限从 Redis 读取，不塞进 token
-- `mustChangePassword` 为 true 时前端强制跳转改密页，不允许进入系统
+- `must_change_password` 为 true 时前端强制跳转改密页，不允许进入系统
 
 ### 当前用户信息
 
@@ -266,12 +279,12 @@ POST /admin/auth/login
 ```json
 {
   "user": {
-    "id": 1, "username": "admin", "realName": "系统管理员",
-    "avatar": "", "deptId": 1, "deptName": "总公司", "isSuper": true
+    "id": 1, "username": "admin", "real_name": "系统管理员",
+    "avatar": "", "dept_id": 1, "dept_name": "总公司", "is_super": true
   },
   "roles": ["ROLE_SUPER"],
-  "permissions": ["sys:user:list", "sys:user:edit", "biz:item:list"],
-  "dataScope": 1,
+  "permissions": ["sys:user:list", "sys:user:update", "biz:item:list"],
+  "data_scope": 1,
   "menus": [
     {
       "id": 1, "name": "概览", "path": "/", "component": "Layout",
@@ -279,7 +292,7 @@ POST /admin/auth/login
         {
           "id": 2, "name": "系统概览", "path": "/dashboard",
           "component": "views/dashboard/index.vue",
-          "permCode": "sys:dashboard:view", "visible": true, "keepAlive": true
+          "perm_code": "sys:dashboard:view", "visible": true, "keep_alive": true
         }
       ]
     }
@@ -296,7 +309,7 @@ POST /admin/auth/login
 
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
-| GET | `/admin/users` | `sys:user:list` | 列表，支持 `deptId` `includeChildDept` `status` `roleId` `keyword` |
+| GET | `/admin/users` | `sys:user:list` | 列表，支持 `dept_id` `include_child_dept` `status` `role_id` `keyword` |
 | GET | `/admin/users/{id}` | `sys:user:list` | 详情 |
 | POST | `/admin/users` | `sys:user:create` | 新建 |
 | PUT | `/admin/users/{id}` | `sys:user:update` | 编辑 |
@@ -314,16 +327,16 @@ POST /admin/auth/login
 **列表关键参数**
 
 ```
-GET /admin/users?deptId=3&includeChildDept=true&status=1&pageNum=1&pageSize=20
+GET /admin/users?dept_id=3&include_child_dept=true&status=1&page_num=1&page_size=20
 ```
 
-`includeChildDept` 默认 `true`：选中部门时包含其所有子部门的用户（对应原型上的"包含子部门"开关）。
+`include_child_dept` 默认 `true`：选中部门时包含其所有子部门的用户（对应原型上的"包含子部门"开关）。
 
 **分配角色**
 
 ```http
 PUT /admin/users/12/roles
-{ "roleIds": [3, 5] }
+{ "role_ids": [3, 5] }
 ```
 
 服务端校验：互斥角色（400 + `20304`）、角色数上限（400 + `20305`）、超级管理员不可改（403 + `20103`）。成功后递增该用户 `perm_version`，权限**即时生效**，无需重新登录。
@@ -375,7 +388,7 @@ GET /admin/roles/3/permissions
 
 ```http
 PUT /admin/roles/3/permissions
-{ "permissionIds": [1,2,5,8,12] }
+{ "permission_ids": [1,2,5,8,12] }
 ```
 
 保存后递增所有持有该角色用户的 `perm_version`。
@@ -384,7 +397,7 @@ PUT /admin/roles/3/permissions
 
 ```http
 PUT /admin/roles/3/data-scope
-{ "dataScope": 5, "deptIds": [3,4,7] }   // deptIds 仅 dataScope=5 时必填
+{ "data_scope": 5, "dept_ids": [3,4,7] }   // dept_ids 仅 data_scope=5 时必填
 ```
 
 ---
@@ -400,7 +413,7 @@ PUT /admin/roles/3/data-scope
 | DELETE | `/admin/menus/{id}` | `sys:menu:delete` | 删除（被引用 409 + `20402`） |
 | GET | `/admin/menus/matrix` | `sys:menu:list` | 角色 × 权限矩阵（只读审计视图） |
 
-**本模块只定义权限点，不做授权**。`GET /admin/menus/tree` 返回的每个节点带 `grantedRoleCount`，仅供展示。
+**本模块只定义权限点，不做授权**。`GET /admin/menus/tree` 返回的每个节点带 `granted_role_count`，仅供展示。
 
 ---
 
@@ -418,8 +431,8 @@ PUT /admin/roles/3/data-scope
 ```json
 GET /admin/dicts/common_status/items → 200 OK
 [
-  { "label": "正常", "value": "1", "tagType": "success" },
-  { "label": "异常", "value": "3", "tagType": "danger" }
+  { "label": "正常", "value": "1", "tag_type": "success" },
+  { "label": "异常", "value": "3", "tag_type": "danger" }
 ]
 ```
 
@@ -427,7 +440,7 @@ GET /admin/dicts/common_status/items → 200 OK
 要求 `sys:dict:list` 会让没有字典管理权限的账号连状态标签都渲染不出来。
 
 前端存入 Pinia（`stores/dict.ts`，带缓存与并发去重），
-`<DictTag code="common_status" :value="row.status" />` 直接渲染，颜色由 `tagType` 驱动。
+`<DictTag code="common_status" :value="row.status" />` 直接渲染，颜色由 `tag_type` 驱动。
 服务端缓存 5 分钟，字典维护接口写入后主动 `DictService::forget()`。
 
 ---

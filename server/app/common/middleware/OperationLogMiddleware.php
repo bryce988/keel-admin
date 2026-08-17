@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace app\common\middleware;
 
 use app\common\exception\ApiException;
-use app\common\model\SysOperationLog;
+use app\common\model\SysOperationLogModel;
 use app\common\support\Ctx;
 use Throwable;
 use Webman\Http\Request;
@@ -79,13 +79,13 @@ class OperationLogMiddleware implements MiddlewareInterface
         try {
             $user = Ctx::user() ?? [];
 
-            SysOperationLog::create([
+            SysOperationLogModel::create([
                 'trace_id'   => Ctx::traceId(),
                 'user_id'    => (int) ($user['id'] ?? 0),
                 'username'   => (string) ($user['username'] ?? ''),
                 'dept_id'    => (int) ($user['dept_id'] ?? 0),
                 'module'     => (string) ($meta['module'] ?? ''),
-                'action'     => (int) ($meta['action'] ?? SysOperationLog::ACTION_OTHER),
+                'action'     => (int) ($meta['action'] ?? SysOperationLogModel::ACTION_OTHER),
                 'title'      => (string) ($meta['title'] ?? ''),
                 'target'     => (string) Ctx::get('log.target', ''),
                 'api_method' => $request->method(),

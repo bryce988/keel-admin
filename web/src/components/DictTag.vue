@@ -5,7 +5,7 @@ import { useDictStore } from '@/stores/dict'
 /**
  * 字典标签
  *
- * 颜色由字典项的 tagType 决定，页面里不写 status === 1 ? 'success' : 'info' 这种判断——
+ * 颜色由字典项的 tag_type 决定，页面里不写 status === 1 ? 'success' : 'info' 这种判断——
  * 加一个状态值只需要改字典，不用回头找所有写过判断的地方。
  */
 const props = withDefaults(
@@ -28,7 +28,7 @@ const item = computed(() => dictStore.find(props.code, props.value))
 </script>
 
 <template>
-  <el-tag v-if="item" :type="(item.tagType || 'info') as never" :size="size" :effect="effect" disable-transitions>
+  <el-tag v-if="item" :type="(item.tag_type || 'info') as never" :size="size" :effect="effect" disable-transitions>
     {{ item.label }}
   </el-tag>
   <span v-else class="dict-tag-empty">{{ fallback }}</span>

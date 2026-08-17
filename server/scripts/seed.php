@@ -140,7 +140,7 @@ function upsertPermission(array $node, int $parentId, string $now): int
         'component'  => $node['component'] ?? '',
         'icon'       => $node['icon'] ?? '',
         'visible'    => $node['visible'] ?? 1,
-        'keep_alive' => $node['keepAlive'] ?? 1,
+        'keep_alive' => $node['keep_alive'] ?? 1,
         'sort'       => $node['sort'] ?? 0,
         'status'     => 1,
         'updated_at' => $now,

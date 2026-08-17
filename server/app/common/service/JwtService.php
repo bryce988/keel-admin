@@ -49,9 +49,9 @@ class JwtService
         ]);
 
         return [
-            'accessToken'  => $access,
-            'refreshToken' => $refresh,
-            'expiresIn'    => $accessTtl,
+            'access_token'  => $access,
+            'refresh_token' => $refresh,
+            'expires_in'    => $accessTtl,
         ];
     }
 

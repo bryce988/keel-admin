@@ -11,7 +11,7 @@ use Webman\Http\Request;
 /**
  * 列表分页
  *
- * 约定见 docs/api.md §1.3：pageSize 默认 20、上限 100，
+ * 约定见 docs/api.md §1.3：`page_size` 默认 20、上限 100，
  * 排序字段走白名单——不做白名单等于允许对任意列做全表排序，
  * 既是注入面也是慢查询的来源。
  */
@@ -33,13 +33,13 @@ final class Paginator
         string $defaultOrder = 'desc',
         ?callable $map = null,
     ): Response {
-        $pageNum  = max(1, (int) $request->get('pageNum', 1));
-        $pageSize = (int) $request->get('pageSize', self::DEFAULT_SIZE);
+        $pageNum  = max(1, (int) $request->get('page_num', 1));
+        $pageSize = (int) $request->get('page_size', self::DEFAULT_SIZE);
         $pageSize = min(self::MAX_SIZE, max(1, $pageSize));
 
-        // 前端传 camelCase，白名单存数据库字段名
-        $field = Arr::snake((string) $request->get('sortField', ''));
-        $order = strtolower((string) $request->get('sortOrder', '')) === 'asc' ? 'asc' : 'desc';
+        // 入参与白名单都是数据库字段名，不做任何转换
+        $field = (string) $request->get('sort_field', '');
+        $order = strtolower((string) $request->get('sort_order', '')) === 'asc' ? 'asc' : 'desc';
 
         if (!in_array($field, $sortable, true)) {
             $field = $defaultField;

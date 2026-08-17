@@ -11,7 +11,7 @@ use app\common\model\concern\HasDataScope;
  *
  * 只写不改不删。日志本身也受数据权限约束——部门主管只能看到本部门的操作记录。
  */
-class SysOperationLog extends BaseModel
+class SysOperationLogModel extends BaseModel
 {
     use HasDataScope;
 

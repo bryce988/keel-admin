@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property bool   $is_super
  * @property int    $perm_version
  */
-class SysUser extends BaseModel
+class SysUserModel extends BaseModel
 {
     use SoftDeletes;
     use HasDataScope;
@@ -48,17 +48,17 @@ class SysUser extends BaseModel
 
     public function dept(): BelongsTo
     {
-        return $this->belongsTo(SysDept::class, 'dept_id');
+        return $this->belongsTo(SysDeptModel::class, 'dept_id');
     }
 
     public function post(): BelongsTo
     {
-        return $this->belongsTo(SysPost::class, 'post_id');
+        return $this->belongsTo(SysPostModel::class, 'post_id');
     }
 
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(SysRole::class, 'sys_user_roles', 'user_id', 'role_id');
+        return $this->belongsToMany(SysRoleModel::class, 'sys_user_roles', 'user_id', 'role_id');
     }
 
     /** 授权变更后递增，使已签发 token 里的 pv 失效（docs/database.md §3.1） */

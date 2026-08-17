@@ -27,7 +27,7 @@ const todos = [
 ]
 
 const scopeText = computed(
-  () => ['', '全部数据', '本部门及下属', '本部门', '仅本人', '自定义'][userStore.profile?.dataScope ?? 4]
+  () => ['', '全部数据', '本部门及下属', '本部门', '仅本人', '自定义'][userStore.profile?.data_scope ?? 4]
 )
 </script>
 
@@ -79,8 +79,8 @@ const scopeText = computed(
 
           <el-descriptions :column="3" border>
             <el-descriptions-item label="账号">{{ userStore.profile?.user.username }}</el-descriptions-item>
-            <el-descriptions-item label="姓名">{{ userStore.profile?.user.realName }}</el-descriptions-item>
-            <el-descriptions-item label="部门">{{ userStore.profile?.user.deptName || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="姓名">{{ userStore.profile?.user.real_name }}</el-descriptions-item>
+            <el-descriptions-item label="部门">{{ userStore.profile?.user.dept_name || '—' }}</el-descriptions-item>
             <el-descriptions-item label="角色">
               <el-tag v-for="r in userStore.profile?.roles" :key="r" size="small" class="mr">{{ r }}</el-tag>
             </el-descriptions-item>
