@@ -26,8 +26,15 @@ const dictStore = useDictStore()
 
 const tableRef = ref<ProTableInstance | null>(null)
 const drawerRef = ref<FormDrawerInstance | null>(null)
-const grantRef = ref<{ open: (role: RoleRow) => void } | null>(null)
-const memberRef = ref<{ open: (role: RoleRow) => void } | null>(null)
+/**
+ * 子组件的 ref 用 `InstanceType<typeof X>`，不要手写 `{ open: ... }`
+ *
+ * 手写等于跟 TS 打包票「这个组件有 open」，而 TS 无从核对子组件到底
+ * `defineExpose` 了什么——MemberDrawer 漏了那一句，类型检查照样通过，
+ * 直到点下「成员」才 TypeError。用 InstanceType 才是真的去核对。
+ */
+const grantRef = ref<InstanceType<typeof GrantDrawer> | null>(null)
+const memberRef = ref<InstanceType<typeof MemberDrawer> | null>(null)
 
 const query = ref<Record<string, unknown>>({ keyword: '', status: '', data_scope: '' })
 const paramParsers = { status: Number, data_scope: Number }

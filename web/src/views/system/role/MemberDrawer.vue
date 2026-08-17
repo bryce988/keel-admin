@@ -98,6 +98,14 @@ async function onRemove(user: UserRow) {
   await load()
   emit('saved')
 }
+
+/**
+ * `<script setup>` 默认**不对外暴露任何东西**，少了这一句父组件拿到的 ref 上
+ * 就没有 open，点「成员」直接 TypeError。
+ * 类型检查发现不了：父组件那边把 ref 标成了 `{ open: ... } | null`，
+ * 等于跟 TS 打了包票，而 TS 无从核对子组件到底暴露了什么。
+ */
+defineExpose({ open })
 </script>
 
 <template>

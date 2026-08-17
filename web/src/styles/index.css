@@ -154,6 +154,21 @@ body {
   justify-content: center;
   gap: 8px;
   flex-wrap: nowrap;
+  /*
+   * 操作列比正文小一号（EP 基准是 14px）
+   *
+   * 改在这里而不是给每个按钮加 size="small"：七个页面二十来个按钮，
+   * 逐个加迟早漏一个，而且新页面还得记着这回事。
+   * 只压字号不用 size="small"——后者连 padding 一起改小，link 按钮本来就没有边框，
+   * 挤在一起反而更难点。
+   */
+  font-size: 12px;
+}
+
+/* 按钮的 font-size 是显式取变量的，不会继承父级，必须显式压下来 */
+.table-actions .el-button,
+.table-actions .el-dropdown {
+  font-size: 12px;
 }
 
 .table-actions .el-button + .el-button {
