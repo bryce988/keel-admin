@@ -140,6 +140,11 @@ async function onUserCommand(cmd: string) {
 
         <div class="spacer" />
 
+        <!--
+          这里的 size="default" 不是冗余：全局尺寸是 small（main.ts），
+          顶栏属于外壳而非密集表单区，56px 的条里放 24px 输入框会显得空。
+          清理"多余属性"时别把它删了
+        -->
         <el-input
           class="search"
           placeholder="搜索菜单、用户、日志…"

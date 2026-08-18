@@ -18,7 +18,15 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus, { locale: zhCn })
+/**
+ * 全局尺寸 small（24px / 12px），不是默认的 32px / 14px
+ *
+ * 后台是密集型界面，default 尺寸在一屏里堆按钮与筛选框显得笨重。
+ * 走全局配置而不是逐个加 `size="small"`：67 个按钮逐个加迟早漏一个，
+ * 而且按钮与输入框必须同尺寸——搜索栏里它们并排，差一截底边就对不齐。
+ * 表格行高由 ProTable 的密度开关单独控制，不受这里影响。
+ */
+app.use(ElementPlus, { locale: zhCn, size: 'small' })
 app.use(directives) // v-permission / v-role
 app.use(components) // ProTable / SearchForm / DictSelect / DictTag
 

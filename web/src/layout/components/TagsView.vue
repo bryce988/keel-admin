@@ -123,8 +123,8 @@ onUnmounted(() => {
     </div>
 
     <span class="count">{{ tagsStore.tags.length }} / {{ MAX_TAGS }}</span>
-    <el-button size="small" @click="onCommand('closeOthers')">关闭其他</el-button>
-    <el-button size="small" @click="onCommand('closeAll')">全部关闭</el-button>
+    <el-button @click="onCommand('closeOthers')">关闭其他</el-button>
+    <el-button @click="onCommand('closeAll')">全部关闭</el-button>
 
     <!-- 右键菜单 -->
     <teleport to="body">
