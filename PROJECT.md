@@ -1,11 +1,12 @@
 # Keel · 项目文档
 
 > **Keel（龙骨）** —— 多端后台系统的底座
-> 版本 v1.3 · 2026-08-13 · 状态：原型定稿，待进入开发 · 开源协议 MIT
+> 版本 v1.4 · 2026-08-18 · 状态：M1 框架 + M2 系统管理已完成并上线，M3 页型模板待启动 · 开源协议 MIT
 > 技术栈：Vue 3 + Element Plus / PHP 8.4 + webman 2.x（多应用）
 > 仓库：`keel-admin`（monorepo）· Composer `keel/admin` · npm `@keel/ui`
 > 在线预览：http://43.143.249.52:8080（演示账号 admin / admin123）
 > 交互原型（静态稿）：https://claude.ai/code/artifact/97f2c6d1-9b75-4927-8b38-926d0cb926f2
+> 界面设计稿（19 画板 · 令牌与组件规范）：https://claude.ai/code/artifact/7d0007c0-5782-4d50-bbdb-d0c34c35ded1
 > webman 官方文档：https://www.workerman.net/doc/webman/install.html · 多应用：https://www.workerman.net/doc/webman/multiapp.html
 
 ---
