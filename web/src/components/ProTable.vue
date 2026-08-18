@@ -119,7 +119,14 @@ const loading = ref(false)
 const rows = ref<Record<string, any>[]>([])
 const total = ref(0)
 const selected = ref<Record<string, any>[]>([])
-const size = ref<'large' | 'default' | 'small'>('default')
+/**
+ * 表格密度，初始跟随全局尺寸（main.ts 配的是 small）
+ *
+ * 不能停在 EP 的 default：那一档字号是 14px，而全局改 small 之后
+ * 搜索栏、按钮、分页全是 12px——同一屏出现两套字号，表格会显得从别处贴过来。
+ * 用户仍可从工具栏的密度下拉调松。
+ */
+const size = ref<'large' | 'default' | 'small'>('small')
 
 // 组件内部状态，用小驼峰；发请求时映射成接口的 snake_case
 const pager = reactive({
@@ -322,7 +329,7 @@ defineExpose({ reload, refresh, selected, loading })
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="large">宽松</el-dropdown-item>
-                <el-dropdown-item command="default">默认</el-dropdown-item>
+                <el-dropdown-item command="default">适中</el-dropdown-item>
                 <el-dropdown-item command="small">紧凑</el-dropdown-item>
               </el-dropdown-menu>
             </template>

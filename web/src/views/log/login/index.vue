@@ -69,11 +69,6 @@ onMounted(() => dictStore.preload(['login_type', 'log_status']))
 
 <template>
   <div class="page">
-    <div class="page-head">
-      <h1>登录日志</h1>
-      <span class="desc">登录失败也记，连续失败锁定的审计依据就在这里</span>
-    </div>
-
     <SearchForm
       v-model="query"
       :fields="searchFields"

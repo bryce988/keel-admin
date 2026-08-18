@@ -53,36 +53,28 @@ body {
   font-weight: 600;
 }
 
+/*
+ * small 档的留白稍微放开一点
+ *
+ * 表格默认档位跟着全局走 small，字号 12px 才能与搜索栏、按钮对齐。
+ * 但 EP 给 small 配的是 4px/8px 内边距——数据表这么挤，
+ * 行与行几乎贴在一起，操作列的按钮也没有落脚的地方。
+ * 这里只放开留白，不动字号：协调靠字号，可读靠留白，两件事分开调。
+ * 觉得还是紧，把这两条删掉就回到 EP 原值。
+ */
+.el-table--small .el-table__cell {
+  padding: 7px 0;
+}
+
+.el-table--small .cell {
+  padding: 0 12px;
+}
+
 /* ---------------- 页面容器 ---------------- */
 .page {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.page-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.page-head h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.page-head .desc {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-.page-head .actions {
-  margin-left: auto;
-  display: flex;
-  gap: 10px;
 }
 
 /* 滚动条：细一点，跟原型一致 */

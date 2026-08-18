@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Refresh } from '@element-plus/icons-vue'
 import { fetchOverview, type Overview } from '@/api/dashboard'
 import { useDictStore } from '@/stores/dict'
 import { useUserStore } from '@/stores/user'
@@ -36,10 +35,6 @@ async function load() {
 function go(to: string, perm: string) {
   if (!perm || userStore.can(perm)) router.push(to)
 }
-
-const scopeText = computed(
-  () => ['', '全部数据', '本部门及下属', '本部门', '仅本人', '自定义'][userStore.profile?.data_scope ?? 4]
-)
 
 // ---------------------------------------------------------------- 趋势图
 /**
@@ -78,16 +73,6 @@ onMounted(() => {
 
 <template>
   <div v-loading="loading" class="page">
-    <div class="page-head">
-      <h1>系统概览</h1>
-      <span class="desc">
-        汇总当前系统已有的模块，数字都在你的数据权限之内（{{ scopeText }}）
-      </span>
-      <div class="actions">
-        <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
-      </div>
-    </div>
-
     <el-alert
       v-if="nothingVisible"
       type="info"

@@ -246,11 +246,6 @@ onMounted(() => {
 
 <template>
   <div class="page user-page">
-    <div class="page-head">
-      <h1>用户管理</h1>
-      <span class="desc">RBAC 的分配层：把已有的角色分给人，不在用户身上单独授权</span>
-    </div>
-
     <aside class="dept-panel" v-loading="deptLoading">
       <div class="panel-title">部门</div>
       <el-tree
@@ -412,11 +407,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 标题要横跨整行，否则会被当成第一个网格单元塞进左栏 */
-.user-page > .page-head {
-  grid-column: 1 / -1;
-}
-
 .user-page {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);

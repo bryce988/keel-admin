@@ -156,11 +156,6 @@ onMounted(() => {
 
 <template>
   <div class="page">
-    <div class="page-head">
-      <h1>岗位管理</h1>
-      <span class="desc">岗位是 HR 概念，不是角色——只在新建用户时带出默认角色作为初始值</span>
-    </div>
-
     <SearchForm
       v-model="query"
       :fields="searchFields"

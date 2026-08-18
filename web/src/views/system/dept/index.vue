@@ -153,11 +153,6 @@ onMounted(() => {
 
 <template>
   <div class="page">
-    <div class="page-head">
-      <h1>部门管理</h1>
-      <span class="desc">数据权限的载体。移动部门会同步刷新所有子孙的归属链</span>
-    </div>
-
     <SearchForm
       v-model="query"
       :fields="searchFields"
