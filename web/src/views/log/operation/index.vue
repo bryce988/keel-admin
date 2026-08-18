@@ -121,6 +121,11 @@ onMounted(() => dictStore.preload(['log_action', 'log_status']))
 
 <template>
   <div class="page">
+    <div class="page-head">
+      <h1>操作日志</h1>
+      <span class="desc">所有写操作的审计留痕，越权被拒的尝试同样入库</span>
+    </div>
+
     <SearchForm
       v-model="query"
       :fields="searchFields"

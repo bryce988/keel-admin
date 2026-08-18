@@ -186,6 +186,11 @@ onMounted(() => {
 
 <template>
   <div class="page">
+    <div class="page-head">
+      <h1>菜单与权限</h1>
+      <span class="desc">只定义权限点，不做授权。新增接口不在这里登记就是 403</span>
+    </div>
+
     <el-tabs v-model="tab" class="menu-tabs">
       <el-tab-pane label="权限点定义" name="tree" />
       <el-tab-pane label="角色 × 权限矩阵" name="matrix" />

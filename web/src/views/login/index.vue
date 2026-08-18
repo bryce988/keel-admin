@@ -123,7 +123,7 @@ onMounted(loadCaptcha)
   justify-content: center;
   gap: 24px;
   background:
-    radial-gradient(1000px 500px at 50% -10%, #ecf5ff, transparent 70%),
+    radial-gradient(1000px 500px at 50% -10%, var(--el-color-primary-light-9), transparent 70%),
     var(--el-bg-color-page, #f2f3f5);
 }
 .login-card {

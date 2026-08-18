@@ -79,13 +79,13 @@ onMounted(() => {
 <template>
   <div v-loading="loading" class="page">
     <div class="page-head">
-      <div>
-        <h1>系统概览</h1>
-        <span class="desc">
-          汇总当前系统已有的模块，数字都在你的数据权限之内（{{ scopeText }}）
-        </span>
+      <h1>系统概览</h1>
+      <span class="desc">
+        汇总当前系统已有的模块，数字都在你的数据权限之内（{{ scopeText }}）
+      </span>
+      <div class="actions">
+        <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
       </div>
-      <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
     </div>
 
     <el-alert
@@ -249,19 +249,8 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.page-head h1 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
+/* 标题区用全局那一份（styles/index.css），这里不再覆盖，
+   否则概览与其余九个页面会长出两种标题样式 */
 .desc {
   font-size: 12px;
   color: var(--el-text-color-secondary);

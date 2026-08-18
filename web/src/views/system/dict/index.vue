@@ -283,6 +283,11 @@ onMounted(async () => {
 
 <template>
   <div class="page dict-page">
+    <div class="page-head">
+      <h1>数据字典</h1>
+      <span class="desc">全站枚举与状态色的唯一来源，页面里不写死选项与颜色</span>
+    </div>
+
     <!-- 左：字典类型 -->
     <el-card v-loading="typeLoading" class="type-panel" shadow="never">
       <template #header>
@@ -512,6 +517,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 标题要横跨整行，否则会被当成第一个网格单元塞进左栏 */
+.dict-page > .page-head {
+  grid-column: 1 / -1;
+}
+
 .dict-page {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);

@@ -176,6 +176,11 @@ onMounted(async () => {
 
 <template>
   <div class="page">
+    <div class="page-head">
+      <h1>参数配置</h1>
+      <span class="desc">改动只落库并清缓存，不热改后端配置——常驻内存下运行期改配置只影响单个进程</span>
+    </div>
+
     <el-tabs :model-value="activeGroup" @tab-change="onSwitchGroup">
       <el-tab-pane v-for="g in groups" :key="g.code" :label="g.name" :name="g.code" />
     </el-tabs>
@@ -183,9 +188,7 @@ onMounted(async () => {
     <el-card v-loading="loading" shadow="never">
       <template #header>
         <div class="card-header">
-          <span class="hint">
-            改动只写入数据库并清缓存，不会热改后端配置——常驻内存下运行期改配置只影响单个进程
-          </span>
+          <span class="hint">保存后立即生效，无需重启进程</span>
           <div class="actions">
             <el-button
               v-permission="'sys:param:create'"

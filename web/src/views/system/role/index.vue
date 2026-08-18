@@ -129,6 +129,11 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
 
 <template>
   <div class="page">
+    <div class="page-head">
+      <h1>角色管理</h1>
+      <span class="desc">RBAC 的授权层：这个角色能干什么。谁是这个角色在用户管理里分配</span>
+    </div>
+
     <SearchForm
       v-model="query"
       :fields="searchFields"
