@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
 import * as ElIcons from '@element-plus/icons-vue'
 import { Plus } from '@element-plus/icons-vue'
+import IconPicker from '@/components/IconPicker.vue'
 import {
   createMenu,
   deleteMenu,
@@ -39,6 +40,8 @@ const searchFields: SearchField[] = [
 
 const columns: ProColumn[] = [
   { prop: 'name', label: '名称', minWidth: 200, align: 'left' },
+  // 放在名称之后：树形表格的展开箭头在第一列，图标列插到最前会把层级压没
+  { prop: 'icon', label: '图标', width: 70, align: 'center', slot: 'icon' },
   { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'perm_type' },
   { prop: 'perm_code', label: '权限标识', minWidth: 190 },
   { prop: 'path', label: '路由路径', minWidth: 160, slot: 'path' },
@@ -58,8 +61,11 @@ const formType = ref<MenuType>(TYPE_MENU)
 const isRoute = computed(() => formType.value === TYPE_DIR || formType.value === TYPE_MENU)
 const isApi = computed(() => formType.value === TYPE_API)
 
-/** 图标选择：EP 图标近 300 个，用可搜索的下拉，选项里直接画出来 */
-const iconNames = Object.keys(ElIcons)
+/**
+ * 后端存的是 EP 图标名（如 Odometer），列表与详情按名解析成组件。
+ * 解析不到就当没图标——手填错的名字、或 EP 升级后被移除的图标都会走到这里，
+ * 让它显示成「—」，而不是抛渲染错误把整行搞白
+ */
 function iconComp(name: string) {
   return (ElIcons as Record<string, unknown>)[name]
 }
@@ -218,6 +224,14 @@ onMounted(() => {
           </el-button>
         </template>
 
+        <!-- 只有目录和菜单挂图标，其余类型留白 -->
+        <template #icon="{ row }">
+          <el-icon v-if="iconComp(row.icon)" :size="16">
+            <component :is="iconComp(row.icon)" />
+          </el-icon>
+          <span v-else class="muted">—</span>
+        </template>
+
         <!-- 只有目录和菜单才有路由，按钮/接口/数据类节点这一列留白比显示空串清楚 -->
         <template #path="{ row }">
           <span v-if="row.path">{{ row.path }}</span>
@@ -266,6 +280,13 @@ onMounted(() => {
           <el-descriptions-item label="权限标识">{{ form.perm_code }}</el-descriptions-item>
           <el-descriptions-item label="路由路径">{{ form.path || '—' }}</el-descriptions-item>
           <el-descriptions-item label="组件">{{ form.component || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="图标">
+            <span v-if="iconComp(form.icon)" class="icon-inline">
+              <el-icon><component :is="iconComp(form.icon)" /></el-icon>
+              {{ form.icon }}
+            </span>
+            <span v-else>—</span>
+          </el-descriptions-item>
           <el-descriptions-item label="绑定接口">
             {{ form.api_path ? `${form.api_method} ${form.api_path}` : '—' }}
           </el-descriptions-item>
@@ -323,14 +344,7 @@ onMounted(() => {
               <div class="tip">目录填 Layout；菜单填相对 src 的组件路径，写错会导致页面打不开</div>
             </el-form-item>
             <el-form-item label="图标" prop="icon">
-              <el-select v-model="form.icon" filterable clearable style="width: 100%">
-                <el-option v-for="name in iconNames" :key="name" :label="name" :value="name">
-                  <span class="icon-option">
-                    <el-icon><component :is="iconComp(name)" /></el-icon>
-                    {{ name }}
-                  </span>
-                </el-option>
-              </el-select>
+              <IconPicker v-model="form.icon" />
             </el-form-item>
             <el-form-item label="显示" prop="visible">
               <el-radio-group v-model="form.visible">
@@ -398,7 +412,7 @@ onMounted(() => {
   margin-left: 12px;
 }
 
-.icon-option {
+.icon-inline {
   display: flex;
   align-items: center;
   gap: 8px;
