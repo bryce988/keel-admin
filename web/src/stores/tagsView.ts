@@ -19,7 +19,12 @@ const HOME_PATH = '/dashboard'
 /** 上限：超出后淘汰最早打开的（首页签与当前页不淘汰），见 PROJECT.md §5 */
 export const MAX_TAGS = 8
 
-const HOME_TAG: TagItem = { path: HOME_PATH, fullPath: HOME_PATH, title: '系统概览', affix: true }
+/*
+ * 首页签在菜单下发之前就要显示，所以标题只能写死一份。
+ * 它必须与 seed.php 里 `sys:dashboard:view` 的菜单名一致——
+ * 不一致的结果是页签写着一个名字、侧边栏和面包屑写着另一个
+ */
+const HOME_TAG: TagItem = { path: HOME_PATH, fullPath: HOME_PATH, title: '概览', affix: true }
 
 function load(): { tags: TagItem[]; active: string } {
   try {

@@ -439,17 +439,21 @@ VALUES
 按原型的 15 个页面生成，命名遵循 `模块:资源:操作`：
 
 ```sql
--- 目录
-('概览',        1, 'sys:dashboard',      '', '', 10),
+-- 目录（只分组，自己没有页面）
+('系统管理',    1, 'sys',                '/system', 'Layout', 90),
 -- 菜单
-('系统概览',    2, 'sys:dashboard:view', '/dashboard', 'views/dashboard/index.vue', 10),
+('用户管理',    2, 'sys:user:list',      '/system/user', 'views/system/user/index.vue', 10),
 -- 按钮
-('导出概览',    3, 'sys:dashboard:export', '', '', 10),
+('导出用户',    3, 'sys:user:export',    '', '', 7),
 -- 接口
-('导出接口',    4, 'sys:dashboard:export:api', '', '', 10),  -- api_method=POST api_path=/admin/dashboard/export
+('导出接口',    4, 'sys:user:export:api', '', '', 90),  -- api_method=POST api_path=/admin/users/export
 -- 数据（字段级）
-('查看手机号',  5, 'sys:field:phone',    '', '', 10);
+('查看手机号',  5, 'sys:field:user:phone', '', '', 90);
 ```
+
+**目录不是必须的**：底下只有一个页面时直接挂成一级菜单
+（`概览` 就是这样，`type=2`、`parent_id=0`）。为一个页面单独立一层目录，
+侧边栏会多一次展开点击，面包屑还会出现「概览 / 系统概览」这种同义重复。
 
 完整清单约 96 条，随迁移脚本落库；新增权限点默认不授予任何角色。
 

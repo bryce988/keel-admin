@@ -183,7 +183,7 @@ start.php                 # 启动入口
 | 路由 | 页面 | 权限标识 | 说明 |
 |---|---|---|---|
 | `/login` | 登录 | — | 账号密码 + 图形验证码，支持三方登录预留 |
-| `/dashboard` | 系统概览 | `sys:dashboard:view` | 指标卡、趋势、系统状态、待办 |
+| `/dashboard` | 概览 | `sys:dashboard:view` | 指标卡、趋势、系统状态、待办。一级菜单，不套目录 |
 | `/template/list` | 模板·标准列表页 | — | **仅开发环境**，五种页型见 §9 |
 | `/template/tree-list` | 模板·树表联动页 | — | 同上 |
 | `/template/master-detail` | 模板·主从页 | — | 同上 |

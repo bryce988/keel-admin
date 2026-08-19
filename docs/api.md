@@ -303,12 +303,17 @@ POST /admin/auth/login
   "data_scope": 1,
   "menus": [
     {
-      "id": 1, "name": "概览", "path": "/", "component": "Layout",
-      "icon": "Odometer", "visible": true, "children": [
+      "id": 1, "name": "概览", "path": "/dashboard",
+      "component": "views/dashboard/index.vue", "icon": "Odometer",
+      "perm_code": "sys:dashboard:view", "visible": true, "keep_alive": true
+    },
+    {
+      "id": 3, "name": "系统管理", "path": "/system", "component": "Layout",
+      "icon": "Setting", "visible": true, "children": [
         {
-          "id": 2, "name": "系统概览", "path": "/dashboard",
-          "component": "views/dashboard/index.vue",
-          "perm_code": "sys:dashboard:view", "visible": true, "keep_alive": true
+          "id": 4, "name": "用户管理", "path": "/system/user",
+          "component": "views/system/user/index.vue",
+          "perm_code": "sys:user:list", "visible": true, "keep_alive": true
         }
       ]
     }
@@ -317,6 +322,8 @@ POST /admin/auth/login
 ```
 
 - `menus` 只返回 `type IN (1,2)` 且当前用户有权的节点，按钮权限在 `permissions` 数组里
+- 一级节点**可以直接是页面**（`component` 不是 `Layout`、没有 `children`），
+  底下只有一个页面时就该这么挂，不必为它套一层目录
 - 超级管理员的 `permissions` 返回 `["*"]`，前端 `v-permission` 见到 `*` 直接放行
 
 ---

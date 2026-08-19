@@ -39,13 +39,12 @@ while (true) {
 // 一棵树，type：1 目录 · 2 菜单 · 3 按钮 · 4 接口 · 5 数据(字段)
 // 目录和菜单的 path/component 直接驱动前端动态路由，改这里就等于改菜单。
 $tree = [
+    // 概览是一级菜单，不套目录：底下只有一个页面，为它单独立一层
+    // 只会让侧边栏多一次展开点击，面包屑还会出现「概览 / 系统概览」这种同义重复。
+    // 一级节点直接当页面用是支持的（component 不填 Layout 即可），见 docs/api.md §菜单
     [
-        'name' => '概览', 'code' => 'sys:dashboard', 'type' => 1,
-        'path' => '/', 'component' => 'Layout', 'icon' => 'Odometer', 'sort' => 10,
-        'children' => [
-            ['name' => '系统概览', 'code' => 'sys:dashboard:view', 'type' => 2,
-             'path' => '/dashboard', 'component' => 'views/dashboard/index.vue', 'icon' => 'Odometer', 'sort' => 10],
-        ],
+        'name' => '概览', 'code' => 'sys:dashboard:view', 'type' => 2,
+        'path' => '/dashboard', 'component' => 'views/dashboard/index.vue', 'icon' => 'Odometer', 'sort' => 10,
     ],
     [
         'name' => '系统管理', 'code' => 'sys', 'type' => 1,
@@ -166,6 +165,29 @@ function upsertPermission(array $node, int $parentId, string $now): int
 foreach ($tree as $node) {
     upsertPermission($node, 0, $now);
 }
+
+/**
+ * 退役的权限点
+ *
+ * upsert **只增不减**：从 $tree 里删掉一个 code，存量库里那一行会永远留着。
+ * 空库看不出问题，生产库上就是「菜单已经不该有了，侧边栏还在渲染它」，
+ * 而且授权关系还挂着。所以退役的 code 要显式登记在这里，每次 seed 幂等清掉。
+ *
+ * 只处理登记的这几个 code 本身——如果退役的是个还带子节点的目录，
+ * 子节点要一并登记，别指望这里级联。
+ */
+$retired = [
+    // 概览原来是目录（sys:dashboard）套一个页面，2026-08-19 改成一级菜单后不再需要
+    'sys:dashboard',
+];
+
+$retiredIds = Db::table('sys_permissions')->whereIn('perm_code', $retired)->pluck('id')->all();
+if ($retiredIds) {
+    Db::table('sys_role_permissions')->whereIn('permission_id', $retiredIds)->delete();
+    Db::table('sys_permissions')->whereIn('id', $retiredIds)->delete();
+    echo '  ✓ 清理退役权限点 ' . count($retiredIds) . " 条\n";
+}
+
 echo '  ✓ 权限点 ' . Db::table('sys_permissions')->count() . " 条\n";
 
 // ─────────────────────────────────────────── 角色授权
@@ -186,7 +208,7 @@ $grants = [
      *   邮箱是掩码，一个账号上就能看出字段级权限的效果
      */
     'ROLE_DEPT_MGR' => [
-        'sys:dashboard', 'sys:dashboard:view',
+        'sys:dashboard:view',
         'sys',
         'sys:user:list', 'sys:user:create', 'sys:user:update',
         'sys:user:resetPwd', 'sys:user:export',
@@ -197,7 +219,7 @@ $grants = [
 
     // 普通员工：只有概览。它是对照组——越权测试要有一个「什么都没有」的账号，
     // 才能验证 fail-closed 是真的关着，而不是碰巧没人去点
-    'ROLE_STAFF'    => ['sys:dashboard', 'sys:dashboard:view'],
+    'ROLE_STAFF'    => ['sys:dashboard:view'],
 ];
 
 $permIdByCode = Db::table('sys_permissions')->pluck('id', 'perm_code')->all();
