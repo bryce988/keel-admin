@@ -4,6 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Keel Admin</title>
+    <!--
+      主题必须在首屏绘制前定下来
+
+      放在 main.ts 里是不行的：<script type="module"> 是 defer 语义，
+      等它执行时浏览器已经按浅色令牌画过一帧了，深色用户每次刷新都先闪一下白。
+      所以这段同步内联脚本要留在这里，且必须在样式表之前。
+      键名与 stores/app.ts 的 THEME_KEY 手工对齐——这里读不到模块里的常量。
+    -->
+    <script>
+      try {
+        if (localStorage.getItem('keel_theme') === 'dark') {
+          document.documentElement.classList.add('dark')
+        }
+      } catch (e) {
+        /* 隐私模式下 localStorage 可能抛异常，忽略即可，退回浅色 */
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

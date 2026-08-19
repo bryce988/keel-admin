@@ -35,7 +35,12 @@ for (const [name, comp] of Object.entries(ElIcons)) {
   app.component(name, comp)
 }
 
-// 主题在挂载前应用，避免首屏闪白
+/*
+ * 让 store 与 DOM 上已有的 `.dark` 对齐
+ *
+ * 真正防闪白的是 `index.html` 里的内联脚本——module 脚本是 defer 的，
+ * 跑到这一行时首帧早画完了，指望这里"挂载前应用"是防不住的。
+ */
 useAppStore().initTheme()
 
 app.mount('#app')

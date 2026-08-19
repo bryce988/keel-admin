@@ -31,6 +31,58 @@ body {
   background: var(--el-bg-color-page);
 }
 
+/* ---------------------------------------------------------------- 主题切换过渡
+ * 深浅色互换如果是瞬变的，看着像"闪了一下"；但**别用逐元素 transition 去淡**。
+ *
+ * 试过那条路：`html.theme-switching *` 套一条 0.2s 的
+ * background-color/color 过渡。帧率是稳的（实测 17ms 一帧、只在起手掉一帧），
+ * 几何、字号、字重也都没动，可文字看着在抖——因为几百个元素的文字色每帧都在变，
+ * 底色也在变，字形的亚像素抗锯齿跟着每帧重算，笔画粗细就会"呼吸"。
+ * 这是逐元素动画的固有代价，调时长或砍属性都救不了。
+ *
+ * 改成 View Transitions：浏览器把切换前后各拍一张，交叉淡化两张**位图**。
+ * 文字只栅格化两次（切换前、切换后），中间没有重画，自然不会抖。
+ *
+ * 默认的 UA 关键帧是错开的（旧的 90ms 先淡出、新的延后 90ms 再淡入），
+ * 中途会露出底下已经换好的新底色，深浅切换时那一下很明显。
+ * 这里改成同时、等长，配合 UA 自带的 `mix-blend-mode: plus-lighter`
+ * 才是真正的交叉淡化——两层透明度和恒为 1，中间不会发灰也不会发亮。
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-delay: 0s;
+  animation-timing-function: linear;
+}
+
+/* ---------------------------------------------------------------- 切换期间禁用过渡
+ * 这一条是上面那套的**必要配套**，不是可选的收尾。
+ *
+ * Element Plus 的组件自己就带过渡：`.el-tag` 是 `transition: all .3s`，
+ * `.el-sub-menu__title` 是 `border-color, background-color, color`……
+ * 主题一换，令牌跟着变，这些过渡会各自跑起来（实测一屏 14~139 条）。
+ * 快照在交叉淡化的同时，底下这些元素还在逐帧重画文字——抖动就是这么来的，
+ * 而且它**先于**我加的任何规则存在。
+ *
+ * 所以切换期间把全站过渡按掉，让颜色一次到位，观感完全交给快照淡化。
+ * 类由 stores/app.ts 加、在 View Transition 结束时摘，不常驻——
+ * 常驻等于永久关掉 hover 反馈的动效。
+ */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+/* 关了动效的用户直接瞬变，别硬给动画 */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
 /* 数字列对齐：表格、指标卡里的数字统一等宽 */
 .num {
   font-variant-numeric: tabular-nums;
