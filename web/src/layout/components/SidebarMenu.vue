@@ -43,12 +43,18 @@ function hasChildren(node: MenuNode) {
           <el-icon><component :is="resolveIcon(group.icon)" /></el-icon>
           <span>{{ group.name }}</span>
         </template>
+        <!--
+          子菜单同样画图标：icon 字段本来就逐条存着（菜单管理里能看到），
+          之前这一支只输出名字，等于把数据白存了。
+          图标也不是纯装饰——折叠态下二级项弹在浮层里，只有图标能提供辨识锚点
+        -->
         <el-menu-item
           v-for="item in group.children!.filter((c) => c.visible)"
           :key="item.id"
           :index="item.path"
         >
-          {{ item.name }}
+          <el-icon><component :is="resolveIcon(item.icon)" /></el-icon>
+          <template #title>{{ item.name }}</template>
         </el-menu-item>
       </el-sub-menu>
 
