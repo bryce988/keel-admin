@@ -1,24 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
-import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { changePassword } from '@/api/profile'
+import { ElMessageBox } from 'element-plus'
 import { Expand, Fold, Moon, Search, Sunny } from '@element-plus/icons-vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import TagsView from './components/TagsView.vue'
+import PasswordDrawer from '@/views/profile/PasswordDrawer.vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { useTagsViewStore } from '@/stores/tagsView'
-import { useDictStore } from '@/stores/dict'
-import { resetDynamicRoutes } from '@/router'
-import type { FormDrawerInstance } from '@/components'
+import { useSignOut } from '@/composables/useSignOut'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
-const tagsStore = useTagsViewStore()
-const dictStore = useDictStore()
+const signOut = useSignOut()
 
 /** 面包屑：一级分组 / 当前页 */
 const breadcrumb = computed(() => {
@@ -51,47 +47,8 @@ function cacheKey(current: RouteLocationNormalizedLoaded): string {
 onMounted(() => window.addEventListener('keel:refresh-page', onRefresh))
 onUnmounted(() => window.removeEventListener('keel:refresh-page', onRefresh))
 
-/** 退出登录：清干净再跳，否则换账号后会残留上个账号的页签、字典与动态路由 */
-async function signOut() {
-  await userStore.logout()
-  tagsStore.reset()
-  dictStore.forget()
-  resetDynamicRoutes()
-  router.replace('/login')
-}
-
-// ---------------------------------------------------------------- 修改密码
-const pwdDrawer = ref<FormDrawerInstance | null>(null)
-
-const pwdRules: FormRules = {
-  old_password: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
-  new_password: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, message: '密码长度不能少于 8 位', trigger: 'blur' }
-  ],
-  confirm_password: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
-    {
-      trigger: 'blur',
-      validator: (_rule, value, callback) => {
-        const form = (pwdDrawer.value as unknown as { form?: Record<string, any> })?.form
-        callback(value && value !== form?.new_password ? new Error('两次输入的密码不一致') : undefined)
-      }
-    }
-  ]
-}
-
-/** 原密码错误是 400 + 20005，映射到输入框上，用户不用自己找是哪一项错了 */
-const pwdErrorFields = { 20005: 'old_password' }
-
-function submitPassword(form: Record<string, any>) {
-  return changePassword({ old_password: form.old_password, new_password: form.new_password })
-}
-
-/** 服务端改密后会把当前 token 拉黑，必须马上重新登录 */
-async function onPasswordChanged() {
-  await signOut()
-}
+/** 改密与登出的细节都在各自的组件/composable 里，这里只做分发 */
+const pwdDrawer = ref<InstanceType<typeof PasswordDrawer> | null>(null)
 
 async function onUserCommand(cmd: string) {
   if (cmd === 'logout') {
@@ -101,15 +58,11 @@ async function onUserCommand(cmd: string) {
   }
 
   if (cmd === 'password') {
-    pwdDrawer.value?.open({
-      title: '修改密码',
-      data: { old_password: '', new_password: '', confirm_password: '' }
-    })
+    pwdDrawer.value?.open()
     return
   }
 
-  // 个人中心属于 M2 范围，先给出明确反馈而不是静默无响应
-  ElMessage.info('该功能将在「个人中心」模块中实现')
+  router.push('/profile')
 }
 </script>
 
@@ -177,34 +130,7 @@ async function onUserCommand(cmd: string) {
       <!-- 多页签 -->
       <TagsView />
 
-      <!-- 修改密码 -->
-      <FormDrawer
-        ref="pwdDrawer"
-        :submit="submitPassword"
-        :rules="pwdRules"
-        :error-fields="pwdErrorFields"
-        size="420px"
-        label-width="80px"
-        success-message="密码已修改，请重新登录"
-        @success="onPasswordChanged"
-      >
-        <template #default="{ form, errors }">
-          <el-form-item label="原密码" prop="old_password" :error="errors.old_password">
-            <el-input v-model="form.old_password" type="password" show-password autocomplete="off" />
-          </el-form-item>
-          <el-form-item label="新密码" prop="new_password" :error="errors.new_password">
-            <el-input v-model="form.new_password" type="password" show-password autocomplete="off" />
-          </el-form-item>
-          <el-form-item label="确认密码" prop="confirm_password">
-            <el-input
-              v-model="form.confirm_password"
-              type="password"
-              show-password
-              autocomplete="off"
-            />
-          </el-form-item>
-        </template>
-      </FormDrawer>
+      <PasswordDrawer ref="pwdDrawer" />
 
       <!-- 内容区 -->
       <main class="content">
@@ -221,10 +147,19 @@ async function onUserCommand(cmd: string) {
 </template>
 
 <style scoped>
+/*
+ * 外壳锁定在视口内，只让内容区滚
+ *
+ * 用 `min-height: 100vh` 的话滚动条长在 window 上，页面一往下翻，
+ * 顶栏（面包屑、搜索、头像）和页签条就一起滚没了——长表格翻到底部时
+ * 既看不到自己在哪个页签，也够不着任何全局操作。
+ * 改成 `height: 100vh` + 内容区 `overflow-y: auto`：外壳固定，内容自己滚。
+ */
 .layout {
   display: grid;
   grid-template-columns: var(--keel-sidebar-width) minmax(0, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   transition: grid-template-columns 0.28s ease;
 }
 
@@ -280,6 +215,9 @@ async function onUserCommand(cmd: string) {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* flex 子项默认 min-height:auto，不置 0 的话 .content 撑不小，
+     滚动条又会跑回 window 上——这一行是整套固定外壳的关键 */
+  min-height: 0;
   background: var(--el-bg-color-page);
 }
 
@@ -331,16 +269,31 @@ async function onUserCommand(cmd: string) {
   color: var(--el-text-color-regular);
 }
 
-/* ---------------- 内容区：全宽铺满 ---------------- */
+/* ---------------- 内容区：全宽铺满，也是唯一的滚动容器 ---------------- */
 .content {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 16px;
 }
 
 @media (max-width: 900px) {
+  /*
+   * 窄屏下侧边栏堆到顶部，整个外壳比一屏高——这时**必须**放开高度限制，
+   * 回到整页滚动。继续锁 100vh 的话菜单会把内容挤出视口，
+   * 而内容区自己那个滚动条又够不着
+   */
   .layout,
   .layout.is-collapsed {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .content {
+    min-height: 0;
+    overflow-y: visible;
   }
 
   .sidebar {

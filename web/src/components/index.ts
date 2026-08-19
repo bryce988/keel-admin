@@ -4,8 +4,10 @@ import SearchForm from './SearchForm.vue'
 import FormDrawer from './FormDrawer.vue'
 import DictSelect from './DictSelect.vue'
 import DictTag from './DictTag.vue'
+import EmptyState from './EmptyState.vue'
+import PageSkeleton from './PageSkeleton.vue'
 
-export { ProTable, SearchForm, FormDrawer, DictSelect, DictTag }
+export { ProTable, SearchForm, FormDrawer, DictSelect, DictTag, EmptyState, PageSkeleton }
 export type { ProColumn, PageResult, TableQuery } from './ProTable.vue'
 export type { SearchField } from './SearchForm.vue'
 export type { FormDrawerOptions, FormDrawerInstance } from './FormDrawer.vue'
@@ -19,7 +21,7 @@ export interface ProTableInstance {
 /**
  * 全局注册
  *
- * 这五个组件在每个列表页都会用到，逐页 import 只是噪音。
+ * 这几个组件在每个列表页都会用到，逐页 import 只是噪音。
  * 业务组件不要往这里加——全局注册的东西进不了 tree-shaking。
  */
 export default {
@@ -29,5 +31,7 @@ export default {
     app.component('FormDrawer', FormDrawer)
     app.component('DictSelect', DictSelect)
     app.component('DictTag', DictTag)
+    app.component('EmptyState', EmptyState)
+    app.component('PageSkeleton', PageSkeleton)
   }
 }

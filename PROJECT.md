@@ -1,7 +1,7 @@
 # Keel · 项目文档
 
 > **Keel（龙骨）** —— 多端后台系统的底座
-> 版本 v1.4 · 2026-08-18 · 状态：M1 框架 + M2 系统管理已完成并上线，M3 页型模板待启动 · 开源协议 MIT
+> 版本 v1.5 · 2026-08-19 · 状态：M1 框架 + M2 系统管理已上线，**M3 已完成**，M4 联调加固待启动 · 开源协议 MIT
 > 技术栈：Vue 3 + Element Plus / PHP 8.4 + webman 2.x（多应用）
 > 仓库：`keel-admin`（monorepo）· Composer `keel/admin` · npm `@keel/ui`
 > 在线预览：http://43.143.249.52:8080（演示账号 admin / admin123）
@@ -60,12 +60,13 @@
 | 框架 | **webman 2.x**（Workerman） | 常驻内存的 HTTP 服务，非 PHP-FPM 模型，见 §14 |
 | 包管理 | Composer >= 2.0 | `composer create-project workerman/webman:~2.0` |
 | ORM | `webman/database`（illuminate/database） | Laravel Eloquent，团队熟悉度优先 |
-| 缓存 | `webman/redis` | 会话、字典缓存、接口限流 |
+| 缓存 | **predis**（纯 PHP） | 会话、字典缓存、接口限流，封装在 `support\Cache` |
+| Redis 扩展 | **phpredis**（`pecl install redis`） | 队列插件的 `RedisConnection extends \Redis`，没有扩展连投递都会致命错误——不是性能优化而是硬依赖 |
 | 日志 | `webman/log`（Monolog） | 按天切分，配置见 `config/log.php` |
 | 校验 | `respect/validation` | 统一在 Request 层校验，控制器不写校验逻辑 |
 | 鉴权 | `firebase/php-jwt` | 无状态 JWT，见 §7.5 |
-| 定时任务 | `workerman/crontab` | 以自定义进程运行，见 §14 |
-| 队列 | `webman/redis-queue` | 导出、通知等耗时任务异步化 |
+| 定时任务 | `workerman/crontab` ^1.0 | `app/process/TaskProcess`，**count 必须为 1**，见 §14.7 |
+| 队列 | `webman/redis-queue` ^2.1 | 耗时任务异步化；消费进程见 `app/queue/`，配置在 `config/plugin/` |
 | 接口文档 | OpenAPI 3.0（注解生成） | 与前端联调的唯一依据 |
 
 **为什么选 webman**：常驻内存带来的性能收益（相比 FPM 提升数倍），且天然适合长连接与定时任务。代价是编程模型与 FPM 不同，全局状态会跨请求存活，**所有开发人员上手前必须先读 §14**。
@@ -180,12 +181,11 @@ start.php                 # 启动入口
 |---|---|---|---|
 | `/login` | 登录 | — | 账号密码 + 图形验证码，支持三方登录预留 |
 | `/dashboard` | 系统概览 | `sys:dashboard:view` | 指标卡、趋势、系统状态、待办 |
-| `/ui/spec` | 组件规范 | `sys:dashboard:view` | 设计令牌与组件用法，仅开发环境显示 |
-| `/template/list` | 标准列表页 | `biz:item:list` | 新列表页从此复制 |
-| `/template/form` | 表单页 | `biz:item:edit` | 新增/编辑共用 |
-| `/template/detail/:id` | 详情页 | `biz:item:view` | 不在菜单，由列表进入 |
-| `/template/tree` | 树表页 | `biz:item:list` | 分类型数据 |
-| `/template/result` | 结果与异常页 | — | 结果页与错误页样式 |
+| `/template/list` | 模板·标准列表页 | — | **仅开发环境**，五种页型见 §9 |
+| `/template/tree-list` | 模板·树表联动页 | — | 同上 |
+| `/template/master-detail` | 模板·主从页 | — | 同上 |
+| `/template/form` | 模板·表单页 | — | 同上 |
+| `/template/detail/:id` | 模板·详情页 | — | 同上 |
 | `/system/user` | 用户管理 | `sys:user:list` | 账号、角色分配、停用 |
 | `/system/dept` | 部门管理 | `sys:dept:list` | 组织树、岗位 |
 | `/system/role` | 角色管理 | `sys:role:list` | 功能权限、数据权限、字段权限 |
@@ -193,9 +193,14 @@ start.php                 # 启动入口
 | `/system/dict` | 数据字典 | `sys:dict:list` | 字典类型与字典项 |
 | `/system/param` | 参数配置 | `sys:param:edit` | 基础、安全、集成、高级参数 |
 | `/system/log` | 操作日志 | `sys:log:list` | 操作/登录/接口日志 |
-| `/profile` | 个人中心 | — | 资料、安全设置、通知偏好、登录日志 |
+| `/profile` | 个人中心 | — | 基本资料、安全设置（改密/换绑手机）、我的登录记录 |
 
 详情页、个人中心不在菜单中，菜单高亮通过路由 `meta.activeMenu` 指回其列表页。
+
+页型模板不走权限点也不进菜单：它们是给开发者复制用的脚手架，只在
+`import.meta.env.DEV` 下注册，生产构建里不存在（`dynamic.ts` 的 glob 也排除了该目录）。
+原先规划里的「结果与异常页」不单列为一种页型——403/404 已在 `views/error/`，
+空状态与异常的规范在 §9.6，再抽一个模板只会多一份要同步的东西。
 
 ---
 
@@ -544,7 +549,26 @@ C 端 token 调 `/admin/users` 同样 401 + `10102`，两个错误体结构不�
 
 ## 9. 页型规范
 
-### 9.1 列表页
+新模块从 `web/src/views/template/` 复制对应页型起步，不要从零搭。五种页型覆盖后台绝大多数场景，
+超出的先问「是不是拆成两个页面更清楚」，确实需要第六种时先在这里补规范再写代码。
+
+| 页型 | 模板 | 什么时候用 | 现有实证 |
+|---|---|---|---|
+| 标准列表页 | `template/list/` | 单一实体的增删改查 | 岗位、角色 |
+| 树表联动页 | `template/tree-list/` | 实体挂在层级归属下，左树筛右表 | 用户（部门树）、部门 |
+| 主从页 | `template/master-detail/` | 一对多且从表离开主表没有意义 | 字典类型 + 字典项 |
+| 表单页 | `template/form/` | 字段多到抽屉装不下，或需要草稿与分步 | — |
+| 详情页 | `template/detail/` | 只读信息 + 多个关联区块 + 变更记录 | 个人中心 |
+
+**抽屉还是页面**：字段少于 12 个、不需要草稿、不需要分享链接的，一律用 `FormDrawer`——
+系统管理七个模块全部是这种。表单页与详情页是给业务模块准备的，脚手架自身只有个人中心用到。
+
+模板是**能打开的页面**，开发环境下访问 `/template/list`、`/template/tree-list`、
+`/template/master-detail`、`/template/form`、`/template/detail/1` 即可预览。
+它们只在 `import.meta.env.DEV` 下注册，且被 `dynamic.ts` 的 glob 排除，不进生产包。
+用法与复制清单见 `web/src/views/template/README.md`。
+
+### 9.1 标准列表页
 
 - 结构：搜索区（可折叠）→ 工具栏 → 表格 → 分页
 - 第一列为主标识列，点击进详情；副信息用第二行小字，不新增列
@@ -554,7 +578,22 @@ C 端 token 调 `/admin/users` 同样 401 + `10102`，两个错误体结构不�
 - 删除等危险操作二次确认，弹窗写明影响范围（如「将同时删除 12 条关联数据」）
 - 搜索条件、页码、排序写入 URL query，刷新与分享链接后状态不丢
 
-### 9.2 表单页
+### 9.2 树表联动页
+
+- 左树固定宽度（默认 240px）可折叠，右表占满剩余；窄屏（< 1200px）树收进抽屉
+- **选中节点写进 URL query**，与列表的分页排序同属一套状态，刷新后高亮与数据一起回来
+- 树默认「全部」根节点，选中即筛选；不做多选树——多选的语义（并集？子树？）说不清
+- 切换节点重置到第 1 页，但**保留搜索关键词**：用户的意图是「换个部门再搜一次」
+- 树的数据量通常远小于表，一次拉全量在前端过滤；超过 500 节点才考虑懒加载
+
+### 9.3 主从页
+
+- 上主下从或左主右从，主区选中行驱动从区加载；主区未选中时从区显示空状态而非空表格
+- 从区的增删改**不刷新主区**，除非主区展示了从表的聚合值（如字典项数量）
+- 删除主记录前检查从记录，走 `Guard::notReferenced`，提示写明条数
+- 主从共用一个页面 URL，选中的主记录 id 进 query，刷新后从区跟着回来
+
+### 9.4 表单页
 
 - 标签置于控件上方左对齐；长表单按语义分卡片，单卡片字段不超过 8 个
 - 失焦校验单字段，提交校验全表；失败后滚动并聚焦第一个错误字段
@@ -562,13 +601,13 @@ C 端 token 调 `/admin/users` 同样 401 + `10102`，两个错误体结构不�
 - 有未保存修改时离开页面二次确认；草稿每 30 秒自动暂存
 - 附件上传到临时目录，表单提交后才正式关联，取消时清理
 
-### 9.3 详情页
+### 9.5 详情页
 
 - 左栏静态属性（只读），右栏动态数据与关联对象
 - 关联区块数量为 0 时显示空状态与新建入口，不隐藏区块
 - 变更记录展示字段级差异（旧值 → 新值），不可删除
 
-### 9.4 空状态与异常
+### 9.6 空状态与异常
 
 | 场景 | 文案方向 | 必带动作 |
 |---|---|---|
@@ -577,7 +616,17 @@ C 端 token 调 `/admin/users` 同样 401 + `10102`，两个错误体结构不�
 | 无权限 | 你没有访问该页面的权限 | 申请权限 |
 | 服务异常 | 服务暂时不可用 + 错误码 | 重新加载 |
 
-加载策略：首屏骨架屏，翻页局部遮罩，按钮操作用按钮内 loading，避免整页闪烁。
+四种场景由 `<EmptyState>` 统一实现，`scene` 取上表四个值之一；只想换句文案传
+`description` 即可，不必新增场景。**动作按钮是默认带的**——「暂无数据」下面没有新建入口，
+用户只能盯着它发呆。确实不该有动作时（无权限、数据权限造成的空、"没有更多了"）
+显式传 `:action="false"`，让「这里不给动作」成为一个被写下来的决定，而不是忘了写。
+
+列表页不用自己处理空态：`ProTable` 会区分「一条都没有」和「筛出来是空的」，
+后者自动给出「清空筛选」并真的清掉条件与 URL 参数。需要新建入口的页面覆盖 `#empty` 插槽。
+
+加载策略：首屏用 `<PageSkeleton>`（list / detail / form 三种骨架），翻页局部遮罩，
+按钮操作用按钮内 loading，避免整页闪烁。骨架屏**只用于首屏**——版面已经渲染出来之后
+再换回骨架，等于把内容抹掉重来，比转圈还难受。
 
 ---
 
@@ -772,6 +821,26 @@ $user = Context::get('user');
 - 定时任务用 `workerman/crontab` 注册为自定义进程（`config/process.php`），**不要用系统 crontab 调 PHP 脚本**，那样等于回到 FPM 模型
 - 多进程下定时任务只应在一个进程中执行，用 `count => 1` 的独立进程承载，避免重复触发
 - 导出、批量通知等耗时操作走队列消费进程，不占用 HTTP 进程
+
+**已落地的实现**
+
+```
+app/process/TaskProcess.php        定时任务，count=1，只投递不干活
+app/queue/LogCleanupConsumer.php   队列消费者，按目录扫描，无需注册
+app/common/service/LogCleanupService.php   实际逻辑（按 sys.log.retainDays 分批删）
+config/plugin/webman/redis-queue/  app.php / process.php / redis.php / log.php
+```
+
+三条从实测里换来的硬约束：
+
+1. **定时任务进程里不要写耗时逻辑**。它只有一个进程，一个任务卡住，后面所有计划任务
+   跟着延后。正确做法是投队列——`TaskProcess` 里那句 `Redis::send()` 就是范例。
+2. **队列插件的四个配置文件一个都不能少**。`app.php`（`enable`）缺了插件整个不加载、
+   消费进程压根不出现；`log.php` 缺了消费进程启动即崩、以 status 64000 退出。
+   后者尤其阴——启动列表里那一列仍然显示 `[OK]`，那只是拉起瞬间的状态。
+   判断依据看有没有 `exit with status`。
+3. **清理类任务必须 `withoutGlobalScopes()`**。定时任务与队列进程里没有登录用户，
+   带着数据权限跑，轻则删不掉，重则被判成「无部门列」而全表放行。
 
 ---
 

@@ -147,7 +147,12 @@ defineExpose({ open })
           </template>
         </el-table-column>
         <template #empty>
-          <el-empty description="该角色还没有成员" :image-size="80" />
+          <EmptyState
+            description="该角色还没有成员"
+            action-text="添加成员"
+            :size="80"
+            @action="openPicker"
+          />
         </template>
       </el-table>
     </div>
@@ -169,7 +174,7 @@ defineExpose({ open })
         <el-table-column prop="real_name" label="姓名" min-width="90" />
         <el-table-column prop="dept_name" label="部门" min-width="100" />
         <template #empty>
-          <el-empty description="没有可添加的用户" :image-size="70" />
+          <EmptyState description="没有可添加的用户" :size="70" :action="false" />
         </template>
       </el-table>
 

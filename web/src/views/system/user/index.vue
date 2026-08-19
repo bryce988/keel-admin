@@ -258,7 +258,12 @@ onMounted(() => {
         highlight-current
         @node-click="onDeptClick"
       />
-      <el-empty v-if="!deptLoading && deptTree.length === 0" description="无可见部门" :image-size="60" />
+      <EmptyState
+        v-if="!deptLoading && deptTree.length === 0"
+        description="无可见部门"
+        :size="60"
+        :action="false"
+      />
     </aside>
 
     <section class="list-panel">

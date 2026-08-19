@@ -150,6 +150,34 @@ watch(
 
 const shownColumns = computed(() => props.columns.filter((col) => visibleMap[col.prop] !== false))
 
+/** 当前是否带着筛选条件——决定空态给「新建」还是「清空筛选」 */
+const hasFilter = computed(() =>
+  Object.values(props.params ?? {}).some(
+    (v) => v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && !v.length)
+  )
+)
+
+/** 空态文案里回显用户搜的词，比干巴巴一句「无结果」有用 */
+const filterKeyword = computed(() => {
+  const value = props.params?.keyword
+  return typeof value === 'string' && value ? value : undefined
+})
+
+/**
+ * 清空筛选并重新取数
+ *
+ * 把每个键置空而不是整个换成 {}：页面声明过的键必须保留下来，
+ * 否则 URL 同步那边认不出「这个键被清空了」，地址栏里的旧值会留在那儿。
+ */
+function clearFilters() {
+  const cleared: Record<string, unknown> = {}
+  for (const key of Object.keys(props.params ?? {})) {
+    cleared[key] = Array.isArray(props.params?.[key]) ? [] : ''
+  }
+  emit('update:params', cleared)
+  reload()
+}
+
 /**
  * 首次取数用的筛选值
  *
@@ -387,7 +415,23 @@ defineExpose({ reload, refresh, selected, loading })
       </el-table-column>
 
       <template #empty>
-        <el-empty description="暂无数据" :image-size="90" />
+        <!--
+          区分「一条都没有」和「筛出来是空的」——对用户是两件事：
+          前者要的是新建入口，后者要的是把筛选条件清掉。
+          清空筛选这件事 ProTable 自己就能做（params 是它 v-model 来的），
+          但「新建」它不可能知道，所以默认不给动作，
+          需要的页面用 #empty 插槽覆盖：
+            <template #empty><EmptyState @action="onCreate" /></template>
+        -->
+        <slot name="empty" :has-filter="hasFilter">
+          <EmptyState
+            v-if="hasFilter"
+            scene="search"
+            :keyword="filterKeyword"
+            @action="clearFilters"
+          />
+          <EmptyState v-else scene="empty" :action="false" />
+        </slot>
       </template>
     </el-table>
 

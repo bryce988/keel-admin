@@ -40,8 +40,15 @@ export const useDictStore = defineStore('dict', {
           return items
         })
         .catch(() => {
-          // 单个字典取不到不该让整个页面白屏，降级为空选项
-          this.data[code] = []
+          /*
+           * 降级为空选项，但**不写进缓存**
+           *
+           * 写了 `this.data[code] = []` 的话，它就是个真值，
+           * 上面两行的短路判断会认为「已加载」，于是这个字典**永远不再重试**——
+           * 一次网络抖动（或令牌过期期间的那几个 401）就能让全站的
+           * <DictTag> 一直显示「-」，只有整页刷新才好。
+           * 不缓存失败，下一次 preload 会重新拉。
+           */
           return []
         })
         .finally(() => {
@@ -68,7 +75,7 @@ export const useDictStore = defineStore('dict', {
           Object.assign(this.data, result)
         })
         .catch(() => {
-          missing.forEach((c) => (this.data[c] = []))
+          // 同上：失败不写缓存，否则这批字典这一整个会话都不会再拉了
         })
 
       missing.forEach((c) => (this.pending[c] = task.then(() => this.data[c] ?? [])))

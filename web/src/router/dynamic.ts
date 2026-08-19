@@ -9,8 +9,13 @@ import type { MenuNode } from '@/stores/user'
  *
  * import.meta.glob 会在构建时把 views 下所有页面登记成懒加载函数；
  * 不能用 `import(变量)` 拼路径，Vite 静态分析不到就打不进包里。
+ *
+ * 排除 `views/template/`：那是给开发者复制用的页型模板，不是业务页面。
+ * 不排的话它们会被 glob 一并打进生产包（连同 `_demo.ts` 的假数据），
+ * 而且后端只要把某个菜单的 component 填成 'views/template/list/index.vue'
+ * 就真能在生产环境打开一个示例页。
  */
-const modules = import.meta.glob('../views/**/*.vue')
+const modules = import.meta.glob(['../views/**/*.vue', '!../views/template/**'])
 
 function resolveComponent(path: string) {
   if (!path || path === 'Layout') return null

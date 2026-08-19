@@ -150,6 +150,9 @@ onUnmounted(() => {
 <style scoped>
 .tags-view {
   display: flex;
+  /* 固定高度的横条，不参与收缩：外壳锁定视口后，
+     少这一行页签会被内容挤扁（layout/index.vue 的 .content 说明） */
+  flex: none;
   align-items: center;
   gap: 8px;
   height: var(--keel-tags-height);

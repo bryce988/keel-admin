@@ -6,6 +6,7 @@ namespace app\common\middleware;
 
 use app\common\exception\ApiException;
 use app\common\model\SysOperationLogModel;
+use app\common\support\Arr;
 use app\common\support\Ctx;
 use Throwable;
 use Webman\Http\Request;
@@ -29,6 +30,18 @@ class OperationLogMiddleware implements MiddlewareInterface
 {
     /** 命中这些片段的入参一律不落库 */
     private const SENSITIVE = ['password', 'secret', 'token', 'captcha', 'credential', 'privatekey'];
+
+    /**
+     * 命中这些片段的入参**部分**脱敏（138****8000）
+     *
+     * 手机号受字段级权限保护（`sys:field:user:phone`），可操作日志是能导出的，
+     * 而且带数据权限——部门主管看得到下属的日志。原样落库等于开了一个
+     * 「从日志里读别人明文手机号」的旁路，把界面上辛苦做的脱敏绕过去。
+     *
+     * 不用全掩码是因为 `changes` 里存的就是 `138****8000`：
+     * 同一条日志两个字段对不上，看的人会以为系统出了错。
+     */
+    private const PARTIAL = ['phone', 'mobile'];
 
     public function process(Request $request, callable $handler): Response
     {
@@ -115,6 +128,13 @@ class OperationLogMiddleware implements MiddlewareInterface
             foreach (self::SENSITIVE as $word) {
                 if (str_contains($lower, $word)) {
                     $value = '******';
+
+                    return;
+                }
+            }
+            foreach (self::PARTIAL as $word) {
+                if (str_contains($lower, $word) && is_string($value)) {
+                    $value = Arr::mask($value);
 
                     return;
                 }

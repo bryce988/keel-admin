@@ -10,6 +10,7 @@ use app\admin\controller\LogController;
 use app\admin\controller\MenuController;
 use app\admin\controller\ParamController;
 use app\admin\controller\PostController;
+use app\admin\controller\ProfileController;
 use app\admin\controller\RoleController;
 use app\admin\controller\UserController;
 use app\client\controller\PingController as ClientPingController;
@@ -63,6 +64,18 @@ Route::group('/admin', function () {
         'perm' => '',
         'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '修改密码'],
     ]);
+
+    // 个人中心：id 全部取自令牌，没有「改别人」的路径，所以一个权限点都不需要
+    Route::get('/profile', [ProfileController::class, 'index'])->setParams(['perm' => '']);
+    Route::put('/profile', [ProfileController::class, 'update'])->setParams([
+        'perm' => '',
+        'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '修改个人资料'],
+    ]);
+    Route::put('/profile/phone', [ProfileController::class, 'changePhone'])->setParams([
+        'perm' => '',
+        'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '换绑手机号'],
+    ]);
+    Route::get('/profile/logins', [ProfileController::class, 'logins'])->setParams(['perm' => '']);
 
     // 系统概览：数据都受数据权限约束，部门主管看到的是他管得到的那部分
     Route::get('/dashboard/overview', [DashboardController::class, 'overview'])

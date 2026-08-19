@@ -75,6 +75,20 @@ export const useUserStore = defineStore('user', {
       return data
     },
 
+    /**
+     * 局部更新当前用户的基本信息
+     *
+     * 个人中心改完姓名/头像后调一次。不重新拉整个 profile：那会连
+     * 菜单和权限一起换掉，动态路由要跟着重注册，而这次改动跟权限毫无关系。
+     * 顶栏的昵称是从这里派生的 getter，不同步的话改完右上角还是旧名字，
+     * 刷新一下又对了——最招人烦的那类 bug。
+     */
+    patchUser(partial: Partial<Profile['user']>) {
+      if (this.profile) {
+        this.profile.user = { ...this.profile.user, ...partial }
+      }
+    },
+
     /** 登录后第一个请求：拿到用户、角色、权限、菜单 */
     async fetchProfile() {
       const data = await request.get<unknown, Profile>('/admin/auth/profile')

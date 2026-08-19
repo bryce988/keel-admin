@@ -23,6 +23,13 @@ final class Arr
     public static function mask(string $value, int $head = 3, int $tail = 4): string
     {
         $len = mb_strlen($value);
+
+        // 空值原样返回：没填手机号的人显示成 `*`，界面上看着像「有号码但被打码了」，
+        // 用户会追着问「我的手机号谁改的」。没有的东西不该脱敏出一个存在感
+        if ($len === 0) {
+            return '';
+        }
+
         if ($len <= $head + $tail) {
             return $len > 1 ? mb_substr($value, 0, 1) . str_repeat('*', $len - 1) : '*';
         }

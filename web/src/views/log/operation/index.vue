@@ -222,7 +222,7 @@ onMounted(() => dictStore.preload(['log_action', 'log_status']))
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-else description="这次操作没有字段级变更" :image-size="60" />
+          <EmptyState v-else description="这次操作没有字段级变更" :size="60" :action="false" />
 
           <h4>请求参数</h4>
           <pre class="json">{{ prettyJson(detail.params) }}</pre>

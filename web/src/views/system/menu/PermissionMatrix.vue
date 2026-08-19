@@ -93,7 +93,7 @@ onMounted(load)
       </el-table-column>
 
       <template #empty>
-        <el-empty description="暂无数据" :image-size="90" />
+        <EmptyState scene="empty" :action="false" />
       </template>
     </el-table>
   </div>

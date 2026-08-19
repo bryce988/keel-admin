@@ -273,7 +273,12 @@ onMounted(async () => {
           </div>
         </el-form-item>
 
-        <el-empty v-if="!rows.length && !loading" description="该分组下还没有参数" />
+        <EmptyState
+          v-if="!rows.length && !loading"
+          description="该分组下还没有参数"
+          action-text="新增参数"
+          @action="onCreate"
+        />
       </el-form>
     </el-card>
 
