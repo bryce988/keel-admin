@@ -21,12 +21,12 @@
 ## 本地开发
 
 ```bash
-git clone https://github.com/bryce988/keel-admin.git   # 主仓库
+git clone https://github.com/bryce988/keel-admin.git   # 国内可换成 git@gitee.com:yewang_top/keel-admin.git
 cd keel-admin
 ```
 
-> **关于 Gitee**：Gitee 上的 `keel-admin` 是由 GitHub 单向同步的镜像，仅用于国内加速克隆。
-> **所有 PR 必须提到 GitHub**——在 Gitee 提交的分支会在下次同步（`--force`）时被覆盖。
+> **GitHub 与 Gitee 都是主仓库**，维护者一条 `git push` 同时推两边，内容始终一致。
+> Issue 与 PR 提到哪边都行，就近选一个即可。
 
 **后端**（PHP >= 8.1，Composer >= 2.0）
 
@@ -70,8 +70,8 @@ type 取值：`feat` `fix` `refactor` `perf` `style` `docs` `test` `chore`。
 
 ## 推送到两个仓库（维护者）
 
-代码托管在 GitHub，Gitee 是**手动同步的镜像**。给同一个 `origin` 配两个 push 地址，
-之后 `git push` 一条命令就会依次推到两边：
+两个仓库地位相同，都要保持最新。给同一个 `origin` 配两个 push 地址，
+之后 `git push` 一条命令就会依次推到两边——**不要只推一边**，否则两个「主仓库」就名不副实了：
 
 ```bash
 # 一次性配置
@@ -96,17 +96,17 @@ git push -u origin main
 
 **注意事项**
 
-- **fetch 只走 GitHub**：`git pull` / `git fetch` 只从第一个地址拉取，Gitee 是只写不读的镜像
+- **fetch 只走第一个地址**：`git pull` / `git fetch` 只从 GitHub 拉。两边内容一致时这没有影响；
+  若在 Gitee 上直接合并了 PR，记得先 `git pull git@gitee.com:yewang_top/keel-admin.git main` 再推
 - **两边可以共用同一把 SSH 公钥**：把 `~/.ssh/id_ed25519.pub` 分别加到 GitHub 与 Gitee 账号即可，不必生成两把
-- **Gitee 仓库要建成空仓库**：创建时不要勾选「使用 README 初始化」，否则首次推送会因非快进被拒，需要 `git push -f`
+- **新建第二个仓库时要建成空仓库**：创建时不要勾选「使用 README 初始化」，否则首次推送会因非快进被拒，需要 `git push -f`
 - **推送是顺序执行的**：若 Gitee 那一步失败（网络、仓库未审核通过），GitHub 可能已推成功。看清输出，失败后单独补推：
 
 ```bash
 git push git@gitee.com:yewang_top/keel-admin.git main
 ```
 
-- 只想推 GitHub 时，临时指定地址即可：`git push git@github.com:bryce988/keel-admin.git main`
-- 兜底方案：仓库里的 `Sync to Gitee` 工作流支持在 GitHub Actions 页面手动触发，会把所有分支与 tag 强制同步到 Gitee
+- 只想推其中一边时，临时指定地址即可：`git push git@github.com:bryce988/keel-admin.git main`
 
 ---
 

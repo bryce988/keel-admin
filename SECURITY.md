@@ -18,7 +18,7 @@ Keel 是权限框架，安全问题的影响面通常比普通功能 Bug 大。�
 
 👉 https://github.com/bryce988/keel-admin/security/advisories/new
 
-若你无法访问 GitHub，可在 Gitee 提一个**不含任何技术细节**的 Issue（标题写「安全问题反馈」），我们会主动联系你走私下渠道。
+也可以在 Gitee 提一个**不含任何技术细节**的 Issue（标题写「安全问题反馈」），我们会主动联系你走私下渠道。
 
 报告请包含：
 
