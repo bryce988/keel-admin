@@ -2,7 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { Expand, Fold, Moon, Search, Sunny } from '@element-plus/icons-vue'
+import { Expand, Fold, Moon, Sunny } from '@element-plus/icons-vue'
+import MenuSearch from './components/MenuSearch.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import TagsView from './components/TagsView.vue'
 import PasswordDrawer from '@/views/profile/PasswordDrawer.vue'
@@ -93,18 +94,7 @@ async function onUserCommand(cmd: string) {
 
         <div class="spacer" />
 
-        <!--
-          这里的 size="default" 不是冗余：全局尺寸是 small（main.ts），
-          顶栏属于外壳而非密集表单区，56px 的条里放 24px 输入框会显得空。
-          清理"多余属性"时别把它删了
-        -->
-        <el-input
-          class="search"
-          placeholder="搜索菜单、用户、日志…"
-          :prefix-icon="Search"
-          size="default"
-          readonly
-        />
+        <MenuSearch />
 
         <el-tooltip :content="appStore.theme === 'dark' ? '切换到浅色' : '切换到深色'">
           <el-icon class="icon-btn" @click="appStore.toggleTheme()">
@@ -232,8 +222,14 @@ async function onUserCommand(cmd: string) {
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
+/*
+ * `:deep()` 不是风格选择：`.icon-btn` 现在也用在 <MenuSearch> 自己渲染的
+ * 触发器上，而 scoped 的作用域 id 传不到子组件的根元素
+ * （实测那上面既没有子组件的 data-v，也没有本组件的）。
+ * 不穿透的话搜索图标会掉出这套尺寸与 hover，变成一个没边界的裸图标。
+ */
 .hamburger,
-.icon-btn {
+.topbar :deep(.icon-btn) {
   width: 32px;
   height: 32px;
   border-radius: 4px;
@@ -244,16 +240,12 @@ async function onUserCommand(cmd: string) {
 }
 
 .hamburger:hover,
-.icon-btn:hover {
+.topbar :deep(.icon-btn:hover) {
   background: var(--el-fill-color-light);
 }
 
 .spacer {
   flex: 1;
-}
-
-.search {
-  width: 230px;
 }
 
 .user {
@@ -303,8 +295,5 @@ async function onUserCommand(cmd: string) {
     border-bottom: 1px solid var(--el-border-color);
   }
 
-  .search {
-    display: none;
-  }
 }
 </style>
