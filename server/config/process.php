@@ -58,5 +58,20 @@ return [
                 'enable_memory_monitor' => DIRECTORY_SEPARATOR === '/',
             ]
         ]
-    ]
+    ],
+
+    /**
+     * 定时任务（PROJECT.md §14.7）
+     *
+     * `count => 1` 是硬性的，不是调优余地：多进程会让同一个任务在同一时刻
+     * 被触发 N 次。任务本身只负责投递，耗时的活在队列消费进程里干。
+     *
+     * 队列消费进程**不在这里**注册——它由 `webman/redis-queue` 插件提供，
+     * 配置在 `config/plugin/webman/redis-queue/process.php`。
+     */
+    'task' => [
+        'handler'    => app\process\TaskProcess::class,
+        'count'      => 1,
+        'reloadable' => true,
+    ],
 ];
