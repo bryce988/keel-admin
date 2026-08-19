@@ -10,14 +10,24 @@ export interface TagItem {
    */
   fullPath: string
   title: string
-  /** 首页签固定，不可关闭 */
+  /**
+   * 固定：不可关闭，且不参与任何批量关闭。
+   * 首页签天生固定，其余由用户从页签菜单里切换
+   */
   affix?: boolean
 }
 
 const STORAGE_KEY = 'keel_tags_view'
 const HOME_PATH = '/dashboard'
-/** 上限：超出后淘汰最早打开的（首页签与当前页不淘汰），见 PROJECT.md §5 */
-export const MAX_TAGS = 8
+
+/*
+ * 这里**没有**页签数量上限
+ *
+ * 原来限 8 个、超出淘汰最早打开的并弹一条提示。实际用起来是
+ * 「开着开着东西自己没了」——用户没做任何关闭动作却丢了上下文，
+ * 比条子变长难受得多，而且提示只在淘汰那一瞬闪一下，回头根本想不起来丢了什么。
+ * 条子本身是横向滚动的，装不下就滚；要收拾用菜单里的批量关闭。
+ */
 
 /*
  * 首页签在菜单下发之前就要显示，所以标题只能写死一份。
@@ -32,16 +42,21 @@ function load(): { tags: TagItem[]; active: string } {
     if (!raw) return { tags: [HOME_TAG], active: HOME_PATH }
 
     const saved = JSON.parse(raw) as { tags: TagItem[]; active: string }
-    const tags = Array.isArray(saved.tags)
+    const tags: TagItem[] = Array.isArray(saved.tags)
       ? saved.tags
           .filter((t) => t?.path)
-          // fullPath 是后加的字段，老数据里没有，退回 path 兼容
-          .map((t) => ({ ...t, fullPath: t.fullPath || t.path }))
+          // fullPath 是后加的字段，老数据里没有，退回 path 兼容；
+          // 首页签的固定态不信存量数据，永远为真
+          .map((t) => ({
+            ...t,
+            fullPath: t.fullPath || t.path,
+            affix: t.path === HOME_PATH ? true : !!t.affix
+          }))
       : []
     if (!tags.some((t) => t.path === HOME_PATH)) tags.unshift(HOME_TAG)
 
     return {
-      tags: tags.slice(0, MAX_TAGS),
+      tags,
       active: tags.some((t) => t.path === saved.active) ? saved.active : HOME_PATH
     }
   } catch {
@@ -52,7 +67,7 @@ function load(): { tags: TagItem[]; active: string } {
 export const useTagsViewStore = defineStore('tagsView', {
   state: () => {
     const { tags, active } = load()
-    return { tags, active, lastEvicted: '' }
+    return { tags, active }
   },
 
   actions: {
@@ -65,7 +80,6 @@ export const useTagsViewStore = defineStore('tagsView', {
       const path = route.path
       const title = (route.meta.title as string) || path
       this.active = path
-      this.lastEvicted = ''
 
       const existing = this.tags.find((t) => t.path === path)
       if (existing) {
@@ -76,15 +90,6 @@ export const useTagsViewStore = defineStore('tagsView', {
       }
 
       this.tags.push({ path, fullPath: route.fullPath, title, affix: path === HOME_PATH })
-
-      // 超上限：淘汰最早打开的，首页签与当前页不动
-      while (this.tags.length > MAX_TAGS) {
-        const victim = this.tags.find((t) => !t.affix && t.path !== this.active)
-        if (!victim) break
-        this.tags = this.tags.filter((t) => t.path !== victim.path)
-        this.lastEvicted = victim.title
-      }
-
       this.persist()
     },
 
@@ -116,6 +121,27 @@ export const useTagsViewStore = defineStore('tagsView', {
       return this.tags.find((t) => t.path === path)?.fullPath ?? path
     },
 
+    /**
+     * 关闭左侧
+     *
+     * 与 closeRight 的写法刻意对称：固定页签一律留下，
+     * 只有当前页被关掉时才需要跳转，返回值是「该跳去哪」
+     */
+    closeLeft(path: string): string | null {
+      const index = this.tags.findIndex((t) => t.path === path)
+      if (index === -1) return null
+
+      this.tags = this.tags.filter((t, i) => i >= index || t.affix)
+      if (this.tags.some((t) => t.path === this.active)) {
+        this.persist()
+        return null
+      }
+
+      this.active = path
+      this.persist()
+      return this.tags.find((t) => t.path === path)?.fullPath ?? path
+    },
+
     closeRight(path: string): string | null {
       const index = this.tags.findIndex((t) => t.path === path)
       if (index === -1) return null
@@ -135,6 +161,20 @@ export const useTagsViewStore = defineStore('tagsView', {
       this.active = HOME_PATH
       this.persist()
       return this.tags.find((t) => t.path === HOME_PATH)?.fullPath ?? HOME_PATH
+    },
+
+    /**
+     * 切换固定
+     *
+     * 首页签不参与：它的固定不是用户偏好而是结构约束——
+     * 允许取消就会出现「一个页签都不剩」的状态，那时候内容区显示什么没有定义
+     */
+    toggleAffix(path: string) {
+      const tag = this.tags.find((t) => t.path === path)
+      if (!tag || tag.path === HOME_PATH) return
+
+      tag.affix = !tag.affix
+      this.persist()
     },
 
     reset() {

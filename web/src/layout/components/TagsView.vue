@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Close } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { MAX_TAGS, useTagsViewStore } from '@/stores/tagsView'
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  CircleClose,
+  Close,
+  Paperclip,
+  Refresh
+} from '@element-plus/icons-vue'
+import { useTagsViewStore } from '@/stores/tagsView'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,16 +18,59 @@ const tagsStore = useTagsViewStore()
 
 const stripRef = ref<HTMLElement>()
 
-/** 右键菜单 */
+/** 菜单宽度写死，是为了从按钮右对齐时能算准 left（见 openFromButton） */
+const MENU_WIDTH = 176
+/** 估算高度，只用于贴边时的夹取，宁可略大 */
+const MENU_HEIGHT = 250
+
+/**
+ * 一份菜单，两个入口
+ *
+ * 右键页签作用于该页签，页签条右端的下拉按钮作用于当前页签。
+ * 两者共用同一份 items 与同一个浮层——之前页签条上那两个按钮和右键菜单
+ * 是各写各的，加一项要改两处，迟早不一致
+ */
 const ctx = reactive({ visible: false, x: 0, y: 0, path: '' })
 
 const ctxIndex = computed(() => tagsStore.tags.findIndex((t) => t.path === ctx.path))
+const ctxTag = computed(() => tagsStore.tags[ctxIndex.value])
+
+/** 各方向上「真正能被关掉的」数量：固定页签不算在内，否则计数会骗人 */
+const leftCount = computed(() =>
+  ctxIndex.value <= 0 ? 0 : tagsStore.tags.slice(0, ctxIndex.value).filter((t) => !t.affix).length
+)
 const rightCount = computed(() =>
   ctxIndex.value === -1 ? 0 : tagsStore.tags.slice(ctxIndex.value + 1).filter((t) => !t.affix).length
 )
 const otherCount = computed(
   () => tagsStore.tags.filter((t) => !t.affix && t.path !== ctx.path).length
 )
+const allCount = computed(() => tagsStore.tags.filter((t) => !t.affix).length)
+
+interface MenuItem {
+  cmd?: string
+  label?: string
+  icon?: unknown
+  count?: number
+  disabled?: boolean
+  sep?: boolean
+}
+
+const menuItems = computed<MenuItem[]>(() => [
+  { cmd: 'refresh', label: '刷新', icon: Refresh },
+  {
+    cmd: 'affix',
+    label: ctxTag.value?.affix ? '取消固定' : '固定',
+    icon: Paperclip,
+    // 首页签的固定是结构约束不是偏好，理由见 store 的 toggleAffix
+    disabled: !ctxTag.value || ctxIndex.value === 0
+  },
+  { sep: true },
+  { cmd: 'closeLeft', label: '关闭左侧', icon: ArrowLeft, count: leftCount.value },
+  { cmd: 'closeRight', label: '关闭右侧', icon: ArrowRight, count: rightCount.value },
+  { cmd: 'closeOthers', label: '关闭其他', icon: Close, count: otherCount.value },
+  { cmd: 'closeAll', label: '关闭全部', icon: CircleClose, count: allCount.value }
+])
 
 // 监听 fullPath 而不是 path：同一个页面改了筛选条件也要更新页签记住的地址，
 // 这样切走再切回来筛选与页码还在
@@ -28,10 +78,6 @@ watch(
   () => route.fullPath,
   () => {
     tagsStore.open(route)
-    if (tagsStore.lastEvicted) {
-      ElMessage.info(`页签已达上限 ${MAX_TAGS} 个，已关闭最早的「${tagsStore.lastEvicted}」`)
-      tagsStore.lastEvicted = ''
-    }
     scrollActiveIntoView()
   },
   { immediate: true }
@@ -51,22 +97,46 @@ function onClose(path: string) {
   if (next) router.push(next)
 }
 
-function openCtx(e: MouseEvent, path: string) {
+/** 统一开菜单：坐标一律夹在视口内，否则贴着右边或底边的页签会把菜单顶出屏幕 */
+function openMenu(x: number, y: number, path: string) {
   ctx.path = path
-  ctx.x = e.clientX
-  ctx.y = e.clientY
+  ctx.x = Math.max(8, Math.min(x, window.innerWidth - MENU_WIDTH - 8))
+  ctx.y = Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT - 8))
   ctx.visible = true
+}
+
+function openFromTag(e: MouseEvent, path: string) {
+  openMenu(e.clientX, e.clientY, path)
+}
+
+function openFromButton(e: MouseEvent) {
+  // 再点一次收起。按钮上带了 .stop，document 的关闭监听收不到这次点击
+  if (ctx.visible) {
+    closeCtx()
+    return
+  }
+
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  openMenu(rect.right - MENU_WIDTH, rect.bottom + 6, route.path)
 }
 
 function closeCtx() {
   ctx.visible = false
 }
 
-function onCommand(cmd: string) {
+/** 计数为 0 的批量项置灰：它同时在告诉用户「这个方向没东西可关」 */
+function isDisabled(item: MenuItem) {
+  if (item.disabled) return true
+  return item.count !== undefined && item.count === 0
+}
+
+function onCommand(item: MenuItem) {
+  if (item.sep || !item.cmd || isDisabled(item)) return
+
   const path = ctx.path
   closeCtx()
 
-  switch (cmd) {
+  switch (item.cmd) {
     case 'refresh': {
       // 刷新当前页：借助 key 变化重新挂载
       if (path !== route.path) {
@@ -76,9 +146,14 @@ function onCommand(cmd: string) {
       window.dispatchEvent(new CustomEvent('keel:refresh-page'))
       break
     }
-    case 'close':
-      onClose(path)
+    case 'affix':
+      tagsStore.toggleAffix(path)
       break
+    case 'closeLeft': {
+      const next = tagsStore.closeLeft(path)
+      if (next) router.push(next)
+      break
+    }
     case 'closeRight': {
       const next = tagsStore.closeRight(path)
       if (next) router.push(next)
@@ -112,36 +187,33 @@ onUnmounted(() => {
         :to="tag.fullPath"
         class="tag"
         :class="{ 'is-active': tag.path === route.path, 'is-affix': tag.affix }"
-        @contextmenu.prevent="openCtx($event, tag.path)"
+        @contextmenu.prevent="openFromTag($event, tag.path)"
       >
         <span class="dot" />
         <span class="title">{{ tag.title }}</span>
-        <el-icon v-if="!tag.affix" class="close" @click.prevent.stop="onClose(tag.path)">
+        <!-- 固定的页签把关闭位换成图钉：既表明状态，也说明它为什么关不掉 -->
+        <el-icon v-if="tag.affix" class="pin"><Paperclip /></el-icon>
+        <el-icon v-else class="close" @click.prevent.stop="onClose(tag.path)">
           <Close />
         </el-icon>
       </router-link>
     </div>
 
-    <span class="count">{{ tagsStore.tags.length }} / {{ MAX_TAGS }}</span>
-    <el-button @click="onCommand('closeOthers')">关闭其他</el-button>
-    <el-button @click="onCommand('closeAll')">全部关闭</el-button>
+    <button type="button" class="more" title="页签操作" @click.stop="openFromButton">
+      <el-icon><ArrowDown /></el-icon>
+    </button>
 
-    <!-- 右键菜单 -->
+    <!-- 右键页签与右端按钮共用这一个浮层 -->
     <teleport to="body">
       <ul v-show="ctx.visible" class="ctx-menu" :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }">
-        <li @click="onCommand('refresh')">刷新当前</li>
-        <li class="sep" />
-        <li :class="{ disabled: ctxIndex === 0 }" @click="ctxIndex !== 0 && onCommand('close')">
-          关闭
-        </li>
-        <li :class="{ disabled: !rightCount }" @click="rightCount && onCommand('closeRight')">
-          关闭右侧<em>{{ rightCount }}</em>
-        </li>
-        <li :class="{ disabled: !otherCount }" @click="otherCount && onCommand('closeOthers')">
-          关闭其他<em>{{ otherCount }}</em>
-        </li>
-        <li class="sep" />
-        <li @click="onCommand('closeAll')">全部关闭</li>
+        <template v-for="(item, i) in menuItems" :key="item.cmd ?? `sep-${i}`">
+          <li v-if="item.sep" class="sep" />
+          <li v-else :class="{ disabled: isDisabled(item) }" @click="onCommand(item)">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
+            <em v-if="item.count">{{ item.count }}</em>
+          </li>
+        </template>
       </ul>
     </teleport>
   </div>
@@ -229,10 +301,34 @@ onUnmounted(() => {
   color: var(--el-color-primary);
 }
 
-.count {
+.tag .pin {
+  width: 14px;
+  height: 14px;
+  font-size: 11px;
+  /* 图钉是状态而非按钮，压暗一档，别让人以为能点 */
+  opacity: 0.65;
+}
+
+/* 右端的下拉入口。做成和页签同高，视觉上属于这条横条而不是浮在上面 */
+.more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 3px;
+  background: var(--el-bg-color);
+  color: var(--el-text-color-regular);
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  cursor: pointer;
+}
+
+.more:hover {
+  border-color: var(--el-color-primary);
+  color: var(--el-color-primary);
 }
 </style>
 
@@ -241,7 +337,6 @@ onUnmounted(() => {
 .ctx-menu {
   position: fixed;
   z-index: 3000;
-  min-width: 160px;
   margin: 0;
   padding: 5px 0;
   list-style: none;
@@ -251,11 +346,17 @@ onUnmounted(() => {
   box-shadow: var(--el-box-shadow-light);
 }
 
+.ctx-menu {
+  /* 定宽而不是 min-width：从按钮右对齐时要拿它算 left（TagsView 的 MENU_WIDTH） */
+  width: 176px;
+}
+
 .ctx-menu li {
   display: flex;
   align-items: center;
+  gap: 10px;
   height: 34px;
-  padding: 0 16px;
+  padding: 0 14px;
   font-size: 14px;
   color: var(--el-text-color-regular);
   cursor: pointer;
