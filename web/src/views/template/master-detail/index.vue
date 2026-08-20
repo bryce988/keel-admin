@@ -234,10 +234,11 @@ onMounted(loadMasters)
 </template>
 
 <style scoped>
+  /* 面板之间的间距横竖一致，否则同一屏里网格看着比堆叠更挤 */
 .master-detail-page {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--keel-gap-lg);
   align-items: start;
 }
 

@@ -70,7 +70,7 @@ function onReset() {
 </script>
 
 <template>
-  <div class="search-form">
+  <div class="panel search-form">
     <el-form :model="form" inline @submit.prevent="onSearch">
       <el-form-item v-for="field in visibleFields" :key="field.prop" :label="field.label">
         <el-input
@@ -140,25 +140,52 @@ function onReset() {
 </template>
 
 <style scoped>
-.search-form {
-  padding: 16px 16px 0;
-  margin-bottom: 12px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
+/*
+ * 面板外观走全局 .panel（styles/index.css），这里只管排布。
+ *
+ * 原先是 `padding: 16px 16px 0` + form-item 的 `margin-bottom: 16px` 凑出下边距——
+ * 换行时靠 margin 撑、不换行时靠它补底，机制和别的面板不一样，
+ * 谁调一下 padding 就会错位。改成 flex + gap：间距只有一个来源。
+ *
+ * 也去掉了原来的 `margin-bottom: 12px`：容器已经有 gap，
+ * 两者叠加会让搜索栏与表格之间比别处宽出一截。
+ */
+.search-form :deep(.el-form--inline) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--keel-gap-lg);
 }
 
 .search-form :deep(.el-form-item) {
-  margin-right: 16px;
-  margin-bottom: 16px;
+  margin: 0;
 }
 
-/* 输入控件统一宽度，避免每个筛选项宽度不一显得参差 */
-.search-form :deep(.el-input),
-.search-form :deep(.el-select) {
+/*
+ * 宽度按**装什么**分档，不是一刀切
+ *
+ * 原来 input 与 select 一律 200px。结果「关键词」（占位符是
+ * 「操作人 / 描述 / 对象」这种长串）和「状态」（选项只有两个字）一样宽，
+ * 一排看下来就是几个等宽空框，宽度不传达任何信息。
+ *
+ * 下面的数字是量出来的，不是拍的：
+ * 全部字典里最长的选项是「本部门及下属」72px，最长占位符「请选择数据范围」84px，
+ * 加左右内边距与箭头约 128px —— 140 留了余量。
+ * 日期范围两格各需 62px，240 实测不挤（填真实日期验过）。
+ */
+.search-form :deep(.el-input) {
   width: 200px;
 }
 
+.search-form :deep(.el-select) {
+  width: 140px;
+}
+
+.search-form :deep(.el-date-editor:not(.el-date-editor--daterange)) {
+  width: 150px;
+}
+
+/* 放最后：日期范围要盖住上面 .el-input 那条同权重的规则 */
 .search-form :deep(.el-date-editor--daterange) {
   width: 240px;
 }

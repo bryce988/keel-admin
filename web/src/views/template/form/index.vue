@@ -236,7 +236,7 @@ onBeforeUnmount(() => {
     </el-form>
 
     <!-- 操作条吸底：长表单滚到一半要提交时不用再滚回顶部 -->
-    <div class="footer">
+    <div class="panel footer">
       <el-button @click="cancel">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="submit">提交</el-button>
       <span v-if="dirty" class="dirty-tip">有未保存的修改，草稿每 30 秒自动暂存</span>
@@ -262,16 +262,15 @@ onBeforeUnmount(() => {
   }
 }
 
+/* 面板外观走全局 .panel，只覆盖内边距：
+   吸底操作条要比内容面板扁，用满 16px 会显得头重脚轻 */
 .footer {
   position: sticky;
   bottom: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
+  gap: var(--keel-gap);
+  padding: var(--keel-gap) var(--keel-panel-pad);
 }
 
 .dirty-tip {

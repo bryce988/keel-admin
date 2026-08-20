@@ -234,7 +234,7 @@ async function onUserCommand(cmd: string) {
 .topbar :deep(.icon-btn) {
   width: 32px;
   height: 32px;
-  border-radius: 4px;
+  border-radius: var(--keel-radius);
   font-size: 18px;
   color: var(--el-text-color-primary);
   cursor: pointer;

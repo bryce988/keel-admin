@@ -16,6 +16,31 @@
    */
   --keel-topbar-height: 56px;
   --keel-tags-height: 40px;
+
+  /* ---------------------------------------------------------------- 版式令牌
+   * 加这几个是因为「面板」这个概念原先没有共享定义：
+   * SearchForm、ProTable、PageSkeleton、用户页的部门树、两个页型模板——
+   * 六个地方各抄了一份同样的四行 CSS，然后不出意外地漂了：
+   * 内边距出现 16px / 12px / `16px 16px 0` 三种，块间距 12 与 16 混用。
+   *
+   * 收敛成令牌之后，「面板长什么样」只有一处定义（见下面的 .panel）。
+   */
+  --keel-radius: 4px;
+  --keel-panel-pad: 16px;
+  --keel-gap: 12px;       /* 面板**内部**：标题与内容、工具栏与表格 */
+  --keel-gap-lg: 16px;    /* 面板**之间** */
+}
+
+/* ---------------------------------------------------------------- 面板
+ * 页面里所有白底容器都用它，不要再各写各的。
+ * 用全局类而不是 scoped 样式：scoped 的作用域 id 到不了子组件根元素，
+ * 而面板恰恰经常就是某个组件的根（这坑本仓库踩过三次）。
+ */
+.panel {
+  padding: var(--keel-panel-pad);
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--keel-radius);
 }
 
 * {
@@ -89,15 +114,32 @@ html.theme-switching *::after {
   }
 }
 
+/* ---------------------------------------------------------------- 圆角统一
+ * EP 给 small 尺寸的按钮用 `calc(base - 1px)`=3px、分页按钮 2px，
+ * 而同一行并排的输入框、下拉、标签都是 4px。三个值挨在一起看着就是没对齐。
+ * 这里把控件拉回与面板同一个值——本项目只有一个圆角。
+ */
+.el-button,
+.el-button--small,
+.el-pagination .el-pager li,
+.el-pagination button {
+  border-radius: var(--keel-radius);
+}
+
 /* 数字列对齐：表格、指标卡里的数字统一等宽 */
 .num {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- 卡片：原型里是发丝线 + 4px 圆角，不用重阴影 ---------------- */
+/* ---------------- 卡片：原型里是发丝线 + 4px 圆角，不用重阴影 ----------------
+ * 内边距也拉到与 .panel 同一个令牌。EP 默认 20px，而列表页的面板是 16px——
+ * 概览、参数、个人中心用 el-card，列表页用 .panel，两者并存时
+ * 内容起始位置差 4px，翻页时能看出来在「呼吸」。
+ */
 .el-card {
   --el-card-border-color: var(--el-border-color-lighter);
-  --el-card-border-radius: 4px;
+  --el-card-border-radius: var(--keel-radius);
+  --el-card-padding: var(--keel-panel-pad);
 }
 
 .el-card.is-never-shadow {
@@ -128,11 +170,11 @@ html.theme-switching *::after {
   padding: 0 12px;
 }
 
-/* ---------------- 页面容器 ---------------- */
+/* ---------------- 页面容器：面板之间用大间距 ---------------- */
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--keel-gap-lg);
 }
 
 /* 滚动条：细一点，跟原型一致 */

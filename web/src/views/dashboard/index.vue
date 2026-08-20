@@ -95,11 +95,15 @@ onMounted(() => {
         <span class="value num">
           {{ s.value }}<small>{{ s.unit }}</small>
         </span>
-        <el-tag :type="s.tone" size="small" effect="plain">{{ s.hint }}</el-tag>
-        <span v-if="s.extra" class="extra">
-          今日操作 {{ s.extra.op_today }} 次<template v-if="s.extra.op_failed">
-            ，其中被拒 {{ s.extra.op_failed }} 次</template>
-        </span>
+        <!-- 卡脚贴底：只有「今日登录」有 extra，它把整行撑高，
+             不贴底的话另外三张卡下面会各留一截无意义的空白 -->
+        <div class="foot">
+          <el-tag :type="s.tone" size="small" effect="plain">{{ s.hint }}</el-tag>
+          <span v-if="s.extra" class="extra">
+            今日操作 {{ s.extra.op_today }} 次<template v-if="s.extra.op_failed">
+              ，其中被拒 {{ s.extra.op_failed }} 次</template>
+          </span>
+        </div>
       </el-card>
     </div>
 
@@ -241,10 +245,11 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 
+  /* 面板之间的间距横竖一致，否则同一屏里网格看着比堆叠更挤 */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  gap: var(--keel-gap-lg);
 }
 
 .stat-card :deep(.el-card__body) {
@@ -282,15 +287,31 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 
+/*
+ * 卡脚贴底
+ *
+ * 四张指标卡在同一个 grid 行里被拉成等高，而只有「今日登录」多一行附注。
+ * 不贴底的话内容全部顶对齐，另外三张卡下方各空出一截，看着像没做完。
+ * `margin-top: auto` 把卡脚推到底，四张卡的底边就对齐了。
+ */
+.stat-card .foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: auto;
+}
+
 .stat-card .extra {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 
+  /* 面板之间的间距横竖一致，否则同一屏里网格看着比堆叠更挤 */
 .main-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--keel-gap-lg);
 }
 
 @media (max-width: 1100px) {

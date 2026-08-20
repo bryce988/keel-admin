@@ -594,10 +594,11 @@ onMounted(async () => {
   cursor: default;
 }
 
+/* 搜索栏与表格是两个并列面板，间距走「面板之间」那档令牌 */
 .item-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--keel-gap-lg);
   min-width: 0;
 }
 

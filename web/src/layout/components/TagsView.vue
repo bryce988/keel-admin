@@ -255,7 +255,7 @@ onUnmounted(() => {
   height: 26px;
   padding: 0 8px;
   border: 1px solid var(--el-border-color-light);
-  border-radius: 3px;
+  border-radius: var(--keel-radius);
   background: var(--el-bg-color);
   color: var(--el-text-color-regular);
   font-size: 12px;
@@ -319,7 +319,7 @@ onUnmounted(() => {
   height: 26px;
   padding: 0;
   border: 1px solid var(--el-border-color-light);
-  border-radius: 3px;
+  border-radius: var(--keel-radius);
   background: var(--el-bg-color);
   color: var(--el-text-color-regular);
   font-size: 12px;

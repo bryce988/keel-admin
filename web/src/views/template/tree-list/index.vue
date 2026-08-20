@@ -74,7 +74,7 @@ async function onDelete(row: DemoRow) {
 
 <template>
   <div class="page tree-list-page">
-    <aside v-loading="treeLoading" class="tree-panel">
+    <aside v-loading="treeLoading" class="panel tree-panel">
       <div class="panel-title">分类</div>
       <el-tree
         :data="treeData"
@@ -131,19 +131,15 @@ async function onDelete(row: DemoRow) {
 </template>
 
 <style scoped>
+  /* 面板之间的间距横竖一致，否则同一屏里网格看着比堆叠更挤 */
 .tree-list-page {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--keel-gap-lg);
   align-items: start;
 }
 
-.tree-panel {
-  padding: 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-}
+/* 面板外观走全局 .panel（styles/index.css） */
 
 .panel-title {
   margin-bottom: 12px;
@@ -154,7 +150,13 @@ async function onDelete(row: DemoRow) {
 
 /* minmax(0, 1fr) 而不是 1fr：grid 子项默认 min-width:auto，
    表格横向滚动条会把整个页面撑宽 */
+/* 搜索栏与表格是两个并列面板，间距由容器统一给。
+   曾经靠 SearchForm 自带的 margin-bottom 撑开，但那样在 .page 这种
+   本身有 gap 的容器里会叠加成两倍——间距只能有一个来源 */
 .list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keel-gap-lg);
   min-width: 0;
 }
 

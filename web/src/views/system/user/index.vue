@@ -246,7 +246,7 @@ onMounted(() => {
 
 <template>
   <div class="page user-page">
-    <aside class="dept-panel" v-loading="deptLoading">
+    <aside class="panel dept-panel" v-loading="deptLoading">
       <div class="panel-title">部门</div>
       <el-tree
         :data="deptTree"
@@ -415,25 +415,27 @@ onMounted(() => {
 .user-page {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
-  gap: 12px;
+  /* 左树与右侧内容是两个面板，用面板之间的大间距 */
+  gap: var(--keel-gap-lg);
   align-items: start;
 }
 
-.dept-panel {
-  padding: 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-}
+/* 面板外观走全局 .panel（styles/index.css） */
 
 .panel-title {
-  margin-bottom: 12px;
+  margin-bottom: var(--keel-gap);
   font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
+/* 搜索栏与表格是两个并列面板，间距由容器统一给。
+   曾经靠 SearchForm 自带的 margin-bottom 撑开，但那样在 .page 这种
+   本身有 gap 的容器里会叠加成两倍——间距只能有一个来源 */
 .list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--keel-gap-lg);
   min-width: 0;
 }
 

@@ -26,7 +26,7 @@ withDefaults(
   <div class="page-skeleton">
     <!-- 列表页：搜索栏 → 工具栏 → 表格 -->
     <template v-if="type === 'list'">
-      <div class="block search">
+      <div class="panel block search">
         <el-skeleton animated>
           <template #template>
             <div class="row">
@@ -38,7 +38,7 @@ withDefaults(
         </el-skeleton>
       </div>
 
-      <div class="block">
+      <div class="panel block">
         <el-skeleton animated>
           <template #template>
             <div class="row toolbar">
@@ -58,17 +58,17 @@ withDefaults(
 
     <!-- 详情页：左栏静态属性 + 右栏动态区块 -->
     <div v-else-if="type === 'detail'" class="cols">
-      <div class="block">
+      <div class="panel block">
         <el-skeleton animated :rows="6" />
       </div>
-      <div class="block">
+      <div class="panel block">
         <el-skeleton animated :rows="8" />
       </div>
     </div>
 
     <!-- 表单页：按卡片分块 -->
     <template v-else>
-      <div v-for="i in 3" :key="i" class="block">
+      <div v-for="i in 3" :key="i" class="panel block">
         <el-skeleton animated :rows="4" />
       </div>
     </template>
@@ -82,12 +82,8 @@ withDefaults(
   gap: 16px;
 }
 
-.block {
-  padding: 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-}
+/* 面板外观走全局 .panel（styles/index.css）。
+   骨架屏的方块必须和真实面板长得一模一样，否则加载完会「跳一下」 */
 
 .row {
   display: flex;

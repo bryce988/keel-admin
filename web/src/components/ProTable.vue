@@ -341,7 +341,7 @@ defineExpose({ reload, refresh, selected, loading })
 </script>
 
 <template>
-  <div class="pro-table">
+  <div class="panel pro-table">
     <div class="toolbar">
       <div class="left">
         <slot name="toolbar" :selected="selected" />
@@ -451,19 +451,13 @@ defineExpose({ reload, refresh, selected, loading })
 </template>
 
 <style scoped>
-.pro-table {
-  padding: 16px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-}
-
+/* 面板外观走全局 .panel（styles/index.css），这里只管排布 */
 .toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--keel-gap);
+  margin-bottom: var(--keel-gap);
 }
 
 .toolbar .left,
@@ -482,6 +476,7 @@ defineExpose({ reload, refresh, selected, loading })
 .pagination {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  /* 与工具栏到表格的距离取同一个令牌，上下留白才对称 */
+  margin-top: var(--keel-gap);
 }
 </style>
