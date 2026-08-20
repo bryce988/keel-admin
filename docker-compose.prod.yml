@@ -78,7 +78,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须在 .env 中设置}
       SEED_DEMO: ${SEED_DEMO:-}           # 生产默认不播演示账号，预览站在 .env 里显式打开
       # 多端：生产不给默认值，未配置即该端不可用（PROJECT.md §8）
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       CLIENT_RATE_LIMIT: ${CLIENT_RATE_LIMIT:-120}
+      CLIENT_IP_RATE_LIMIT: ${CLIENT_IP_RATE_LIMIT:-}
       CLIENT_RATE_WINDOW: ${CLIENT_RATE_WINDOW:-60}
       OPEN_APP_KEY: ${OPEN_APP_KEY:-}
       OPEN_APP_SECRET: ${OPEN_APP_SECRET:-}

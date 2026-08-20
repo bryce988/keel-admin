@@ -58,3 +58,38 @@ Keel 是权限框架，安全问题的影响面通常比普通功能 Bug 大。�
 - JWT 密钥、数据库密码通过环境变量注入，未提交进仓库
 - 管理后台接口未直接暴露公网，或已配置 IP 白名单
 - 开启了操作日志与登录日志，并定期在「角色管理 → 分配权限」里核对每个角色的授权范围
+- **`TRUSTED_PROXIES` 与你的实际拓扑一致**（见下）
+
+### 客户端 IP 与反向代理
+
+IP 白名单、限流、登录日志、操作日志四样东西全都依赖「客户端真实 IP」，
+而这个值在有反向代理时只能从转发头里取——**取错就是四样一起失真**。
+
+Keel 的规则（`app/common/support/ClientIp.php`）：
+
+> 只有当 TCP 对端本身在 `TRUSTED_PROXIES` 里时，才采信它转发的 `X-Real-IP`；
+> 否则一律用对端地址。**任何情况下都不读 `X-Forwarded-For`**——
+> 它是链式追加的，最左段由客户端控制。
+
+部署时要做的：
+
+1. **代理必须覆盖式设置 `X-Real-IP`**，不能是追加或条件设置。
+   仓库自带的 `docker/nginx/default.conf` 已经是 `proxy_set_header X-Real-IP $remote_addr;`。
+2. **`TRUSTED_PROXIES` 收窄到你的网关地址**。默认值是三段私有网段，
+   意味着同一内网里的任何主机都能声明客户端 IP——单机 docker 部署够用，
+   多租户内网里不够。
+3. **前面若还有 CDN / SLB**，nginx 那层要改成从上游头取真实 IP
+   （如 `proxy_set_header X-Real-IP $http_x_real_ip;`），并把回源网段加进
+   `TRUSTED_PROXIES`；否则记录到的是回源节点地址。
+4. **不要把应用端口直接暴露公网**。绕过代理直连时对端就是客户端自己，
+   IP 是准的，但代理层加的其他防护（限流、白名单前置）也一并绕过了。
+   自带的 `docker-compose.prod.yml` 只发布 nginx 的端口。
+
+自查方法：
+
+```bash
+curl -H 'X-Forwarded-For: 1.2.3.4' -H 'X-Real-IP: 9.9.9.9' https://你的域名/open/ping
+```
+
+返回的 `your_ip` 应当是你的真实出口 IP。如果回显成 `1.2.3.4` 或 `9.9.9.9`，
+说明代理层配置有误，上面四样防护都处于可绕过状态。

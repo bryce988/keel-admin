@@ -7,6 +7,7 @@ namespace app\common\middleware;
 use app\common\exception\ApiException;
 use app\common\model\SysOperationLogModel;
 use app\common\support\Arr;
+use app\common\support\ClientIp;
 use app\common\support\Ctx;
 use Throwable;
 use Webman\Http\Request;
@@ -103,7 +104,7 @@ class OperationLogMiddleware implements MiddlewareInterface
                 'target'     => (string) Ctx::get('log.target', ''),
                 'api_method' => $request->method(),
                 'api_path'   => $request->path(),
-                'ip'         => $this->clientIp($request),
+                'ip'         => ClientIp::of($request),
                 'user_agent' => mb_substr((string) $request->header('user-agent', ''), 0, 255),
                 'params'     => $this->maskParams($request),
                 'changes'    => Ctx::get('log.changes'),
@@ -145,15 +146,5 @@ class OperationLogMiddleware implements MiddlewareInterface
         });
 
         return $params;
-    }
-
-    private function clientIp(Request $request): string
-    {
-        $forwarded = (string) $request->header('x-forwarded-for', '');
-        if ($forwarded !== '') {
-            return trim(explode(',', $forwarded)[0]);
-        }
-
-        return (string) $request->getRealIp();
     }
 }

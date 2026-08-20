@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\common\middleware;
 
 use app\common\exception\ForbiddenException;
+use app\common\support\ClientIp;
 use app\common\support\Env;
 use Webman\Http\Request;
 use Webman\Http\Response;
@@ -17,8 +18,8 @@ use Webman\MiddlewareInterface;
  * **留空表示不限制**——开源项目的默认行为不能是「谁也调不通」，
  * 生产环境务必在 .env 里配上。
  *
- * 取 IP 时优先 X-Forwarded-For 的第一段，因为线上有 nginx 在前面；
- * 这要求 nginx 正确设置该头，且不接受客户端伪造的值。
+ * 来源 IP 统一走 {@see ClientIp::of()}——**不要在这里自己读转发头**。
+ * 白名单是硬边界，取错一次就等于整道门形同虚设，而且配了的人不会知道。
  */
 class IpWhitelistMiddleware implements MiddlewareInterface
 {
@@ -29,7 +30,7 @@ class IpWhitelistMiddleware implements MiddlewareInterface
             return $handler($request);
         }
 
-        $ip = self::clientIp($request);
+        $ip = ClientIp::of($request);
 
         foreach (array_filter(array_map('trim', explode(',', $raw))) as $rule) {
             if (self::matches($ip, $rule)) {
@@ -38,16 +39,6 @@ class IpWhitelistMiddleware implements MiddlewareInterface
         }
 
         throw new ForbiddenException('来源 IP 不在白名单内', 40301);
-    }
-
-    private static function clientIp(Request $request): string
-    {
-        $forwarded = (string) $request->header('x-forwarded-for', '');
-        if ($forwarded !== '') {
-            return trim(explode(',', $forwarded)[0]);
-        }
-
-        return (string) $request->getRealIp();
     }
 
     private static function matches(string $ip, string $rule): bool
