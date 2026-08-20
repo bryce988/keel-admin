@@ -20,6 +20,18 @@ use Webman\Http\Request;
  */
 class EchoController
 {
+    /**
+     * 验签示例（空壳）
+     *
+     * `POST /open/echo` · **需要验签**
+     *
+     * 原样回显收到的参数与解析出的 `app_key`：签名验过了才进得来，
+     * 所以拿到 200 就说明对方的签名算法与时间戳都对上了。
+     *
+     * @param Request $request 任意参数，外加签名相关的头/字段（由 SignMiddleware 校验）
+     *
+     * @return Response 200，`{app_key, method, params, signed_ok}`
+     */
     public function index(Request $request): Response
     {
         return Result::ok([

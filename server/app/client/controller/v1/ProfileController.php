@@ -20,6 +20,17 @@ use Webman\Http\Request;
  */
 class ProfileController
 {
+    /**
+     * C 端个人信息
+     *
+     * `GET /client/v1/profile` · 需要 **C 端令牌**
+     *
+     * 两套身份体系永不混用：后台令牌调这里一律 401，反之亦然。
+     *
+     * @param Request $request 请求头：`Authorization` C 端令牌、`X-Channel` 渠道标识
+     *
+     * @return Response 200，`{user_id, channel, note}`
+     */
     public function index(Request $request): Response
     {
         $user = Ctx::get('client_user') ?? [];

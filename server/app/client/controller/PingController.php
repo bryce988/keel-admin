@@ -18,6 +18,19 @@ use Webman\Http\Request;
  */
 class PingController
 {
+    /**
+     * C 端存活探测
+     *
+     * `GET /client/ping` · 免鉴权，但**必须带渠道头**
+     *
+     * 缺 `X-Channel` 会被 ChannelMiddleware 挡在 400，且错误体不带 `trace_id`——
+     * 这两点正是「分端链路确实分开了」的可观测证据。
+     *
+     * @param Request $request 请求头：`X-Channel` 渠道标识（h5/ios/android 等）、
+     *                         `X-App-Version` 客户端版本
+     *
+     * @return Response 200，`{pong, app, channel, app_version}`
+     */
     public function index(Request $request): Response
     {
         return Result::ok([

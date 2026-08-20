@@ -18,6 +18,21 @@ use Webman\Http\Request;
  */
 class DashboardController
 {
+    /**
+     * 概览数据
+     *
+     * `GET /admin/dashboard/overview` · 权限点 `sys:dashboard:view`
+     *
+     * 一次返回首页要的全部区块：指标卡、近 7 天登录趋势、运行状态、最近操作、模块统计。
+     * 拆成多个接口会让首页发五六个请求，而这些数字本来就该是同一时刻的快照。
+     *
+     * 其中的用户数、部门数等**受数据权限约束**——部门主管看到的是他管得到的那部分，
+     * 不是全公司。归属过滤由模型全局 Scope 注入，service 里没有手写条件。
+     *
+     * @param Request $request 无参数
+     *
+     * @return Response 200，`{stats, login_trend, runtime, recent_logs, modules}`
+     */
     public function overview(Request $request): Response
     {
         return Result::ok(DashboardService::overview());
