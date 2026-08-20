@@ -50,6 +50,62 @@ request.interceptors.request.use((config) => {
   return config
 })
 
+const TOKEN_KEY = 'keel_token'
+const REFRESH_KEY = 'keel_refresh_token'
+
+/**
+ * 正在进行的续期请求
+ *
+ * 并发的多个请求会同时收到 401，**必须只发一次续期**：
+ * 刷新令牌是一次性的（后端用过即废并换发新的），并发续期会让第二个请求
+ * 拿着已作废的旧令牌去换，结果是刚续上就被踢下线。
+ * 所以这里把 Promise 存起来，后来者一律 await 同一个。
+ */
+let refreshing: Promise<string> | null = null
+
+/**
+ * 用刷新令牌换一对新令牌
+ *
+ * ⚠️ **必须把新的 refresh_token 也写回去**。后端每次刷新都会轮换：
+ * 旧的用过即废，不写回的话下一次续期就是 401，表现为「用一会儿就掉线，
+ * 而且时间不固定」——最难查的那种。
+ *
+ * 用裸 axios 而不是本文件的 request 实例：走实例会被响应拦截器接住，
+ * 续期失败时又触发一轮 401 处理，绕成环。
+ */
+async function doRefresh(): Promise<string> {
+  const refreshToken = localStorage.getItem(REFRESH_KEY)
+  if (!refreshToken) {
+    throw new Error('no refresh token')
+  }
+
+  const base = import.meta.env.VITE_API_BASE ?? ''
+  const { data } = await axios.post<{ access_token: string; refresh_token: string }>(
+    `${base}/admin/auth/refresh`,
+    { refresh_token: refreshToken },
+    { timeout: 15000 }
+  )
+
+  localStorage.setItem(TOKEN_KEY, data.access_token)
+  localStorage.setItem(REFRESH_KEY, data.refresh_token)
+
+  // store 里那份也要同步，否则它会一直留着已经作废的旧令牌。
+  // 动态 import 是为了断开循环依赖：user store 自己 import 了本文件
+  const { useUserStore } = await import('@/stores/user')
+  useUserStore().token = data.access_token
+
+  return data.access_token
+}
+
+/** 登录态彻底失效：清干净再交给上层跳登录页，避免带着废令牌反复重试 */
+function giveUp() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(REFRESH_KEY)
+  if (!location.pathname.startsWith('/login')) {
+    onUnauthorized?.()
+  }
+}
+
 request.interceptors.response.use(
   // 2xx：直接把数据本体交给调用方
   // 例外是文件下载：blob 请求要留住整个响应，文件名在 Content-Disposition 头里
@@ -76,12 +132,49 @@ request.interceptors.response.use(
     const { code = 0, message = '请求失败', trace_id: traceId = '', details } = data ?? {}
 
     switch (status) {
-      case 401:
-        // 登录页自己处理错误提示，不跳转
-        if (!location.pathname.startsWith('/login')) {
-          onUnauthorized?.()
+      case 401: {
+        const config = err.config as (typeof err.config & { _retried?: boolean }) | undefined
+
+        /*
+         * 静默续期：access 只活 2 小时，掉线就跳登录页太粗暴。
+         *
+         * 三个前提缺一不可：
+         * - `_retried` 防止死循环——续期后重放仍然 401（比如账号被停用），
+         *   就不该再续一次
+         * - 续期接口自身的 401 不能再触发续期，否则同样绕成环
+         * - 登录页不续期：那里本来就没有登录态
+         */
+        if (
+          config &&
+          !config._retried &&
+          !config.url?.includes('/auth/refresh') &&
+          !location.pathname.startsWith('/login') &&
+          localStorage.getItem(REFRESH_KEY)
+        ) {
+          config._retried = true
+
+          try {
+            // 并发的多个 401 共用同一个续期 Promise，见 refreshing 的说明
+            refreshing ??= doRefresh().finally(() => {
+              refreshing = null
+            })
+            const token = await refreshing
+
+            config.headers = config.headers ?? {}
+            config.headers.Authorization = `Bearer ${token}`
+
+            // 重放原请求。这里返回的是 request 实例的结果，
+            // 已经过响应拦截器解包，调用方拿到的仍是数据本体
+            return request(config)
+          } catch {
+            giveUp()
+            break
+          }
         }
+
+        giveUp()
         break
+      }
       case 403:
         ElMessage.error(message || '无权限访问')
         break

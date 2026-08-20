@@ -244,6 +244,13 @@ class UserService
 
         $user->password       = password_hash($plain, PASSWORD_DEFAULT);
         $user->pwd_updated_at = null;   // 强制本人下次登录时修改
+
+        // 作废该用户的全部会话。这是最需要立刻生效的场景——管理员重置密码
+        // 通常意味着账号疑似泄露，此时旧 refresh 还能用 7 天是不可接受的。
+        //
+        // ⚠️ 不能拿 pwd_updated_at 当判据：它在这里被置为 null（兼作「必须改密」标志），
+        // 参与时间比较毫无意义，所以才单独有 token_version 这一列
+        $user->token_version = (int) $user->token_version + 1;
         $user->save();
 
         OpLog::target("用户 {$user->username}({$id})");

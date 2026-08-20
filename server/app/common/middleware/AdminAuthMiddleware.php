@@ -45,10 +45,17 @@ class AdminAuthMiddleware implements MiddlewareInterface
         // perm_version 的用途是让 Redis 里的权限缓存 key 失效，
         // 授权变更后下一个请求就按新权限判定——用户无需重新登录（PROJECT.md §15 验收项）。
         // 若在此比对 pv 并抛 401，等于管理员每改一次角色就把在线用户全部踢下线。
-        // 真正需要强制下线的场景（改密码、管理员踢人）走 jti 黑名单。
+
+        // 但 tv 必须比对：它只在改密、管理员重置密码时递增，语义就是「作废这个人的所有会话」。
+        // 缺省为 0 与建表默认值一致，所以补列不会把存量在线用户踢下去。
+        if ((int) ($payload['tv'] ?? 0) !== (int) ($user['token_version'] ?? 0)) {
+            throw new UnauthorizedException('密码已变更，请重新登录', 10103);
+        }
 
         Ctx::set('user', $user);
         Ctx::set('jti', $payload['jti'] ?? '');
+        // 登出与改密要按当前 access 的剩余寿命拉黑它，所以得留着 exp
+        Ctx::set('jwt_payload', $payload);
 
         return $handler($request);
     }

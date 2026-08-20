@@ -72,6 +72,7 @@ CREATE TABLE `sys_users` (
   `status`         TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1在职 2试用期',
   `is_super`       TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '超级管理员，跳过权限校验',
   `perm_version`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '权限版本号，授权变更时递增使缓存失效',
+  `token_version`  INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '会话版本号，改密/重置密码时递增使该用户全部令牌失效',
   `pwd_updated_at` DATETIME        NULL                    COMMENT '密码最后修改时间，用于有效期校验',
   `last_login_at`  DATETIME        NULL COMMENT '最后登录时间',
   `last_login_ip`  VARCHAR(45)     NOT NULL DEFAULT ''     COMMENT '兼容 IPv6',
@@ -92,6 +93,10 @@ CREATE TABLE `sys_users` (
 **说明**
 
 - `perm_version` 是权限即时生效的关键：角色授权变更时递增，Redis 中的权限缓存 key 含该值，旧缓存自然失效，用户无需重新登录
+- `token_version` 是**强制下线**的开关，与 `perm_version` 职责不同：改密与管理员重置密码时递增，
+  令牌载荷里带着它，鉴权与刷新都比对，不一致即 401。
+  不能拿 `pwd_updated_at` 代替——那一列在管理员重置密码时被置为 `NULL`（兼作「必须改密」标志），
+  参与时间比较毫无意义
 - `is_super = 1` 的账号跳过一切权限校验，**不允许通过界面授予**，只能在数据库或初始化脚本中设置
 - 账号只停用（`status = 0`）不物理删除，`deleted_at` 仅用于极端情况的软删
 

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS `sys_users` (
   `status`         TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1在职 2试用期',
   `is_super`       TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '超级管理员，跳过权限校验',
   `perm_version`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '权限版本号，授权变更时递增使缓存失效',
+  `token_version`  INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '会话版本号，改密/重置密码时递增使该用户全部令牌失效',
   `pwd_updated_at` DATETIME        NULL                    COMMENT '密码最后修改时间',
   `last_login_at`  DATETIME        NULL                    COMMENT '最后登录时间',
   `last_login_ip`  VARCHAR(45)     NOT NULL DEFAULT ''     COMMENT '兼容 IPv6',

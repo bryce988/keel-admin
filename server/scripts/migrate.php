@@ -89,6 +89,14 @@ $columnPatches = [
         'UPDATE `sys_login_logs` l JOIN `sys_users` u ON u.id = l.user_id
             SET l.dept_id = u.dept_id WHERE l.user_id > 0 AND l.dept_id = 0',
     ],
+    [
+        'sys_users',
+        'token_version',
+        "INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '会话版本号，改密/重置密码时递增使该用户全部令牌失效' AFTER `perm_version`",
+        // 不需要回填：默认 0 与令牌里缺省的 tv=0 相等，存量会话不受影响。
+        // 反过来说，补列**不会**把线上在线用户踢下去
+        null,
+    ],
 ];
 
 $database = Db::conn()->getDatabaseName();

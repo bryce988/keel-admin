@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\common\service;
 
 use app\common\exception\BusinessException;
+use app\common\exception\RateLimitException;
 use app\common\exception\UnauthorizedException;
 use app\common\exception\ValidationException;
 use app\common\support\Cache;
@@ -24,12 +25,51 @@ class AuthService
      *
      * 安全约定：
      * - 账号不存在与密码错误返回同一个错误码，避免账号枚举
-     * - 连续失败按 账号+IP 双维度计数，超限锁定
+     * - 连续失败按 **账号 + IP** 计数并锁定，另有一道**按 IP 的总闸**
+     *
+     * ## 为什么锁定必须带 IP 维度
+     *
+     * 曾经只按账号锁：`login:lock:{username}`。`$ip` 传进来了却只用于写日志，
+     * 与注释里写的「账号+IP 双维度」完全不符。后果是**任何能打开登录页的人，
+     * 拿 5 次错密码就能让指定账号 30 分钟登不进去**——而 `admin` 这个账号名
+     * 在本项目里是公开且必然存在的，等于谁都能定点锁死超管。
+     *
+     * 更难受的是：全仓**没有任何解锁入口**，锁上之后只能干等 TTL 到期，
+     * 或者有人 SSH 上去 `redis-cli DEL`。管理员坐在后台里束手无策。
+     *
+     * 带上 IP 之后，攻击者只锁得到「他自己的 IP × 该账号」这一个组合，
+     * 受害者从自己的网络照常登录。
+     *
+     * ## 为什么同时还要一道 IP 总闸
+     *
+     * 只加 IP 维度会把 DoS 换成撞库：换个 IP 计数就归零，代理池一挂等于无限次尝试。
+     * 而后台端 `config/middleware.php` 里 `'admin' => []` 是空的，
+     * **一道限流都没有**。所以这里必须自带一道按 IP 的失败总闸（跨账号），
+     * 挡住单机横扫用户名。
+     *
+     * 两个计数器都是固定窗口（`Cache::incr` 只在首次设 TTL），窗口一到自动清零——
+     * 滑动窗口会让持续攻击把整个办公室的出口 IP 永久堵死。
      */
     public static function login(string $username, string $password, string $ip, string $ua): array
     {
-        $lockKey = "login:lock:{$username}";
-        $failKey = "login:fail:{$username}";
+        $limit       = Env::int('LOGIN_FAIL_LIMIT', 5);
+        $ipLimit     = Env::int('LOGIN_IP_FAIL_LIMIT', 20);
+        $lockMinutes = Env::int('LOGIN_LOCK_MINUTES', 30);
+        $window      = $lockMinutes * 60;
+
+        // 同一 IP 的失败次数按 IP 归集，与具体账号无关
+        $ipFailKey = 'login:fail:ip:' . md5($ip);
+
+        // 锁定与计数都带 IP：锁的是「这个人从这个地方登」，不是「这个账号」
+        $scope   = $username . ':' . md5($ip);
+        $lockKey = "login:lock:{$scope}";
+        $failKey = "login:fail:{$scope}";
+
+        // IP 总闸放在最前：横扫用户名的请求根本不该走到查库
+        if ($ipLimit > 0 && (int) (Cache::get($ipFailKey) ?? 0) >= $ipLimit) {
+            self::writeLoginLog(0, $username, $ip, $ua, false, '来源 IP 失败次数超限');
+            throw new RateLimitException('该来源失败次数过多，请稍后再试', max(Cache::ttl($ipFailKey), 1));
+        }
 
         if (Cache::exists($lockKey)) {
             $minutes = (int) ceil(Cache::ttl($lockKey) / 60);
@@ -45,12 +85,13 @@ class AuthService
         $ok = $user && password_verify($password, $user->password);
 
         if (!$ok) {
-            $limit = Env::int('LOGIN_FAIL_LIMIT', 5);
-            $lockMinutes = Env::int('LOGIN_LOCK_MINUTES', 30);
-            $fails = Cache::incr($failKey, $lockMinutes * 60);
+            // 两个计数器一起涨：一个决定「这个账号从这个 IP」要不要锁，
+            // 一个决定「这个 IP」要不要被整体挡住
+            Cache::incr($ipFailKey, $window);
+            $fails = Cache::incr($failKey, $window);
 
             if ($fails >= $limit) {
-                Cache::set($lockKey, 1, $lockMinutes * 60);
+                Cache::set($lockKey, 1, $window);
                 Cache::del($failKey);
             }
 
@@ -63,6 +104,9 @@ class AuthService
             throw new UnauthorizedException('账号已被停用，请联系管理员', 20002);
         }
 
+        // 只清「这个账号从这个 IP」的计数。**IP 总闸不清**——
+        // 否则攻击者只要手上有一个有效账号，登一次就能把闸门重置，
+        // 接着继续横扫其他用户名
         Cache::del($failKey);
 
         Db::table('sys_users')->where('id', $user->id)->update([
@@ -73,7 +117,7 @@ class AuthService
 
         self::writeLoginLog((int) $user->id, $username, $ip, $ua, true, '');
 
-        $tokens = JwtService::issue((int) $user->id, (int) $user->perm_version);
+        $tokens = JwtService::issue((int) $user->id, (int) $user->perm_version, (int) $user->token_version);
 
         // 密码从未修改过 → 强制首次登录改密
         $tokens['must_change_password'] = $user->pwd_updated_at === null;
@@ -231,6 +275,11 @@ class AuthService
             'pwd_updated_at' => date('Y-m-d H:i:s'),
             'updated_at'     => date('Y-m-d H:i:s'),
         ]);
+
+        // 改密即作废该用户的**全部**会话，其他端的 access 与 refresh 一起失效。
+        // 这是「改密踢下线」真正生效的地方——只吊销当前 jti 的话，
+        // 别的设备上那对令牌照常能用，泄露的 refresh 还能一直换新
+        Db::table('sys_users')->where('id', $user['id'])->increment('token_version');
     }
 
     public static function writeLoginLog(

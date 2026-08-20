@@ -48,7 +48,12 @@ class AuthController
      * 攻击者可以用错误的验证码试出「账号密码对不对」。
      *
      * 账号不存在与密码错误**返回同一个错误**（`20001`），不给枚举账号的机会。
-     * 连续失败会锁定，阈值与时长由系统参数 `sys.login.failLimit` / `sys.login.lockMinutes` 控制。
+     * 连续失败按「账号 + IP」计数并锁定，另有一道按 IP 的失败总闸（跨账号）。
+     * 只按账号锁会变成 DoS——谁都能拿 5 次错密码把指定账号锁死，详见 AuthService::login。
+     *
+     * ⚠️ 阈值与时长读的是**环境变量** `LOGIN_FAIL_LIMIT` / `LOGIN_IP_FAIL_LIMIT` /
+     * `LOGIN_LOCK_MINUTES`。seed 里那两个同名系统参数（`sys.login.*`）**目前是死配置**，
+     * 界面上改了不生效——这是既有缺陷，别照着参数页去调。
      *
      * @param Request $request 请求体：`username` 账号（必填）、`password` 密码（必填）、
      *                         `captcha_key` 验证码标识、`captcha_code` 验证码（必填）
@@ -126,7 +131,13 @@ class AuthController
     public function logout(Request $request): Response
     {
         $user = Ctx::user() ?? [];
-        JwtService::revoke((string) Ctx::get('jti', ''));
+
+        // 连同签发时与它配对的 refresh 一起作废。只吊销 access 的话，
+        // 泄露的 refresh 在剩余寿命内还能不断换出可用的新令牌
+        JwtService::revokePair(
+            (string) Ctx::get('jti', ''),
+            JwtService::remaining((array) Ctx::get('jwt_payload', []))
+        );
 
         if ($user) {
             AuthService::writeLoginLog(
@@ -172,9 +183,28 @@ class AuthController
             throw new UnauthorizedException('凭证类型错误', 10101);
         }
 
+        // 登出时这个 jti 已经被拉黑（见 logout 里的 revokePair）。
+        // 少了这一步，登出之后拿旧 refresh 照样能换出可用的 access token
+        if (JwtService::isRevoked((string) ($payload['jti'] ?? ''))) {
+            throw new UnauthorizedException('登录已失效，请重新登录');
+        }
+
         $user = AuthService::loadUser((int) ($payload['uid'] ?? 0));
 
-        return Result::ok(JwtService::issue((int) $user['id'], (int) $user['perm_version']));
+        // 改密或管理员重置密码后 token_version 会递增，此处比对使旧 refresh 立即作废
+        if ((int) ($payload['tv'] ?? 0) !== (int) ($user['token_version'] ?? 0)) {
+            throw new UnauthorizedException('密码已变更，请重新登录', 10103);
+        }
+
+        // 轮换：旧的 refresh 用过即废，按它自己的剩余寿命拉黑。
+        // 除了限制泄露窗口，还顺带得到重放检测——同一个 refresh 用第二次直接 401
+        JwtService::revokePayload($payload);
+
+        return Result::ok(JwtService::issue(
+            (int) $user['id'],
+            (int) $user['perm_version'],
+            (int) $user['token_version']
+        ));
     }
 
     /**
@@ -201,7 +231,13 @@ class AuthController
         $new = (string) $request->post('new_password', '');
 
         AuthService::changePassword(Ctx::user() ?? [], $old, $new);
-        JwtService::revoke((string) Ctx::get('jti', ''));   // 改密后当前 token 失效
+
+        // 全端失效由 service 里递增的 token_version 负责；这里再把当前这一对拉黑，
+        // 是为了不依赖「下一个请求会去比对 tv」这一件事——两条路径都堵上
+        JwtService::revokePair(
+            (string) Ctx::get('jti', ''),
+            JwtService::remaining((array) Ctx::get('jwt_payload', []))
+        );
 
         return Result::noContent();
     }

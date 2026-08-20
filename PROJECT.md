@@ -399,7 +399,19 @@ throw new BusinessException('名称已存在', 40001);   // 推荐：由异常�
 | `ForbiddenException` | 403 | 40300 | 已登录但无权限 |
 | 其他未捕获异常 | 500 | 50000 | **生产环境不返回堆栈**，只返回 traceId，详情进日志 |
 
-**JWT**：access token 有效期 2 小时，refresh token 7 天；token 内只放 `uid` 与签发时间，权限从 Redis 缓存读取，不塞进 token（避免授权变更后 token 内权限过期）。用户停用或角色变更时递增权限版本号，使旧 token 立即失效。
+**JWT**：access token 有效期 2 小时，refresh token 7 天；token 内只放 `uid`、`type` 与两个版本号，
+权限从 Redis 缓存读取，不塞进 token（避免授权变更后 token 内权限过期）。
+
+**两个版本号分工不同，别混用**：
+
+- `pv`（perm_version）—— 授权变更时递增，**只**用来让权限缓存失效。鉴权时**不比对**，
+  否则管理员每改一次角色就把在线用户全部踢下线。
+- `tv`（token_version）—— 改密、管理员重置密码时递增，鉴权与刷新**都比对**。
+  这才是「强制下线」的开关。
+
+**刷新令牌必须轮换**：旧的用过即废。只靠 jti 黑名单堵不住——登出时手上只有 access token，
+refresh 的 jti 是另一个值且从不落库，「作废这个人所有会话」用黑名单表达不了，
+必须靠 `token_version`。
 
 **幂等与限流**：写接口支持 `Idempotency-Key` 头（Redis SETNX，10 分钟窗口）；登录、短信等接口按 IP + 账号双维度限流。
 
