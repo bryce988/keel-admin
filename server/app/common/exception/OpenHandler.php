@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\exception;
 
+use app\common\constant\BizCode;
 use app\common\support\Ctx;
 
 /**
@@ -22,18 +23,18 @@ class OpenHandler extends AbstractHandler
 {
     /** 业务码 → 对外的稳定字符串标识 */
     private const CODE_MAP = [
-        10101 => 'UNAUTHORIZED',
-        10301 => 'FORBIDDEN',
-        10404 => 'NOT_FOUND',
-        10409 => 'CONFLICT',
-        10422 => 'INVALID_PARAMETER',
-        10429 => 'RATE_LIMIT_EXCEEDED',
-        10500 => 'INTERNAL_ERROR',
-        40101 => 'INVALID_SIGNATURE',
-        40102 => 'SIGNATURE_EXPIRED',
-        40103 => 'DUPLICATE_NONCE',
-        40104 => 'UNKNOWN_APP_KEY',
-        40301 => 'IP_NOT_ALLOWED',
+        BizCode::UNAUTHORIZED        => 'UNAUTHORIZED',
+        BizCode::FORBIDDEN           => 'FORBIDDEN',
+        BizCode::NOT_FOUND           => 'NOT_FOUND',
+        BizCode::CONFLICT            => 'CONFLICT',
+        BizCode::VALIDATION_FAILED   => 'INVALID_PARAMETER',
+        BizCode::RATE_LIMITED        => 'RATE_LIMIT_EXCEEDED',
+        BizCode::INTERNAL_ERROR      => 'INTERNAL_ERROR',
+        BizCode::INVALID_SIGNATURE   => 'INVALID_SIGNATURE',
+        BizCode::SIGNATURE_EXPIRED   => 'SIGNATURE_EXPIRED',
+        BizCode::DUPLICATE_NONCE     => 'DUPLICATE_NONCE',
+        BizCode::UNKNOWN_APP_KEY     => 'UNKNOWN_APP_KEY',
+        BizCode::IP_NOT_ALLOWED      => 'IP_NOT_ALLOWED',
     ];
 
     protected function format(int $status, int $bizCode, string $message, ?array $details): array

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\middleware;
 
+use app\common\constant\BizCode;
 use app\common\exception\UnauthorizedException;
 use app\common\service\JwtService;
 use app\common\support\Ctx;
@@ -33,7 +34,7 @@ class ClientAuthMiddleware implements MiddlewareInterface
         $payload = JwtService::decode(trim(substr($header, 7)));
 
         if (($payload['type'] ?? '') !== 'client') {
-            throw new UnauthorizedException('登录凭证类型不匹配', 10102);
+            throw new UnauthorizedException('登录凭证类型不匹配', BizCode::TOKEN_TYPE_MISMATCH);
         }
 
         if (JwtService::isRevoked($payload['jti'] ?? '')) {

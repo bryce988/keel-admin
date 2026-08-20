@@ -15,6 +15,8 @@ use app\admin\controller\RoleController;
 use app\admin\controller\UserController;
 use app\client\controller\PingController as ClientPingController;
 use app\client\controller\v1\ProfileController as ClientProfileController;
+use app\common\constant\BizCode;
+use app\common\constant\HttpStatus;
 use app\common\middleware\AdminAuthMiddleware;
 use app\common\middleware\ClientAuthMiddleware;
 use app\common\middleware\OperationLogMiddleware;
@@ -337,4 +339,4 @@ Route::group('/internal', function () {
 Route::disableDefaultRoute();
 
 // 404 兜底，保持与业务错误一致的响应结构
-Route::fallback(fn () => Result::error(404, 10404, '接口不存在'));
+Route::fallback(fn () => Result::error(HttpStatus::NOT_FOUND, BizCode::NOT_FOUND, '接口不存在'));

@@ -14,6 +14,7 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 岗位管理
@@ -76,7 +77,7 @@ const rules: FormRules = {
   ]
 }
 
-const errorFields = { 20201: 'code' }
+const errorFields = { [BizCode.POST_CODE_EXISTS]: 'code' }
 
 function onCreate() {
   editingId.value = 0

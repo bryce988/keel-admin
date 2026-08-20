@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\model\SysDeptModel;
 use app\common\model\SysPostModel;
 use app\common\model\SysUserModel;
@@ -100,7 +101,7 @@ class DeptService
 
     public static function create(array $data): SysDeptModel
     {
-        Guard::unique(SysDeptModel::class, 'code', $data['code'], null, '部门编码已存在', 20201);
+        Guard::unique(SysDeptModel::class, 'code', $data['code'], null, '部门编码已存在', BizCode::DEPT_CODE_EXISTS);
 
         $parentId = (int) ($data['parent_id'] ?? 0);
 
@@ -122,10 +123,10 @@ class DeptService
         /** @var SysDeptModel $dept */
         $dept = Guard::found(SysDeptModel::find($id));
 
-        Guard::unique(SysDeptModel::class, 'code', $data['code'], $id, '部门编码已存在', 20201);
+        Guard::unique(SysDeptModel::class, 'code', $data['code'], $id, '部门编码已存在', BizCode::DEPT_CODE_EXISTS);
 
         $newParentId = (int) ($data['parent_id'] ?? $dept->parent_id);
-        Guard::noCycle(SysDeptModel::class, $id, $newParentId, '上级部门不能是自己或其子部门', 20202);
+        Guard::noCycle(SysDeptModel::class, $id, $newParentId, '上级部门不能是自己或其子部门', BizCode::DEPT_CYCLE);
 
         $before = $dept->toArray();
 
@@ -156,9 +157,9 @@ class DeptService
         $dept = Guard::found(SysDeptModel::find($id));
 
         $message = '部门下存在用户、岗位或子部门，无法删除';
-        Guard::notReferenced(SysDeptModel::class, 'parent_id', $id, $message, 20203);
-        Guard::notReferenced(SysUserModel::class, 'dept_id', $id, $message, 20203);
-        Guard::notReferenced(SysPostModel::class, 'dept_id', $id, $message, 20203);
+        Guard::notReferenced(SysDeptModel::class, 'parent_id', $id, $message, BizCode::DEPT_HAS_CHILDREN);
+        Guard::notReferenced(SysUserModel::class, 'dept_id', $id, $message, BizCode::DEPT_HAS_CHILDREN);
+        Guard::notReferenced(SysPostModel::class, 'dept_id', $id, $message, BizCode::DEPT_HAS_CHILDREN);
 
         OpLog::target("部门 {$dept->name}({$dept->id})");
 

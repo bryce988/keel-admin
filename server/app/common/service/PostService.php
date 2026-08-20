@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\model\SysPostModel;
 use app\common\model\SysUserModel;
 use app\common\support\Db;
@@ -71,7 +72,7 @@ class PostService
 
     public static function create(array $data): SysPostModel
     {
-        Guard::unique(SysPostModel::class, 'code', $data['code'], null, '岗位编码已存在', 20201);
+        Guard::unique(SysPostModel::class, 'code', $data['code'], null, '岗位编码已存在', BizCode::POST_CODE_EXISTS);
 
         return Db::transaction(function () use ($data) {
             $post = new SysPostModel();
@@ -89,7 +90,7 @@ class PostService
         /** @var SysPostModel $post */
         $post = Guard::found(SysPostModel::find($id));
 
-        Guard::unique(SysPostModel::class, 'code', $data['code'], $id, '岗位编码已存在', 20201);
+        Guard::unique(SysPostModel::class, 'code', $data['code'], $id, '岗位编码已存在', BizCode::POST_CODE_EXISTS);
 
         $before = $post->toArray();
 
@@ -114,7 +115,7 @@ class PostService
             'post_id',
             $id,
             '该岗位下存在用户，无法删除',
-            20203
+            BizCode::POST_HAS_USERS,
         );
 
         OpLog::target("岗位 {$post->name}({$post->id})");

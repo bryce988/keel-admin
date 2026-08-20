@@ -19,6 +19,7 @@ import {
 import { download } from '@/utils/request'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 用户管理（RBAC 的**分配**层）
@@ -95,7 +96,7 @@ const rules: FormRules = {
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
 }
 
-const errorFields = { 20101: 'username' }
+const errorFields = { [BizCode.ACCOUNT_EXISTS]: 'username' }
 
 function onCreate() {
   editingId.value = 0

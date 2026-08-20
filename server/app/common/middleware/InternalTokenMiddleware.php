@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\middleware;
 
+use app\common\constant\BizCode;
 use app\common\exception\UnauthorizedException;
 use app\common\support\Env;
 use Webman\Http\Request;
@@ -26,13 +27,13 @@ class InternalTokenMiddleware implements MiddlewareInterface
     {
         $expected = (string) Env::get('INTERNAL_TOKEN', '');
         if ($expected === '') {
-            throw new UnauthorizedException('内部服务令牌未配置，该组接口已禁用', 10101);
+            throw new UnauthorizedException('内部服务令牌未配置，该组接口已禁用', BizCode::UNAUTHORIZED);
         }
 
         $token = (string) $request->header('x-internal-token', '');
 
         if ($token === '' || !hash_equals($expected, $token)) {
-            throw new UnauthorizedException('内部服务令牌无效', 10101);
+            throw new UnauthorizedException('内部服务令牌无效', BizCode::UNAUTHORIZED);
         }
 
         return $handler($request);

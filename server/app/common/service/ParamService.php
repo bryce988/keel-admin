@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\model\SysParamModel;
 use app\common\support\Cache;
 use app\common\support\Db;
@@ -188,7 +189,7 @@ class ParamService
 
     public static function create(array $data): array
     {
-        Guard::unique(SysParamModel::class, 'param_key', $data['param_key'], null, '参数键已存在', 20602);
+        Guard::unique(SysParamModel::class, 'param_key', $data['param_key'], null, '参数键已存在', BizCode::PARAM_KEY_EXISTS);
 
         return Db::transaction(function () use ($data) {
             $param = new SysParamModel();
@@ -219,7 +220,7 @@ class ParamService
         if ($param->is_builtin) {
             $data = ['param_value' => $data['param_value'] ?? $param->param_value, 'remark' => $data['remark'] ?? $param->remark];
         } elseif (isset($data['param_key'])) {
-            Guard::unique(SysParamModel::class, 'param_key', $data['param_key'], $id, '参数键已存在', 20602);
+            Guard::unique(SysParamModel::class, 'param_key', $data['param_key'], $id, '参数键已存在', BizCode::PARAM_KEY_EXISTS);
         }
 
         if ($param->is_secret && ($data['param_value'] ?? null) === self::MASK) {
@@ -248,7 +249,7 @@ class ParamService
         /** @var SysParamModel $param */
         $param = Guard::found(SysParamModel::find($id));
 
-        Guard::notBuiltin($param, '内置参数不可删除', 20601);
+        Guard::notBuiltin($param, '内置参数不可删除', BizCode::BUILTIN_PARAM_PROTECTED);
 
         OpLog::target("参数 {$param->param_key}");
 

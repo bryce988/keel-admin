@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\support;
 
+use app\common\constant\HttpStatus;
 use support\Response;
 
 /**
@@ -20,25 +21,25 @@ class Result
     /** 200 查询 / 更新成功 */
     public static function ok(mixed $data = null): Response
     {
-        return self::json(200, $data ?? new \stdClass());
+        return self::json(HttpStatus::OK, $data ?? new \stdClass());
     }
 
     /** 201 创建成功 */
     public static function created(mixed $data = null): Response
     {
-        return self::json(201, $data ?? new \stdClass());
+        return self::json(HttpStatus::CREATED, $data ?? new \stdClass());
     }
 
     /** 204 删除等无返回内容的成功 */
     public static function noContent(): Response
     {
-        return (new Response(204))->withHeaders(self::headers());
+        return (new Response(HttpStatus::NO_CONTENT))->withHeaders(self::headers());
     }
 
     /** 分页列表 */
     public static function page(array $list, int $total, int $pageNum, int $pageSize): Response
     {
-        return self::json(200, [
+        return self::json(HttpStatus::OK, [
             'list'      => $list,
             'total'     => $total,
             'page_num'  => $pageNum,

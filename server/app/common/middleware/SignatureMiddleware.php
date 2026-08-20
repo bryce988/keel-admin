@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\middleware;
 
+use app\common\constant\BizCode;
 use app\common\exception\UnauthorizedException;
 use app\common\support\Cache;
 use app\common\support\Env;
@@ -50,28 +51,28 @@ class SignatureMiddleware implements MiddlewareInterface
         $signature = (string) $request->header('x-signature', '');
 
         if ($appKey === '' || $nonce === '' || $signature === '' || $timestamp === 0) {
-            throw new UnauthorizedException('缺少签名参数', 40101);
+            throw new UnauthorizedException('缺少签名参数', BizCode::INVALID_SIGNATURE);
         }
 
         $secret = self::secretOf($appKey);
         if ($secret === null) {
-            throw new UnauthorizedException('未知的 app_key', 40104);
+            throw new UnauthorizedException('未知的 app_key', BizCode::UNKNOWN_APP_KEY);
         }
 
         if (abs(time() - $timestamp) > self::WINDOW) {
-            throw new UnauthorizedException('签名已过期', 40102);
+            throw new UnauthorizedException('签名已过期', BizCode::SIGNATURE_EXPIRED);
         }
 
         // nonce 只在时间窗口内需要保留，过期自动回收
         if (!Cache::setNx("open:nonce:{$appKey}:{$nonce}", self::WINDOW * 2)) {
-            throw new UnauthorizedException('请求已被处理，请勿重复提交', 40103);
+            throw new UnauthorizedException('请求已被处理，请勿重复提交', BizCode::DUPLICATE_NONCE);
         }
 
         $expected = self::sign($request, $secret, $timestamp, $nonce);
 
         // hash_equals 而非 ===：避免按字符比较的时序侧信道
         if (!hash_equals($expected, $signature)) {
-            throw new UnauthorizedException('签名校验失败', 40101);
+            throw new UnauthorizedException('签名校验失败', BizCode::INVALID_SIGNATURE);
         }
 
         Ctx::set('app_key', $appKey);

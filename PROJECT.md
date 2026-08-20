@@ -93,7 +93,8 @@ keel-admin/
 
 **发版策略**：`web/` 与 `server/` 共用同一个 tag（如 `v1.2.0`），保证前后端接口对得上；单端修复用 patch 版本。
 
-**没有 CI**：目前靠本地 `vue-tsc` + `vite build` + `php -l` + `sh scripts/acceptance.sh` 把关。
+**没有 CI**：目前靠本地 `vue-tsc` + `vite build` + `php -l` + `sh scripts/acceptance.sh`
++ `sh scripts/check-bizcode.sh` 把关。
 仓库里也没有 Issue / PR 模板——把问题说清楚比填表格有用。
 GitHub 与 Gitee 都是主仓库，维护者一条 `git push` 同时推两边。
 
@@ -430,6 +431,18 @@ public function store(StoreRequest $request): Response
 
 只做格式合法性。账号是否重复、部门有没有下级这类业务规则留在 service 层，
 它们失败是 409/400 而不是 422，交互完全不同。
+
+**业务码**：值只在 `app/common/constant/BizCode.php` 里出现一次，HTTP 状态码在
+`HttpStatus.php`，抛异常一律引用常量。三条约定：
+
+- **只增不改**。码发出去就是对外契约，新增往段尾追加，不为了让分组挨在一起而重排
+  （岗位段排在导入导出后面就是这个原因）
+- **一个码对应一个「原因」，不对应一句话**。措辞可以随场景变（「内置角色不允许修改」
+  与「不允许删除」共用一个码没问题），但原因不同必须给新码——原因决定前端怎么处理：
+  「岗位下有用户」要提示去改人员归属，「岗位编码重复」要把红框标到编码输入框上
+- **前端有一份全量镜像** `web/src/constants/bizCode.ts`。这是跨语言契约，
+  没有任何编译器管得着：后端改码，PHP 侧有 grep 兜着，前端只是「红框悄悄标错地方」，
+  没有测试能发现。`sh scripts/check-bizcode.sh` 做严格集合相等校验，不一致退出非 0
 
 **JWT**：access token 有效期 2 小时，refresh token 7 天；token 内只放 `uid`、`type` 与两个版本号，
 权限从 Redis 缓存读取，不塞进 token（避免授权变更后 token 内权限过期）。

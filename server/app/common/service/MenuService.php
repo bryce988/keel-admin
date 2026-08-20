@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\ConflictException;
 use app\common\model\SysPermissionModel;
 use app\common\support\Db;
@@ -105,9 +106,7 @@ class MenuService
             SysPermissionModel::class,
             $id,
             (int) ($data['parent_id'] ?? $node->parent_id),
-            '上级菜单不能是自己或其子节点',
-            20403
-        );
+            '上级菜单不能是自己或其子节点', BizCode::MENU_CYCLE);
 
         $before = $node->toArray();
 
@@ -132,14 +131,16 @@ class MenuService
             SysPermissionModel::class,
             'parent_id',
             $id,
+            // 与 20402「被角色引用」是两件事：这条的出路是先删子节点，
+            // 那条的出路是改为停用，不能共用一个码
             '该节点下还有子节点，请先删除子节点',
-            20402
+            BizCode::MENU_HAS_CHILDREN,
         );
 
         // 被角色引用的权限点**只能停用不能删**：直接删掉会让已授权的角色
         // 悄悄少一项权限，而管理员在角色页上看不到任何痕迹
         if (Db::table('sys_role_permissions')->where('permission_id', $id)->exists()) {
-            throw new ConflictException('该权限点已被角色引用，请改为停用', 20402);
+            throw new ConflictException('该权限点已被角色引用，请改为停用', BizCode::PERM_IN_USE);
         }
 
         OpLog::target("权限点 {$node->name}({$node->perm_code})");
@@ -170,7 +171,7 @@ class MenuService
             $data['perm_code'],
             $exceptId,
             '权限标识已存在',
-            20401
+            BizCode::PERM_CODE_EXISTS,
         );
 
         $parentId = (int) ($data['parent_id'] ?? 0);

@@ -11,6 +11,7 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 部门管理
@@ -90,7 +91,7 @@ const rules: FormRules = {
 }
 
 /** 业务码 → 字段，让「编码已存在」红框标在编码上而不是只弹一句 */
-const errorFields = { 20201: 'code' }
+const errorFields = { [BizCode.DEPT_CODE_EXISTS]: 'code' }
 
 function onCreate(parentId = 0) {
   editingId.value = 0

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\UnauthorizedException;
 use app\common\support\Cache;
 use app\common\support\Env;
@@ -103,7 +104,7 @@ class JwtService
         } catch (ExpiredException) {
             throw new UnauthorizedException('登录已过期，请重新登录');
         } catch (\Throwable) {
-            throw new UnauthorizedException('登录凭证无效', 10101);
+            throw new UnauthorizedException('登录凭证无效', BizCode::UNAUTHORIZED);
         }
     }
 

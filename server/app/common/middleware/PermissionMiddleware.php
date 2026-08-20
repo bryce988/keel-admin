@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\middleware;
 
+use app\common\constant\BizCode;
 use app\common\exception\ForbiddenException;
 use app\common\exception\UnauthorizedException;
 use app\common\service\PermissionService;
@@ -42,7 +43,7 @@ class PermissionMiddleware implements MiddlewareInterface
                 Env::isProd()
                     ? '无权限访问'
                     : sprintf('接口未声明权限点：%s %s，请在 config/route.php 的 setParams 中补充 perm', $request->method(), $request->path()),
-                10301
+                BizCode::FORBIDDEN,
             );
         }
 
@@ -56,7 +57,7 @@ class PermissionMiddleware implements MiddlewareInterface
             : PermissionService::has($user, (string) $perm);
 
         if (!$ok) {
-            throw new ForbiddenException('无权限访问', 10301);
+            throw new ForbiddenException('无权限访问', BizCode::FORBIDDEN);
         }
 
         return $handler($request);

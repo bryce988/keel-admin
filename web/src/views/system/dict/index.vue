@@ -23,6 +23,7 @@ import type {
   TableQuery
 } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 数据字典（主从页：左类型、右字典项）
@@ -171,7 +172,9 @@ const itemRules: FormRules = {
   value: [{ required: true, message: '请输入存储值', trigger: 'blur' }]
 }
 
-const errorFields = { 20501: 'value', 20502: 'value' }
+// 同一组码在两个抽屉里标到不同字段：字典类型抽屉里冲突的是编码，字典项抽屉里是值
+const typeErrorFields = { [BizCode.DICT_CODE_EXISTS]: 'code', [BizCode.DICT_ITEM_IN_USE]: 'code' }
+const itemErrorFields = { [BizCode.DICT_CODE_EXISTS]: 'value', [BizCode.DICT_ITEM_IN_USE]: 'value' }
 
 const TAG_TYPES = [
   { label: '默认（灰）', value: '' },
@@ -426,7 +429,7 @@ onMounted(async () => {
       ref="typeDrawerRef"
       :submit="submitType"
       :rules="typeRules"
-      :error-fields="{ 20501: 'code', 20502: 'code' }"
+      :error-fields="typeErrorFields"
       size="480px"
       @success="onTypeSaved"
     >
@@ -464,7 +467,7 @@ onMounted(async () => {
       ref="itemDrawerRef"
       :submit="submitItem"
       :rules="itemRules"
-      :error-fields="errorFields"
+      :error-fields="itemErrorFields"
       size="480px"
       @success="afterItemSaved"
     >

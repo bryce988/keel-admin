@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\middleware;
 
+use app\common\constant\BizCode;
 use app\common\exception\ForbiddenException;
 use app\common\support\ClientIp;
 use app\common\support\Env;
@@ -38,7 +39,7 @@ class IpWhitelistMiddleware implements MiddlewareInterface
             }
         }
 
-        throw new ForbiddenException('来源 IP 不在白名单内', 40301);
+        throw new ForbiddenException('来源 IP 不在白名单内', BizCode::IP_NOT_ALLOWED);
     }
 
     private static function matches(string $ip, string $rule): bool

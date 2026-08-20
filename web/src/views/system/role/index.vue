@@ -14,6 +14,7 @@ import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } fro
 import { useDictStore } from '@/stores/dict'
 import GrantDrawer from './GrantDrawer.vue'
 import MemberDrawer from './MemberDrawer.vue'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 角色管理（RBAC 的**授权**层）
@@ -68,7 +69,7 @@ const rules: FormRules = {
   ]
 }
 
-const errorFields = { 20301: 'code' }
+const errorFields = { [BizCode.ROLE_CODE_EXISTS]: 'code' }
 
 async function loadParentOptions(excludeId = 0) {
   const roles = await fetchRoleOptions()

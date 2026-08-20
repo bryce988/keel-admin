@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\common\exception;
 
+use app\common\constant\BizCode;
+use app\common\constant\HttpStatus;
 use app\common\support\Ctx;
 use app\common\support\Env;
 use support\Log;
@@ -76,7 +78,10 @@ abstract class AbstractHandler extends ExceptionHandler
             ? '服务暂时不可用，请稍后重试'
             : $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
 
-        return $this->json(500, $this->format(500, 10500, $message, null));
+        return $this->json(
+            HttpStatus::INTERNAL_SERVER_ERROR,
+            $this->format(HttpStatus::INTERNAL_SERVER_ERROR, BizCode::INTERNAL_ERROR, $message, null)
+        );
     }
 
     protected function json(int $status, array $body): Response

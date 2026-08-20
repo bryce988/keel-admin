@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\exception\ValidationException;
 use app\common\model\SysLoginLogModel;
@@ -115,7 +116,7 @@ class ProfileService
 
         if (!password_verify($password, (string) $user->password)) {
             // 复用「原密码错误」，与修改密码同一个码：对用户来说是同一件事
-            throw new BusinessException('密码错误', 20005);
+            throw new BusinessException('密码错误', BizCode::OLD_PASSWORD_ERROR);
         }
 
         if (!preg_match('/^1[3-9]\d{9}$/', $phone)) {
@@ -132,7 +133,7 @@ class ProfileService
          * 既绕开数据权限（看不见的人一样占着号码）也算上软删记录——
          * 漏掉任何一种，都会出现两个账号绑同一个号，将来接短信登录就撞了。
          */
-        Guard::unique(SysUserModel::class, 'phone', $phone, $userId, '手机号已被其他账号使用', 20106);
+        Guard::unique(SysUserModel::class, 'phone', $phone, $userId, '手机号已被其他账号使用', BizCode::PHONE_TAKEN);
 
         OpLog::target("个人资料 {$user->username}");
         // 新旧号码都脱敏后再进日志：操作日志本身是可导出的，

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\model\SysLoginLogModel;
 use app\common\model\SysOperationLogModel;
@@ -266,7 +267,7 @@ class LogService
         $limit = (int) ParamService::value(self::MAX_EXPORT_KEY, 50000);
 
         if ($query->toBase()->getCountForPagination() > $limit) {
-            throw new BusinessException("导出数据量超过上限 {$limit} 行，请缩小时间范围", 20701);
+            throw new BusinessException("导出数据量超过上限 {$limit} 行，请缩小时间范围", BizCode::EXPORT_LIMIT_EXCEEDED);
         }
 
         return $query;

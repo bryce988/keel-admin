@@ -5,6 +5,7 @@ import { Plus } from '@element-plus/icons-vue'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 // ⛔ 复制后把这一行换成你自己的 api/xxx.ts
 import { createDemo, deleteDemo, fetchDemoList, updateDemo, type DemoRow } from '../_demo'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 【模板 ①】标准列表页 —— 单一实体的增删改查
@@ -66,7 +67,7 @@ const rules: FormRules = {
 }
 
 /** 业务码 → 字段名：409 这类只有一句 message 的错误靠它落到具体输入框上 */
-const errorFields = { 10409: 'code' }
+const errorFields = { [BizCode.CONFLICT]: 'code' }
 
 function onCreate() {
   editingId.value = 0

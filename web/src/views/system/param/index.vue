@@ -13,6 +13,8 @@ import {
   type ParamRow
 } from '@/api/system'
 import type { FormDrawerInstance } from '@/components'
+import { BizCode } from '@/constants/bizCode'
+
 
 /**
  * 参数配置（按分组分 tab，一组一张表单）
@@ -24,6 +26,8 @@ import type { FormDrawerInstance } from '@/components'
  * ⚠️ 改参数只落库，不会热改后端配置——webman 是常驻内存多进程，
  * 运行期改配置只影响当前 worker（PROJECT.md §14）。
  */
+const paramErrorFields = { [BizCode.PARAM_KEY_EXISTS]: 'param_key' }
+
 const groups = ref<Array<{ code: string; name: string }>>([])
 const activeGroup = ref('')
 
@@ -286,7 +290,7 @@ onMounted(async () => {
       ref="drawerRef"
       :submit="submit"
       :rules="rules"
-      :error-fields="{ 20602: 'param_key' }"
+      :error-fields="paramErrorFields"
       size="520px"
       @success="loadParams"
     >

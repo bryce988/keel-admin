@@ -60,8 +60,11 @@ const props = withDefaults(
     confirmText?: string
     /**
      * 业务码 → 字段名，用于把 409 这类冲突错误落到具体输入框上。
-     * 例：`{ 20101: 'username' }` —— 账号已存在时红框标在账号上，
-     * 而不是只弹一句用户还得自己找是哪一项（docs/api.md §1.3.1）
+     * 例：`{ [BizCode.ACCOUNT_EXISTS]: 'username' }` —— 账号已存在时红框标在账号上，
+     * 而不是只弹一句、用户还得自己找是哪一项（docs/api.md §1.3.1）
+     *
+     * **码一律用 `@/constants/bizCode` 里的常量，不要写裸数字**：
+     * 后端改码时裸数字不报错也不告警，只是红框悄悄标错地方
      */
     errorFields?: Record<number, string>
   }>(),

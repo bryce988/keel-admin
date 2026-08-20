@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\exception\ForbiddenException;
 use app\common\exception\ValidationException;
@@ -133,7 +134,7 @@ class UserService
      */
     public static function create(array $data, array $roleIds = []): array
     {
-        Guard::unique(SysUserModel::class, 'username', $data['username'], null, '账号已存在', 20101);
+        Guard::unique(SysUserModel::class, 'username', $data['username'], null, '账号已存在', BizCode::ACCOUNT_EXISTS);
 
         $plain = (string) ($data['password'] ?? '');
         if ($plain === '') {
@@ -167,7 +168,7 @@ class UserService
     {
         $user = self::findEditable($id);
 
-        Guard::unique(SysUserModel::class, 'username', $data['username'], $id, '账号已存在', 20101);
+        Guard::unique(SysUserModel::class, 'username', $data['username'], $id, '账号已存在', BizCode::ACCOUNT_EXISTS);
 
         if ($roleIds !== null) {
             RoleService::assertAssignable($id, $roleIds);
@@ -197,7 +198,7 @@ class UserService
         $user = self::findEditable($id);
 
         if ($user->id === Ctx::userId()) {
-            throw new BusinessException('不能删除自己的账号', 20105);
+            throw new BusinessException('不能删除自己的账号', BizCode::CANNOT_OPERATE_SELF);
         }
 
         self::assertNoPendingHandover($user);
@@ -216,7 +217,7 @@ class UserService
         $user = self::findEditable($id);
 
         if ($user->id === Ctx::userId() && $status === 0) {
-            throw new BusinessException('不能停用自己的账号', 20105);
+            throw new BusinessException('不能停用自己的账号', BizCode::CANNOT_OPERATE_SELF);
         }
 
         if ($status === 0) {
@@ -288,7 +289,7 @@ class UserService
         $query = self::listQuery($filters);
 
         if ($query->toBase()->getCountForPagination() > $limit) {
-            throw new BusinessException("导出数据量超过上限 {$limit} 行，请缩小筛选范围", 20701);
+            throw new BusinessException("导出数据量超过上限 {$limit} 行，请缩小筛选范围", BizCode::EXPORT_LIMIT_EXCEEDED);
         }
 
         $mapper = self::rowMapper();
@@ -393,7 +394,7 @@ class UserService
         $user = Guard::found(SysUserModel::find($id));
 
         if ($user->is_super) {
-            throw new ForbiddenException('不允许操作超级管理员', 20103);
+            throw new ForbiddenException('不允许操作超级管理员', BizCode::SUPER_ADMIN_PROTECTED);
         }
 
         return $user;
@@ -417,9 +418,7 @@ class UserService
 
         if ($pending) {
             throw new BusinessException(
-                '请先完成数据交接：' . implode('、', $pending),
-                20104
-            );
+                '请先完成数据交接：' . implode('、', $pending), BizCode::DATA_HANDOVER_REQUIRED);
         }
     }
 
@@ -442,9 +441,7 @@ class UserService
         if (mb_strlen($plain) < $min) {
             throw new ValidationException(
                 ['password' => ["密码长度不能少于 {$min} 位"]],
-                '密码不符合安全策略',
-                20006
-            );
+                '密码不符合安全策略', BizCode::PASSWORD_POLICY_VIOLATION);
         }
     }
 

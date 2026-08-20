@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\ConflictException;
 use app\common\exception\NotFoundException;
 use app\common\model\SysDeptModel;
@@ -152,7 +153,7 @@ class DictService
 
     public static function createType(array $data): SysDictTypeModel
     {
-        Guard::unique(SysDictTypeModel::class, 'code', $data['code'], null, '字典编码已存在', 20501);
+        Guard::unique(SysDictTypeModel::class, 'code', $data['code'], null, '字典编码已存在', BizCode::DICT_CODE_EXISTS);
 
         return Db::transaction(function () use ($data) {
             $type = new SysDictTypeModel();
@@ -177,11 +178,11 @@ class DictService
         /** @var SysDictTypeModel $type */
         $type = Guard::found(SysDictTypeModel::find($id));
 
-        Guard::unique(SysDictTypeModel::class, 'code', $data['code'], $id, '字典编码已存在', 20501);
+        Guard::unique(SysDictTypeModel::class, 'code', $data['code'], $id, '字典编码已存在', BizCode::DICT_CODE_EXISTS);
 
         $oldCode = $type->code;
         if ($data['code'] !== $oldCode && SysDictItemModel::where('type_code', $oldCode)->exists()) {
-            throw new ConflictException('该字典下已有字典项，编码不可修改', 20502);
+            throw new ConflictException('该字典下已有字典项，编码不可修改', BizCode::DICT_ITEM_IN_USE);
         }
 
         $before = $type->toArray();
@@ -211,9 +212,7 @@ class DictService
             SysDictItemModel::class,
             'type_code',
             $type->code,
-            '该字典下还有字典项，请先删除字典项',
-            20502
-        );
+            '该字典下还有字典项，请先删除字典项', BizCode::DICT_ITEM_IN_USE);
 
         OpLog::target("字典 {$type->name}({$type->code})");
 
@@ -298,7 +297,7 @@ class DictService
         if ($newValue !== $item->value) {
             $refs = self::refCount($item->type_code, $item->value);
             if ($refs > 0) {
-                throw new ConflictException("该字典项已被 {$refs} 条数据引用，值不可修改", 20502);
+                throw new ConflictException("该字典项已被 {$refs} 条数据引用，值不可修改", BizCode::DICT_ITEM_IN_USE);
             }
 
             self::assertValueUnique($item->type_code, $newValue, $id);
@@ -330,7 +329,7 @@ class DictService
 
         $refs = self::refCount($item->type_code, $item->value);
         if ($refs > 0) {
-            throw new ConflictException("该字典项已被 {$refs} 条数据引用，无法删除", 20502);
+            throw new ConflictException("该字典项已被 {$refs} 条数据引用，无法删除", BizCode::DICT_ITEM_IN_USE);
         }
 
         OpLog::target("字典项 {$item->type_code}.{$item->value}({$item->label})");
@@ -376,7 +375,7 @@ class DictService
         }
 
         if ($query->exists()) {
-            throw new ConflictException('该字典下已存在相同的值', 20501);
+            throw new ConflictException('该字典下已存在相同的值', BizCode::DICT_CODE_EXISTS);
         }
     }
 }

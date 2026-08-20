@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\exception\RateLimitException;
 use app\common\exception\UnauthorizedException;
@@ -74,7 +75,7 @@ class AuthService
         if (Cache::exists($lockKey)) {
             $minutes = (int) ceil(Cache::ttl($lockKey) / 60);
             self::writeLoginLog(0, $username, $ip, $ua, false, '账号已锁定');
-            throw new UnauthorizedException("账号已锁定，请 {$minutes} 分钟后重试", 20003);
+            throw new UnauthorizedException("账号已锁定，请 {$minutes} 分钟后重试", BizCode::ACCOUNT_LOCKED);
         }
 
         $user = Db::table('sys_users')
@@ -96,12 +97,12 @@ class AuthService
             }
 
             self::writeLoginLog((int) ($user->id ?? 0), $username, $ip, $ua, false, '账号或密码错误');
-            throw new UnauthorizedException('账号或密码错误', 20001);
+            throw new UnauthorizedException('账号或密码错误', BizCode::ACCOUNT_OR_PASSWORD_ERROR);
         }
 
         if ((int) $user->status === 0) {
             self::writeLoginLog((int) $user->id, $username, $ip, $ua, false, '账号已停用');
-            throw new UnauthorizedException('账号已被停用，请联系管理员', 20002);
+            throw new UnauthorizedException('账号已被停用，请联系管理员', BizCode::ACCOUNT_DISABLED);
         }
 
         // 只清「这个账号从这个 IP」的计数。**IP 总闸不清**——
@@ -133,7 +134,7 @@ class AuthService
             throw new UnauthorizedException('账号不存在或已被删除');
         }
         if ((int) $user->status === 0) {
-            throw new UnauthorizedException('账号已被停用，请联系管理员', 20002);
+            throw new UnauthorizedException('账号已被停用，请联系管理员', BizCode::ACCOUNT_DISABLED);
         }
 
         $row = (array) $user;
@@ -250,7 +251,7 @@ class AuthService
         $hash = (string) Db::table('sys_users')->where('id', $user['id'])->value('password');
 
         if (!password_verify($oldPassword, $hash)) {
-            throw new BusinessException('原密码错误', 20005);
+            throw new BusinessException('原密码错误', BizCode::OLD_PASSWORD_ERROR);
         }
 
         // 密码强度是**字段级**校验，返回 422 + details 让前端标在输入框上，
@@ -259,14 +260,14 @@ class AuthService
             throw new ValidationException(
                 ['new_password' => ['新密码长度不能少于 8 位']],
                 '新密码不符合安全策略',
-                20006
+                BizCode::PASSWORD_POLICY_VIOLATION,
             );
         }
         if ($newPassword === $oldPassword) {
             throw new ValidationException(
                 ['new_password' => ['新密码不能与原密码相同']],
                 '新密码不符合安全策略',
-                20006
+                BizCode::PASSWORD_POLICY_VIOLATION,
             );
         }
 

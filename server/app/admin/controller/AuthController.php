@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
+use app\common\constant\BizCode;
 use app\common\exception\UnauthorizedException;
 use app\common\exception\ValidationException;
 use app\common\service\AuthService;
@@ -180,7 +181,7 @@ class AuthController
 
         $payload = JwtService::decode($refreshToken);
         if (($payload['scope'] ?? '') !== 'refresh') {
-            throw new UnauthorizedException('凭证类型错误', 10101);
+            throw new UnauthorizedException('凭证类型错误', BizCode::UNAUTHORIZED);
         }
 
         // 登出时这个 jti 已经被拉黑（见 logout 里的 revokePair）。
@@ -193,7 +194,7 @@ class AuthController
 
         // 改密或管理员重置密码后 token_version 会递增，此处比对使旧 refresh 立即作废
         if ((int) ($payload['tv'] ?? 0) !== (int) ($user['token_version'] ?? 0)) {
-            throw new UnauthorizedException('密码已变更，请重新登录', 10103);
+            throw new UnauthorizedException('密码已变更，请重新登录', BizCode::PASSWORD_CHANGED);
         }
 
         // 轮换：旧的 refresh 用过即废，按它自己的剩余寿命拉黑。

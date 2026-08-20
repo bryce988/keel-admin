@@ -14,6 +14,7 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 菜单与权限点（RBAC 的**定义**层）
@@ -110,7 +111,7 @@ const rules: FormRules = {
   ]
 }
 
-const errorFields = { 20401: 'perm_code' }
+const errorFields = { [BizCode.PERM_CODE_EXISTS]: 'perm_code' }
 
 function blank(parentId = 0, type: MenuType = TYPE_MENU) {
   return {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\middleware;
 
+use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\support\Ctx;
 use Webman\Http\Request;
@@ -31,10 +32,10 @@ class ChannelMiddleware implements MiddlewareInterface
         $channel = (string) $request->header('x-channel', '');
 
         if ($channel === '') {
-            throw new BusinessException('缺少 X-Channel 请求头', 30001);
+            throw new BusinessException('缺少 X-Channel 请求头', BizCode::CHANNEL_HEADER_MISSING);
         }
         if (!in_array($channel, self::CHANNELS, true)) {
-            throw new BusinessException('不支持的渠道标识', 30002);
+            throw new BusinessException('不支持的渠道标识', BizCode::CHANNEL_UNSUPPORTED);
         }
 
         Ctx::set('channel', $channel);

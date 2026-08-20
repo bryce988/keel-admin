@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\exception\ConflictException;
 use app\common\model\SysPermissionModel;
@@ -109,7 +110,7 @@ class RoleService
 
     public static function create(array $data): SysRoleModel
     {
-        Guard::unique(SysRoleModel::class, 'code', $data['code'], null, '角色编码已存在', 20301);
+        Guard::unique(SysRoleModel::class, 'code', $data['code'], null, '角色编码已存在', BizCode::ROLE_CODE_EXISTS);
 
         return Db::transaction(function () use ($data) {
             $role = new SysRoleModel();
@@ -127,16 +128,14 @@ class RoleService
     {
         /** @var SysRoleModel $role */
         $role = Guard::found(SysRoleModel::find($id));
-        Guard::notBuiltin($role, '内置角色不允许修改', 20302);
+        Guard::notBuiltin($role, '内置角色不允许修改', BizCode::BUILTIN_ROLE_PROTECTED);
 
-        Guard::unique(SysRoleModel::class, 'code', $data['code'], $id, '角色编码已存在', 20301);
+        Guard::unique(SysRoleModel::class, 'code', $data['code'], $id, '角色编码已存在', BizCode::ROLE_CODE_EXISTS);
         Guard::noCycle(
             SysRoleModel::class,
             $id,
             (int) ($data['parent_id'] ?? $role->parent_id),
-            '继承角色不可形成环',
-            20306
-        );
+            '继承角色不可形成环', BizCode::ROLE_INHERIT_CYCLE);
 
         $before = $role->toArray();
 
@@ -158,19 +157,21 @@ class RoleService
     {
         /** @var SysRoleModel $role */
         $role = Guard::found(SysRoleModel::find($id));
-        Guard::notBuiltin($role, '内置角色不允许删除', 20302);
+        Guard::notBuiltin($role, '内置角色不允许删除', BizCode::BUILTIN_ROLE_PROTECTED);
 
         // 成员关系在中间表里，Guard::notReferenced 只能查单表，这里直接判
         if (Db::table('sys_user_roles')->where('role_id', $id)->exists()) {
-            throw new ConflictException('角色下存在用户，无法删除', 20303);
+            throw new ConflictException('角色下存在用户，无法删除', BizCode::ROLE_HAS_USERS);
         }
 
         Guard::notReferenced(
             SysRoleModel::class,
             'parent_id',
             $id,
+            // 与 20303「角色下存在用户」是两件事：这条要用户先去解除继承关系，
+            // 那条要用户先去改人员的角色，前端提示与跳转都不同
             '该角色被其他角色继承，无法删除',
-            20303
+            BizCode::ROLE_INHERITED,
         );
 
         OpLog::target("角色 {$role->name}({$role->code})");
@@ -222,7 +223,7 @@ class RoleService
         $role = Guard::found(SysRoleModel::find($id));
 
         if ($dataScope === 5 && !$deptIds) {
-            throw new BusinessException('自定义数据范围至少要选择一个部门', 20307);
+            throw new BusinessException('自定义数据范围至少要选择一个部门', BizCode::DATA_SCOPE_REQUIRES_DEPT);
         }
 
         $before = $role->data_scope;
@@ -324,7 +325,7 @@ class RoleService
 
         $limit = (int) ParamService::value('sys.role.maxPerUser', 5);
         if ($limit > 0 && count($roleIds) > $limit) {
-            throw new BusinessException("单账号最多持有 {$limit} 个角色", 20305);
+            throw new BusinessException("单账号最多持有 {$limit} 个角色", BizCode::ROLE_LIMIT_EXCEEDED);
         }
 
         if (count($roleIds) < 2) {
@@ -344,7 +345,7 @@ class RoleService
 
             throw new BusinessException(
                 '角色「' . implode('」与「', $names) . '」互斥，不可同时授予',
-                20304
+                BizCode::ROLE_MUTUAL_EXCLUSION,
             );
         }
     }

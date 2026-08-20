@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\middleware;
 
+use app\common\constant\BizCode;
 use app\common\exception\UnauthorizedException;
 use app\common\service\AuthService;
 use app\common\service\JwtService;
@@ -32,7 +33,7 @@ class AdminAuthMiddleware implements MiddlewareInterface
 
         // 端隔离：员工 token 不能调 C 端接口，反之亦然
         if (($payload['type'] ?? '') !== 'admin') {
-            throw new UnauthorizedException('登录凭证类型不匹配', 10102);
+            throw new UnauthorizedException('登录凭证类型不匹配', BizCode::TOKEN_TYPE_MISMATCH);
         }
 
         if (JwtService::isRevoked($payload['jti'] ?? '')) {
@@ -49,7 +50,7 @@ class AdminAuthMiddleware implements MiddlewareInterface
         // 但 tv 必须比对：它只在改密、管理员重置密码时递增，语义就是「作废这个人的所有会话」。
         // 缺省为 0 与建表默认值一致，所以补列不会把存量在线用户踢下去。
         if ((int) ($payload['tv'] ?? 0) !== (int) ($user['token_version'] ?? 0)) {
-            throw new UnauthorizedException('密码已变更，请重新登录', 10103);
+            throw new UnauthorizedException('密码已变更，请重新登录', BizCode::PASSWORD_CHANGED);
         }
 
         Ctx::set('user', $user);

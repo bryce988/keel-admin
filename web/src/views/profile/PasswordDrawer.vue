@@ -4,6 +4,7 @@ import type { FormRules } from 'element-plus'
 import { changePassword } from '@/api/profile'
 import { useSignOut } from '@/composables/useSignOut'
 import type { FormDrawerInstance } from '@/components'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 修改密码
@@ -38,7 +39,7 @@ const rules: FormRules = {
 }
 
 /** 原密码错误是 400 + 20005，映射到输入框上，用户不用自己找是哪一项错了 */
-const errorFields = { 20005: 'old_password' }
+const errorFields = { [BizCode.OLD_PASSWORD_ERROR]: 'old_password' }
 
 function submit(form: Record<string, any>) {
   return changePassword({ old_password: form.old_password, new_password: form.new_password })

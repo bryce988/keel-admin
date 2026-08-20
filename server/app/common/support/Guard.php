@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\support;
 
+use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\exception\ConflictException;
 use app\common\exception\ForbiddenException;
@@ -20,7 +21,7 @@ use app\common\model\scope\DataScope;
  * 用法都是「不满足就抛」，service 里读起来像前置条件声明：
  *
  *   Guard::unique(SysDeptModel::class, 'code', $code, exceptId: $id,
- *                 message: '部门编码已存在', bizCode: 20201);
+ *                 message: '部门编码已存在', bizCode: BizCode::DEPT_CODE_EXISTS);
  */
 final class Guard
 {
@@ -51,7 +52,7 @@ final class Guard
         mixed $value,
         ?int $exceptId = null,
         string $message = '该值已存在',
-        int $bizCode = 10409,
+        int $bizCode = BizCode::CONFLICT,
     ): void {
         $query = $modelClass::query()->withoutGlobalScopes()->where($column, $value);
 
@@ -76,7 +77,7 @@ final class Guard
         string $column,
         mixed $value,
         string $message = '数据被引用，无法删除',
-        int $bizCode = 10409,
+        int $bizCode = BizCode::CONFLICT,
     ): void {
         $exists = $modelClass::query()
             ->withoutGlobalScope(DataScope::class)
@@ -101,7 +102,7 @@ final class Guard
         int $id,
         int $newParentId,
         string $message = '上级不能是自己或自己的下级',
-        int $bizCode = 10400,
+        int $bizCode = BizCode::GENERAL_BAD_REQUEST,
     ): void {
         if ($newParentId === 0) {
             return;   // 挂到顶级，不可能成环

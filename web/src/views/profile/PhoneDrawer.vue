@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type { FormRules } from 'element-plus'
 import { changePhone } from '@/api/profile'
 import type { FormDrawerInstance } from '@/components'
+import { BizCode } from '@/constants/bizCode'
 
 /**
  * 换绑手机号
@@ -30,7 +31,7 @@ const rules: FormRules = {
  * 两个都是 4xx + 单条 message，没有 details，所以要靠 errorFields
  * 落到对应输入框上——不映射的话用户只看到顶部一句红字，得自己猜是哪一栏错了
  */
-const errorFields = { 20005: 'password', 20106: 'phone' }
+const errorFields = { [BizCode.OLD_PASSWORD_ERROR]: 'password', [BizCode.PHONE_TAKEN]: 'phone' }
 
 function submit(form: Record<string, any>) {
   return changePhone({ phone: form.phone, password: form.password })
