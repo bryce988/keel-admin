@@ -11,7 +11,7 @@ use app\common\exception\ApiException;
  *
  * 批量删除十条，其中三条因为「部门下还有用户」删不掉——
  * 整批回滚太粗暴（另外七条本来能删），只报一句「操作失败」又让用户不知道该改哪条。
- * 所以按 api.md §1.4 的约定：**逐条尽力执行，返回成功与失败明细**。
+ * 所以按 api.md §1.4 的约定：逐条尽力执行，返回成功与失败明细。
  *
  *   return Result::ok(BatchResult::run($ids, fn (int $id) => self::deleteOne($id))->toArray());
  *

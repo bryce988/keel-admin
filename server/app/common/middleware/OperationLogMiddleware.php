@@ -33,7 +33,7 @@ class OperationLogMiddleware implements MiddlewareInterface
     private const SENSITIVE = ['password', 'secret', 'token', 'captcha', 'credential', 'privatekey'];
 
     /**
-     * 命中这些片段的入参**部分**脱敏（138****8000）
+     * 命中这些片段的入参部分脱敏（138****8000）
      *
      * 手机号受字段级权限保护（`sys:field:user:phone`），可操作日志是能导出的，
      * 而且带数据权限——部门主管看得到下属的日志。原样落库等于开了一个
@@ -57,7 +57,7 @@ class OperationLogMiddleware implements MiddlewareInterface
         try {
             $response = $handler($request);
 
-            // ⚠️ 成败必须看**响应状态码**，不能靠 catch：
+            // ⚠️ 成败必须看响应状态码，不能靠 catch：
             // webman 给每一层中间件都套了 try/catch，内层抛的异常在到达这里之前
             // 已经被转成 Response 了（vendor/workerman/webman-framework/src/App.php 的 array_reduce）。
             // 早期版本用 catch 判定，结果所有失败操作都被记成成功。

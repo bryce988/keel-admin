@@ -22,7 +22,7 @@ final class Paginator
 
     /**
      * @param  Builder   $query      已经拼好筛选条件的查询
-     * @param  string[]  $sortable   允许排序的**数据库字段名**白名单
+     * @param  string[]  $sortable   允许排序的数据库字段名白名单
      * @param  callable|null  $map   行映射，不传则用模型的 toArray()（camelCase）
      */
     public static function response(

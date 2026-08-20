@@ -16,10 +16,10 @@ use Webman\MiddlewareInterface;
  * 开放平台 IP 白名单
  *
  * 支持单 IP 与 CIDR（`203.0.113.5`、`10.0.0.0/8`），逗号分隔。
- * **留空表示不限制**——开源项目的默认行为不能是「谁也调不通」，
+ * 留空表示不限制——开源项目的默认行为不能是「谁也调不通」，
  * 生产环境务必在 .env 里配上。
  *
- * 来源 IP 统一走 {@see ClientIp::of()}——**不要在这里自己读转发头**。
+ * 来源 IP 统一走 {@see ClientIp::of()}——不要在这里自己读转发头。
  * 白名单是硬边界，取错一次就等于整道门形同虚设，而且配了的人不会知道。
  */
 class IpWhitelistMiddleware implements MiddlewareInterface

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * 角色
  *
- * 角色是**全局定义**，不接数据权限 Scope——否则部门主管会看不到自己要授予的角色。
+ * 角色是全局定义，不接数据权限 Scope——否则部门主管会看不到自己要授予的角色。
  * data_scope 决定的是「持有该角色的人能看到哪些数据」，不是「谁能看到这个角色」。
  */
 class SysRoleModel extends BaseModel

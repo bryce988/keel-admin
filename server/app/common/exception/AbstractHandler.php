@@ -23,7 +23,7 @@ use Webman\Http\Response;
  * 开放平台按第三方习惯给字符串错误码（PROJECT.md §8.3）。
  *
  * webman 按 $request->app 选处理器，而 app 是从控制器命名空间推出来的，
- * 所以**闭包路由拿不到分端处理器**，各端的接口必须落在自己的 controller 里。
+ * 所以闭包路由拿不到分端处理器，各端的接口必须落在自己的 controller 里。
  */
 abstract class AbstractHandler extends ExceptionHandler
 {

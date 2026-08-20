@@ -12,9 +12,9 @@ use app\common\support\Guard;
 use app\common\support\OpLog;
 
 /**
- * 菜单与权限点（RBAC 的**定义**层）
+ * 菜单与权限点（RBAC 的定义层）
  *
- * 这里只定义「系统里存在哪些权限」，**不做授权**——把权限给谁是角色管理的事。
+ * 这里只定义「系统里存在哪些权限」，不做授权——把权限给谁是角色管理的事。
  * 三层职责分离：定义（本模块）→ 授权（角色）→ 分配（用户）。
  *
  * 菜单树同时驱动前端路由：`path` 与 `component` 一改，用户刷新页面就生效，
@@ -25,7 +25,7 @@ class MenuService
     /** 全量树，含停用节点与按钮/接口/数据类节点，供管理界面使用 */
     public static function tree(array $filters = []): array
     {
-        // ⚠️ 筛选**不能写进 SQL**：按钮挂在菜单下，直接 where type=3 会把父菜单一起滤掉，
+        // ⚠️ 筛选不能写进 SQL：按钮挂在菜单下，直接 where type=3 会把父菜单一起滤掉，
         // buildTree 从根节点找不到任何孩子，结果是一棵空树。
         // 树形筛选的正确语义是「命中的节点连同它的祖先链一起保留」。
         $nodes = SysPermissionModel::query()
@@ -137,7 +137,7 @@ class MenuService
             BizCode::MENU_HAS_CHILDREN,
         );
 
-        // 被角色引用的权限点**只能停用不能删**：直接删掉会让已授权的角色
+        // 被角色引用的权限点只能停用不能删：直接删掉会让已授权的角色
         // 悄悄少一项权限，而管理员在角色页上看不到任何痕迹
         if (Db::table('sys_role_permissions')->where('permission_id', $id)->exists()) {
             throw new ConflictException('该权限点已被角色引用，请改为停用', BizCode::PERM_IN_USE);

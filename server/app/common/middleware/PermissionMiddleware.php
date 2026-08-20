@@ -22,7 +22,7 @@ use Webman\MiddlewareInterface;
  *   Route::post('/users', [C::class, 'store'])
  *       ->setParams(['perm' => 'sys:user:create']);
  *
- * **fail-closed**：没声明 perm 的接口一律拒绝，而不是放行。
+ * fail-closed：没声明 perm 的接口一律拒绝，而不是放行。
  * 放行意味着「忘了写」等于「不需要权限」，这类漏洞不会有人主动发现；
  * 拒绝则会在第一次自测时就暴露出来。确实无需授权的接口显式写 `'perm' => ''`。
  */

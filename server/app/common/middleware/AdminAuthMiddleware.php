@@ -42,7 +42,7 @@ class AdminAuthMiddleware implements MiddlewareInterface
 
         $user = AuthService::loadUser((int) ($payload['uid'] ?? 0));
 
-        // ⚠️ 这里**不**校验 token 里的 pv。
+        // ⚠️ 这里不校验 token 里的 pv。
         // perm_version 的用途是让 Redis 里的权限缓存 key 失效，
         // 授权变更后下一个请求就按新权限判定——用户无需重新登录（PROJECT.md §15 验收项）。
         // 若在此比对 pv 并抛 401，等于管理员每改一次角色就把在线用户全部踢下线。

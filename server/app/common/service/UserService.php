@@ -20,9 +20,9 @@ use app\common\support\Spreadsheet;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * 用户（RBAC 的**分配**层）
+ * 用户（RBAC 的分配层）
  *
- * ⚠️ 这里**没有**任何 `where dept_id in (...)`——数据权限由 SysUserModel 的全局 Scope 注入。
+ * ⚠️ 这里没有任何 `where dept_id in (...)`——数据权限由 SysUserModel 的全局 Scope 注入。
  * 想验证效果：换个部门主管账号调同一个接口，返回的行数会自己变少。
  */
 class UserService
@@ -74,7 +74,7 @@ class UserService
     /**
      * 行映射
      *
-     * 字段级权限在**服务端**落实：无权限的字段返回的就是脱敏值，
+     * 字段级权限在服务端落实：无权限的字段返回的就是脱敏值，
      * 而不是前端拿到明文再打码——后者用 F12 一看就穿（PROJECT.md §15 验收项）。
      */
     public static function rowMapper(): callable
@@ -129,7 +129,7 @@ class UserService
     /**
      * 新建用户
      *
-     * 不传密码则自动生成一个并**只在这次响应里返回**——管理员当面交给本人。
+     * 不传密码则自动生成一个并只在这次响应里返回——管理员当面交给本人。
      * 明文密码不入库、不进日志（操作日志中间件按 key 名把 password 脱敏了）。
      */
     public static function create(array $data, array $roleIds = []): array
@@ -280,7 +280,7 @@ class UserService
     /**
      * 导出
      *
-     * **必须 chunk 分批**：一次 `get()` 全表在常驻进程里就是内存炸弹，
+     * 必须 chunk 分批：一次 `get()` 全表在常驻进程里就是内存炸弹，
      * 而且这条红线在 CLAUDE.md 里写着（大数据量查询用 chunk）。
      */
     public static function export(array $filters): string
@@ -323,7 +323,7 @@ class UserService
      * 导入
      *
      * 逐行尽力执行：一行格式错不该让另外九十九行也白导。
-     * 失败明细带上**行号**，用户才知道回去改哪一行。
+     * 失败明细带上行号，用户才知道回去改哪一行。
      */
     public static function import(string $path): array
     {
@@ -384,7 +384,7 @@ class UserService
     /**
      * 取出可编辑的用户
      *
-     * 超级管理员是**权限体系的最后一道保险**：它跳过一切校验，
+     * 超级管理员是权限体系的最后一道保险：它跳过一切校验，
      * 一旦能被界面改角色、停用或删除，就可能出现「所有人都进不去」的死局。
      * 所以只能在数据库或初始化脚本里操作（docs/database.md §3.1）。
      */

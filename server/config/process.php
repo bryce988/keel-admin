@@ -28,7 +28,7 @@ return [
          * 业务是「查库 → 拼 JSON」的阻塞 I/O 型，进程多于核数才能在等 MySQL 时
          * 让出 CPU；4 倍是 webman 对这类负载的常用起点。
          *
-         * **内存是硬约束**：M4 压测实测每个 worker 稳态约 26MB（冷启动 17.6MB，
+         * 内存是硬约束：M4 压测实测每个 worker 稳态约 26MB（冷启动 17.6MB，
          * 30 秒预热到 26MB 后进入平台期，30 分钟不再上涨）。所以
          *     常驻内存 ≈ count × 26MB + task 16MB + consumer 16MB × QUEUE_WORKERS
          * 2 核的机器 → 8 个 worker ≈ 208MB，很宽裕；调大 count 前先按这个式子算一遍，
@@ -89,7 +89,7 @@ return [
      * `count => 1` 是硬性的，不是调优余地：多进程会让同一个任务在同一时刻
      * 被触发 N 次。任务本身只负责投递，耗时的活在队列消费进程里干。
      *
-     * 队列消费进程**不在这里**注册——它由 `webman/redis-queue` 插件提供，
+     * 队列消费进程不在这里注册——它由 `webman/redis-queue` 插件提供，
      * 配置在 `config/plugin/webman/redis-queue/process.php`。
      */
     'task' => [

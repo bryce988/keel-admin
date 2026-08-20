@@ -9,12 +9,12 @@ use Webman\Http\Request;
 /**
  * 客户端真实 IP —— 全站唯一来源
  *
- * ⚠️ **不要再用 `$request->getRealIp()`，也不要自己读 `X-Forwarded-For`。**
+ * ⚠️ 不要再用 `$request->getRealIp()`，也不要自己读 `X-Forwarded-For`。
  *
  * 曾经有三份各写各的取 IP 逻辑（IP 白名单、操作日志、框架自带），而且三份都能被伪造：
  *
  * 1. nginx 用的是追加式 `$proxy_add_x_forwarded_for`，客户端自带的 XFF
- *    会被原样保留在**最左端**；
+ *    会被原样保留在最左端；
  * 2. 应用层一律取 `explode(',', $xff)[0]`，取的正是那个客户端可控的值；
  * 3. webman 的 `getRealIp()` 也救不了——它的头优先级是
  *    `x-forwarded-for` → `x-real-ip` → …，XFF 排在最前面，而且在 safeMode 下
@@ -28,10 +28,10 @@ use Webman\Http\Request;
  *
  * ## 这里的规则
  *
- * **只有当 TCP 对端本身是可信代理时，才采信它转发过来的 `X-Real-IP`；
- * 否则一律用对端地址，并且任何情况下都不读 `X-Forwarded-For`。**
+ * 只有当 TCP 对端本身是可信代理时，才采信它转发过来的 `X-Real-IP`；
+ * 否则一律用对端地址，并且任何情况下都不读 `X-Forwarded-For`。
  *
- * 采信 `X-Real-IP` 而不是 XFF，是因为 nginx 对它是**覆盖式**赋值
+ * 采信 `X-Real-IP` 而不是 XFF，是因为 nginx 对它是覆盖式赋值
  * （`proxy_set_header X-Real-IP $remote_addr`），客户端传什么都会被盖掉；
  * 而 XFF 是链式的，天然含有不可信段。
  *
@@ -41,7 +41,7 @@ use Webman\Http\Request;
  * 默认值是三段私有网段 + 回环——docker compose 里 nginx 与 server 同在一个
  * bridge 网络上，对端永远是 `172.x`，不给这个默认值的话所有日志都会记成容器 IP。
  *
- * **生产环境应当收窄成你自己的网关地址**：默认值意味着「同一内网里的任何主机
+ * 生产环境应当收窄成你自己的网关地址：默认值意味着「同一内网里的任何主机
  * 都能声明客户端 IP」。如果前面还有 CDN / SLB，要把它们的回源网段也加进来，
  * 并确认那一层同样是覆盖式设置 `X-Real-IP`。
  */

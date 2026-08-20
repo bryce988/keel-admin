@@ -19,7 +19,7 @@ use Webman\MiddlewareInterface;
  * 缺了以后再补会发现历史数据全是空的，所以在入口就拦。
  *
  * 渠道解析出来放进 Ctx，业务代码用 Ctx::get('channel') 取，
- * **不要在 service 里再去读 Request**：那样 common/service 就绑死在 HTTP 上，
+ * 不要在 service 里再去读 Request：那样 common/service 就绑死在 HTTP 上，
  * 队列和定时任务里再想复用就得造假请求对象。
  */
 class ChannelMiddleware implements MiddlewareInterface

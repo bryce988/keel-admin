@@ -36,7 +36,7 @@ use Webman\Http\Request;
  * 的 resolveMethodDependencies），构造函数里声明的 {@see Request} 会被注入
  * 当前请求对象。
  *
- * 校验仍走 {@see Validator}——**不继承 webman/validation 的 Validator 基类**，
+ * 校验仍走 {@see Validator}——不继承 webman/validation 的 Validator 基类，
  * 所以 422 + 字段级 details、空串视同未填、类型转型这些增强一条不丢
  * （原因详见 config/plugin/webman/validation/app.php）。
  */
@@ -78,9 +78,9 @@ abstract class FormRequest
     /**
      * 取单个原始输入（查询串 + 请求体），用于没进校验白名单、但控制器要用的字段
      *
-     * ⚠️ **写接口的可选字段不要用它，用 {@see self::post()}**。
+     * ⚠️ 写接口的可选字段不要用它，用 {@see self::post()}。
      * 底层是 `$request->all()`，而 webman 的 `all()` 是 `get() + post()`——
-     * `+` 号意味着同名键**查询串盖过请求体**。用户接口踩过这个坑：
+     * `+` 号意味着同名键查询串盖过请求体。用户接口踩过这个坑：
      * `role_ids` 的三态语义是「不传=不动角色、空数组=清空」，
      * 改用 `input()` 之后一个 `PUT /admin/users/3?role_ids=` 就能绕过请求体
      * 把这个人的角色清空（实测 `[3]` → `[]`）。

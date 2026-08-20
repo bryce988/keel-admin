@@ -13,13 +13,13 @@ use Illuminate\Database\Eloquent\Scope;
 /**
  * 数据权限全局 Scope
  *
- * 挂在模型上自动注入归属过滤条件，**业务代码禁止手写 where dept_id in (...)**
+ * 挂在模型上自动注入归属过滤条件，业务代码禁止手写 where dept_id in (...)
  * （见 CLAUDE.md 硬性约定）。手写的过滤总会在某个新接口上被忘记，
  * 而全局 Scope 是默认开启、需要显式 withoutDataScope() 才能绕过的。
  *
  * 范围取值见 sys_roles.data_scope：
  *   1 全部  2 本部门及下属  3 本部门  4 仅本人  5 自定义部门集合
- * 多角色时取**范围最大者**（数值越小范围越大）。
+ * 多角色时取范围最大者（数值越小范围越大）。
  */
 final class DataScope implements Scope
 {

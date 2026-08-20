@@ -169,7 +169,7 @@ foreach ($tree as $node) {
 /**
  * 退役的权限点
  *
- * upsert **只增不减**：从 $tree 里删掉一个 code，存量库里那一行会永远留着。
+ * upsert 只增不减：从 $tree 里删掉一个 code，存量库里那一行会永远留着。
  * 空库看不出问题，生产库上就是「菜单已经不该有了，侧边栏还在渲染它」，
  * 而且授权关系还挂着。所以退役的 code 要显式登记在这里，每次 seed 幂等清掉。
  *
@@ -337,7 +337,7 @@ foreach ($params as $row) {
 
     $exists = Db::table('sys_params')->where('param_key', $key)->first();
     if ($exists) {
-        // 只补齐元信息，**不覆盖已改过的值**
+        // 只补齐元信息，不覆盖已改过的值
         Db::table('sys_params')->where('id', $exists->id)->update([
             'name' => $name, 'group' => $group, 'value_type' => $type,
             'is_builtin' => 1, 'is_secret' => $isSecret, 'updated_at' => $now,

@@ -11,7 +11,7 @@ use app\common\support\Ctx;
  *
  * { code, message, trace_id, details?, exception? }
  *
- * 调用方是我们自己的服务，不是人也不是第三方，所以**信息给足**：
+ * 调用方是我们自己的服务，不是人也不是第三方，所以信息给足：
  * 非业务异常时连异常类名一起返回，调用方的日志里直接能看到根因，
  * 不用再去两个服务的日志里对 traceId。
  *

@@ -15,16 +15,16 @@ use Webman\Validation\Factory\ValidationFactory;
  * 底层是 illuminate/validation（经 webman/validation 接进来），这一层只做四件
  * 它不做、而我们的接口契约又必须有的事：
  *
- *   1. **错误体**：转成 `ValidationException`，details 是 `{字段: [消息]}`，
+ *   1. 错误体：转成 `ValidationException`，details 是 `{字段: [消息]}`，
  *      HTTP 422 + 业务码 10422（docs/api.md §3）。插件自带的 `validate()` 只抛
  *      第一条消息、状态码 400、异常基类还是 BusinessException，全对不上，所以不用它
- *   2. **一个字段只报一条**：Laravel 默认把该字段所有没过的规则都列出来，
+ *   2. 一个字段只报一条：Laravel 默认把该字段所有没过的规则都列出来，
  *      前端表单项下方一次弹三行很难看
- *   3. **空串视同未填**：前端清空输入框传的是 `''`。Laravel 里 `''` 是个实实在在的值，
- *      `in:0,1` 会直接判失败。这里对非 required 字段跳过规则、**但把原值带出去**——
+ *   3. 空串视同未填：前端清空输入框传的是 `''`。Laravel 里 `''` 是个实实在在的值，
+ *      `in:0,1` 会直接判失败。这里对非 required 字段跳过规则、但把原值带出去——
  *      带出去是必要的：字典项的 `tag_type` 就是靠提交 `''` 来清空标签颜色的，
  *      丢掉这个键等于「清空」变成「不修改」
- *   4. **转型**：integer 规则给 int、boolean 给 bool、string 顺手 trim，
+ *   4. 转型：integer 规则给 int、boolean 给 bool、string 顺手 trim，
  *      免得 service 里到处 `(int)`（GET 查询串过来的全是字符串）
  *
  * 用法：
@@ -51,7 +51,7 @@ final class Validator
     /**
      * 自定义规则只需注册一次
      *
-     * static 存的是**进程级基础设施**（规则注册到了共享的 Factory 上），不是请求态，
+     * static 存的是进程级基础设施（规则注册到了共享的 Factory 上），不是请求态，
      * 符合 PROJECT.md §14 的常驻内存约束。ValidationFactory 里的 Factory 本身也是
      * 进程内单例，语言包只在首次用到时读一次盘。
      */
@@ -119,7 +119,7 @@ final class Validator
     /**
      * 共享的 illuminate Factory，附带项目自定义规则
      *
-     * **不走 `support\validation\Validator::make()`**：它内部是
+     * 不走 `support\validation\Validator::make()`：它内部是
      * `support\Container::make(static::class)`，而 `support\Container::instance()`
      * 取的是 `Config::get('container')`——webman 的 Config 没引导时返回 null，
      * 于是 `Call to a member function make() on null` 直接致命。

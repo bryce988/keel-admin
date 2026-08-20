@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * 岗位
  *
- * 岗位是 HR 概念，**不是角色**：它只在新建用户时带出 `default_role_id`
+ * 岗位是 HR 概念，不是角色：它只在新建用户时带出 `default_role_id`
  * 作为初始值，之后改岗位不会动已有账号的授权（docs/database.md §3.3）。
  * 这个边界一旦被打破，「改一下岗位结果一批人权限变了」就会变成线上事故。
  */

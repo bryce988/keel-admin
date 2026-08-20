@@ -11,11 +11,11 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * 模型基类
  *
- * 职责边界（CLAUDE.md 硬性约定）：模型只放**字段、关联、Scope**，
+ * 职责边界（CLAUDE.md 硬性约定）：模型只放字段、关联、Scope，
  * 不写业务流程、不开事务——那些在 service 层。
  *
  * 接口契约用 snake_case，与数据库字段名一致（docs/api.md §1.4），
- * 所以 toArray() 直接输出原始键名，**全链路不做键名转换**：
+ * 所以 toArray() 直接输出原始键名，全链路不做键名转换：
  * 同一个字段从数据库到前端只有一个名字，日志、报错、搜代码时不用在两种写法之间换算。
  *
  * 时间统一序列化为 'Y-m-d H:i:s'，不返回 ISO8601。

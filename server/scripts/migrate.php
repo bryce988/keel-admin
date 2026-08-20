@@ -11,7 +11,7 @@ declare(strict_types=1);
  * INSERT ... ON DUPLICATE KEY，重复执行安全。
  *
  * 为什么不只依赖 MySQL 容器的 /docker-entrypoint-initdb.d：
- * 那个目录只在**数据卷为空**时执行一次，之后新增的表在已有环境上永远不会被创建，
+ * 那个目录只在数据卷为空时执行一次，之后新增的表在已有环境上永远不会被创建，
  * 线上尤其致命。所以每次进程启动都对齐一次表结构。
  *
  * 注意这只是脚手架阶段的做法——表一旦有存量数据、需要改列或加索引时，
@@ -68,7 +68,7 @@ foreach ($statements as $statement) {
  * 存量表的列补丁
  *
  * `CREATE TABLE IF NOT EXISTS` 只管建表：表已经存在时，schema.sql 里新加的列
- * **一个字都不会生效**。开发机上 `down -v` 重来看不出问题，线上却是静默漏列，
+ * 一个字都不会生效。开发机上 `down -v` 重来看不出问题，线上却是静默漏列，
  * 直到某个字段一直是默认值才被发现。
  *
  * MySQL 8 没有 `ADD COLUMN IF NOT EXISTS`（那是 MariaDB 的扩展），
@@ -84,7 +84,7 @@ $columnPatches = [
         'sys_login_logs',
         'dept_id',
         "BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '登录人部门，日志本身也受数据权限约束' AFTER `username`",
-        // 没有这一列时，数据权限对登录日志**整个失效**（DataScope 找不到部门列就直接放行），
+        // 没有这一列时，数据权限对登录日志整个失效（DataScope 找不到部门列就直接放行），
         // 部门主管能看到全公司的登录记录。所以补列之后必须立刻回填历史数据
         'UPDATE `sys_login_logs` l JOIN `sys_users` u ON u.id = l.user_id
             SET l.dept_id = u.dept_id WHERE l.user_id > 0 AND l.dept_id = 0',
@@ -94,7 +94,7 @@ $columnPatches = [
         'token_version',
         "INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '会话版本号，改密/重置密码时递增使该用户全部令牌失效' AFTER `perm_version`",
         // 不需要回填：默认 0 与令牌里缺省的 tv=0 相等，存量会话不受影响。
-        // 反过来说，补列**不会**把线上在线用户踢下去
+        // 反过来说，补列不会把线上在线用户踢下去
         null,
     ],
 ];

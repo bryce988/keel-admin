@@ -50,7 +50,7 @@ class LogCleanupService
     /**
      * 分批删除，直到没有更早的记录
      *
-     * **必须 `withoutGlobalScopes()`**：两张日志表都带 `HasDataScope`，
+     * 必须 `withoutGlobalScopes()`：两张日志表都带 `HasDataScope`，
      * 而清理跑在定时任务/队列进程里——那里没有登录用户，
      * `Ctx::user()` 是空的。带着数据权限跑，轻则一行删不掉，
      * 重则被判成「无部门列」而全表放行，两种都不是我们要的。

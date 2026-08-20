@@ -9,7 +9,7 @@ use app\admin\validation\FormRequest;
 /**
  * 新增菜单 / 权限点（`POST /admin/menus`）
  *
- * **五种类型（目录/菜单/按钮/接口/字段）的字段要求不同，但规则只写这一份。**
+ * 五种类型（目录/菜单/按钮/接口/字段）的字段要求不同，但规则只写这一份。
  * 不适用的字段由 {@see \app\common\service\MenuService} 的 `normalize()` 清空，
  * 这里只保证格式合法。分开写五套规则的话，「按钮不该有 component」这种约束
  * 会散落在五个地方，改一处漏四处。

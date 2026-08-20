@@ -12,7 +12,7 @@ use app\common\support\Ctx;
  *
  * { error_code, error_message, request_id }
  *
- * 用**字符串错误码**而不是数字：第三方的代码里 `if (err.error_code === 'INVALID_SIGNATURE')`
+ * 用字符串错误码而不是数字：第三方的代码里 `if (err.error_code === 'INVALID_SIGNATURE')`
  * 比 `if (code === 40102)` 可读得多，也不会因为我们内部重排码段而失效。
  * 数字码是内部实现细节，不该成为对外契约的一部分。
  *

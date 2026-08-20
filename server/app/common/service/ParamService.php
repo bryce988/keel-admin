@@ -14,7 +14,7 @@ use app\common\support\OpLog;
 /**
  * 系统参数
  *
- * ⚠️ 参数只落库 + 走缓存，**绝不在运行期改 webman 配置**：
+ * ⚠️ 参数只落库 + 走缓存，绝不在运行期改 webman 配置：
  * 常驻内存下 `config()` 改了只影响当前 worker，多进程之间立刻不一致，
  * 表现为「同一个操作有时按新值有时按旧值」，极难排查（PROJECT.md §14）。
  */
@@ -34,7 +34,7 @@ class ParamService
     /**
      * 密钥掩码
      *
-     * `is_secret` 的参数**只写不读**：读接口一律返回这个常量，
+     * `is_secret` 的参数只写不读：读接口一律返回这个常量，
      * 保存时值等于它就跳过更新。所以「不改密钥」与「把密钥改成 ******」
      * 在协议上是同一件事——后者本来也不该是一个合法密钥。
      */
@@ -209,7 +209,7 @@ class ParamService
     /**
      * 编辑参数
      *
-     * 内置参数只让改**值**：键、类型、分组都被代码按名字读取（`ParamService::value('sys.pwd.minLength')`），
+     * 内置参数只让改值：键、类型、分组都被代码按名字读取（`ParamService::value('sys.pwd.minLength')`），
      * 改了那些等于让代码读到 null，而调用点全都有默认值兜底，故障会以「配置怎么不生效」的形式出现。
      */
     public static function update(int $id, array $data): array
@@ -258,7 +258,7 @@ class ParamService
         self::forget($key);
     }
 
-    /** 出参统一走这里，保证密钥在**任何**返回路径上都是掩码 */
+    /** 出参统一走这里，保证密钥在任何返回路径上都是掩码 */
     private static function rowToArray(SysParamModel $row): array
     {
         return [

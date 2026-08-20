@@ -14,11 +14,11 @@ use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 /**
  * 表格导入导出
  *
- * 用 openspout 而不是 PhpSpreadsheet：它是**流式**的，两万行读写内存峰值只有 4MB，
+ * 用 openspout 而不是 PhpSpreadsheet：它是流式的，两万行读写内存峰值只有 4MB，
  * 而且不随文件增长。webman 是常驻进程，一次导出把内存吃到几百 MB 就再也降不回来，
  * 整个 worker 会带着这份内存服务后续所有请求（PROJECT.md §14）。
  *
- * 同理，导出必须由调用方用 chunk 分批喂数据，**不能先 get() 全表再传进来**——
+ * 同理，导出必须由调用方用 chunk 分批喂数据，不能先 get() 全表再传进来——
  * 那样瓶颈就从写文件挪到了查询，内存照样爆。
  */
 final class Spreadsheet
@@ -49,8 +49,8 @@ final class Spreadsheet
         $writer->openToFile($path);
 
         // openspout v5 的三处 API 与 v4 不同，照 v4 写会直接 500：
-        // - Style 是不可变对象，用 withXxx() 且**必须传参**（没有无参的 setFontBold()）
-        // - Row::fromValues() 的第二个参数是**行高**，不是样式
+        // - Style 是不可变对象，用 withXxx() 且必须传参（没有无参的 setFontBold()）
+        // - Row::fromValues() 的第二个参数是行高，不是样式
         // - 带样式的行要用 fromValuesWithStyle()
         $writer->addRow(Row::fromValuesWithStyle($headers, (new Style())->withFontBold(true)));
 

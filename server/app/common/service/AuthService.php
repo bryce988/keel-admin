@@ -26,16 +26,16 @@ class AuthService
      *
      * 安全约定：
      * - 账号不存在与密码错误返回同一个错误码，避免账号枚举
-     * - 连续失败按 **账号 + IP** 计数并锁定，另有一道**按 IP 的总闸**
+     * - 连续失败按 账号 + IP 计数并锁定，另有一道按 IP 的总闸
      *
      * ## 为什么锁定必须带 IP 维度
      *
      * 曾经只按账号锁：`login:lock:{username}`。`$ip` 传进来了却只用于写日志，
-     * 与注释里写的「账号+IP 双维度」完全不符。后果是**任何能打开登录页的人，
-     * 拿 5 次错密码就能让指定账号 30 分钟登不进去**——而 `admin` 这个账号名
+     * 与注释里写的「账号+IP 双维度」完全不符。后果是任何能打开登录页的人，
+     * 拿 5 次错密码就能让指定账号 30 分钟登不进去——而 `admin` 这个账号名
      * 在本项目里是公开且必然存在的，等于谁都能定点锁死超管。
      *
-     * 更难受的是：全仓**没有任何解锁入口**，锁上之后只能干等 TTL 到期，
+     * 更难受的是：全仓没有任何解锁入口，锁上之后只能干等 TTL 到期，
      * 或者有人 SSH 上去 `redis-cli DEL`。管理员坐在后台里束手无策。
      *
      * 带上 IP 之后，攻击者只锁得到「他自己的 IP × 该账号」这一个组合，
@@ -45,7 +45,7 @@ class AuthService
      *
      * 只加 IP 维度会把 DoS 换成撞库：换个 IP 计数就归零，代理池一挂等于无限次尝试。
      * 而后台端 `config/middleware.php` 里 `'admin' => []` 是空的，
-     * **一道限流都没有**。所以这里必须自带一道按 IP 的失败总闸（跨账号），
+     * 一道限流都没有。所以这里必须自带一道按 IP 的失败总闸（跨账号），
      * 挡住单机横扫用户名。
      *
      * 两个计数器都是固定窗口（`Cache::incr` 只在首次设 TTL），窗口一到自动清零——
@@ -105,7 +105,7 @@ class AuthService
             throw new UnauthorizedException('账号已被停用，请联系管理员', BizCode::ACCOUNT_DISABLED);
         }
 
-        // 只清「这个账号从这个 IP」的计数。**IP 总闸不清**——
+        // 只清「这个账号从这个 IP」的计数。IP 总闸不清——
         // 否则攻击者只要手上有一个有效账号，登一次就能把闸门重置，
         // 接着继续横扫其他用户名
         Cache::del($failKey);
@@ -206,7 +206,7 @@ class AuthService
     /**
      * 只保留目录与菜单（type 1、2），按钮权限在 permissions 数组里
      *
-     * **空目录要剪掉**：目录（type=1）自己没有 path 与 component，它的全部意义
+     * 空目录要剪掉：目录（type=1）自己没有 path 与 component，它的全部意义
      * 就是装下面的菜单。授权时只勾到目录、没勾任何子菜单是很常见的手滑，
      * 不剪的话侧边栏会出现一个点开什么都没有的死条目——
      * 用户看到的是「有这个功能但坏了」，而不是「你没有这个权限」。
@@ -254,7 +254,7 @@ class AuthService
             throw new BusinessException('原密码错误', BizCode::OLD_PASSWORD_ERROR);
         }
 
-        // 密码强度是**字段级**校验，返回 422 + details 让前端标在输入框上，
+        // 密码强度是字段级校验，返回 422 + details 让前端标在输入框上，
         // 而不是笼统弹一句（docs/api.md §2.2 把 20006 定为 422）
         if (mb_strlen($newPassword) < 8) {
             throw new ValidationException(
@@ -277,7 +277,7 @@ class AuthService
             'updated_at'     => date('Y-m-d H:i:s'),
         ]);
 
-        // 改密即作废该用户的**全部**会话，其他端的 access 与 refresh 一起失效。
+        // 改密即作废该用户的全部会话，其他端的 access 与 refresh 一起失效。
         // 这是「改密踢下线」真正生效的地方——只吊销当前 jti 的话，
         // 别的设备上那对令牌照常能用，泄露的 refresh 还能一直换新
         Db::table('sys_users')->where('id', $user['id'])->increment('token_version');

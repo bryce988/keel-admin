@@ -11,12 +11,12 @@ use Throwable;
 /**
  * IP 归属地
  *
- * 用 ip2region 的离线库查，**不调任何第三方接口**：
+ * 用 ip2region 的离线库查，不调任何第三方接口：
  * 登录是同步路径，一次外部 HTTP 请求就能让整个登录卡在那里，
  * 对方限流或超时的时候更糟——为了日志上一行字，赌上登录可用性不划算。
  *
  * ⚠️ cachePolicy 必须是 'file'，实测结论（v3.0.15）：
- * - `vectorIndex`：**是坏的**。公网 IP 一律返回空串，还刷一堆
+ * - `vectorIndex`：是坏的。公网 IP 一律返回空串，还刷一堆
  *   「Uninitialized string offset」警告——它把 8KB 的向量索引当整个库在读
  * - `content`：正确但把 10MB 的 xdb 全塞进内存，webman 是多进程常驻，
  *   每个 worker 各占一份，八个进程就是 80MB，只为省 0.3ms

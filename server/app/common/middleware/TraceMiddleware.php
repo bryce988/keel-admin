@@ -13,7 +13,7 @@ use Webman\MiddlewareInterface;
  * 链路追踪 + 上下文清理
  *
  * 管道最外层：进来生成 traceId，出去写响应头，
- * **无论成功失败都在 finally 里清理上下文**，防止跨请求残留。
+ * 无论成功失败都在 finally 里清理上下文，防止跨请求残留。
  */
 class TraceMiddleware implements MiddlewareInterface
 {

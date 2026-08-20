@@ -45,7 +45,7 @@ class RateLimitMiddleware implements MiddlewareInterface
          * 连 IP 都不用伪造，限流等于默认不设防。
          *
          * 现在细粒度桶按「IP + 设备号」算：移动网络下大量用户共用出口 IP，
-         * 设备号仍然起到细分作用，不会误伤；但设备号**不再能替代 IP**。
+         * 设备号仍然起到细分作用，不会误伤；但设备号不再能替代 IP。
          * 再加一个粗粒度的按 IP 上限兜底，把「换设备号刷」的总量封死。
          */
         $device   = (string) (Ctx::get('device_id') ?: '-');

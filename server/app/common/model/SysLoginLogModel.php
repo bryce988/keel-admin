@@ -32,7 +32,7 @@ class SysLoginLogModel extends BaseModel
     /**
      * 有 dept_id，与操作日志一致按部门隔离
      *
-     * ⚠️ 这里**返回 null 是危险的**：DataScope 在非「仅本人」的范围下找不到部门列
+     * ⚠️ 这里返回 null 是危险的：DataScope 在非「仅本人」的范围下找不到部门列
      * 就直接放行不加任何条件，等于登录日志对部门主管完全敞开。
      * 早期建表漏了这一列，正是这么漏的。
      */

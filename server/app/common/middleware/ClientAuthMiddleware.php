@@ -15,7 +15,7 @@ use Webman\MiddlewareInterface;
 /**
  * C 端鉴权
  *
- * 与后台鉴权的关键区别是**身份体系不同**（PROJECT.md §8.4）：
+ * 与后台鉴权的关键区别是身份体系不同（PROJECT.md §8.4）：
  * 这里认的是 app_users 而不是 sys_users，token 的 type 必须是 client。
  * 员工 token 调 C 端接口一律 401，反之亦然——两套体系永不混用。
  *

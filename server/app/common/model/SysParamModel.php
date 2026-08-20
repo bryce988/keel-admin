@@ -7,7 +7,7 @@ namespace app\common\model;
 /**
  * 系统参数
  *
- * ⚠️ 参数只能改数据库、走缓存读取，**不允许运行期改 webman 配置**——
+ * ⚠️ 参数只能改数据库、走缓存读取，不允许运行期改 webman 配置——
  * 常驻内存下改配置只会影响当前 worker，进程间状态立刻不一致（PROJECT.md §14）。
  */
 class SysParamModel extends BaseModel
