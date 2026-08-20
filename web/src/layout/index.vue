@@ -173,10 +173,12 @@ async function onUserCommand(cmd: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: var(--keel-brand-height);
+  /* 高度与描边都必须跟顶栏一致——它们拼的是同一条横线，
+     差 4px 或者差一档灰度都会在侧栏边界处露馅 */
+  height: var(--keel-topbar-height);
   padding: 0 20px;
   flex: none;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--el-border-color-light);
   white-space: nowrap;
 }
 

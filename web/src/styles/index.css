@@ -7,9 +7,15 @@
 :root {
   --keel-sidebar-width: 210px;
   --keel-sidebar-collapsed: 64px;
+  /*
+   * 顶栏与侧栏 logo 区**共用这一个高度**
+   *
+   * 曾经是两个变量（logo 区 60px、顶栏 56px），结果两条底边差 4px，
+   * 侧栏与内容区的分界线接不上。它们在视觉上就是同一条横线，
+   * 拆成两个变量只是给它们提供了走散的机会
+   */
   --keel-topbar-height: 56px;
   --keel-tags-height: 40px;
-  --keel-brand-height: 60px;
 }
 
 * {
