@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
+use app\admin\validation\Menu\StoreRequest;
+use app\admin\validation\Menu\TreeRequest;
+use app\admin\validation\Menu\UpdateRequest;
 use app\common\service\MenuService;
 use app\common\support\Result;
-use app\common\support\Validator;
 use support\Response;
 use Webman\Http\Request;
 
@@ -33,13 +35,9 @@ class MenuController
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      */
-    public function tree(Request $request): Response
+    public function tree(TreeRequest $request): Response
     {
-        $filters = Validator::make($request->all(), [
-            'keyword' => ['string|max:64',   '关键词'],
-            'type'    => ['in:1,2,3,4,5',    '类型'],
-            'status'  => ['in:0,1',          '状态'],
-        ])->validated();
+        $filters = $request->validated();
 
         return Result::ok(MenuService::tree($filters));
     }
@@ -69,7 +67,7 @@ class MenuController
      * ⚠️ 新增权限点**默认不授予任何角色**。只建节点不去角色里勾选，
      * 对应的接口对所有人都是 403（fail-closed，见 CLAUDE.md）。
      *
-     * @param Request $request 请求体见 {@see self::validate()}
+     * @param StoreRequest $request 请求体见 {@see StoreRequest}
      *
      * @return Response 201，返回新建的权限点对象（含 id）
      *
@@ -77,9 +75,9 @@ class MenuController
      * @throws \app\common\exception\ConflictException  权限标识已存在（409 + `20401`）
      * @throws \app\common\exception\NotFoundException  上级节点不存在（404 + `10404`）
      */
-    public function store(Request $request): Response
+    public function store(StoreRequest $request): Response
     {
-        return Result::created(MenuService::create(self::validate($request))->toArray());
+        return Result::created(MenuService::create($request->validated())->toArray());
     }
 
     /**
@@ -90,8 +88,8 @@ class MenuController
      * 改动会顶所有用户的 `perm_version`，让 Redis 里的权限缓存失效——
      * 改完不用重新登录，下一次请求就是新权限。
      *
-     * @param Request $request 请求体见 {@see self::validate()}
-     * @param int     $id      权限点 ID
+     * @param UpdateRequest $request 请求体见 {@see UpdateRequest}
+     * @param int           $id      权限点 ID
      *
      * @return Response 200，返回更新后的权限点对象
      *
@@ -100,9 +98,9 @@ class MenuController
      * @throws \app\common\exception\ConflictException  权限标识已被其他节点占用（409 + `20401`）
      * @throws \app\common\exception\BusinessException  上级节点是自己或自己的子节点（400 + `20403`）
      */
-    public function update(Request $request, int $id): Response
+    public function update(UpdateRequest $request, int $id): Response
     {
-        return Result::ok(MenuService::update($id, self::validate($request))->toArray());
+        return Result::ok(MenuService::update($id, $request->validated())->toArray());
     }
 
     /**
@@ -126,43 +124,5 @@ class MenuController
         MenuService::delete($id);
 
         return Result::noContent();
-    }
-
-    /**
-     * 五种类型共用的入参校验
-     *
-     * 五种类型的字段要求不同，但校验规则写在一处：不适用的字段由 service 的
-     * `normalize()` 清空，这里只保证格式合法。分开写五套规则的话，
-     * 「按钮不该有 component」这种约束会散落在五个地方，改一处漏四处。
-     *
-     * @param Request $request 请求体：`parent_id` 上级节点（0 为顶级）、`name` 名称（必填）、
-     *                         `type` 类型（必填，1 目录 2 菜单 3 按钮 4 接口 5 字段）、
-     *                         `perm_code` 权限标识（必填，唯一，命名 `模块:资源:操作`）、
-     *                         `path` 路由路径、`component` 组件路径（目录填 `Layout`）、
-     *                         `icon` EP 图标名、`api_method` / `api_path` 仅 type=4 用、
-     *                         `visible` 是否进侧边栏、`keep_alive` 是否缓存页面、
-     *                         `sort` 排序、`status` 0 停用 1 启用
-     *
-     * @return array 只含白名单内字段的数组
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
-     */
-    private static function validate(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'parent_id'  => ['int|min:0',                '上级节点'],
-            'name'       => ['required|string|max:64',   '名称'],
-            'type'       => ['required|int|in:1,2,3,4,5', '类型'],
-            'perm_code'  => ['required|code|max:128',    '权限标识'],
-            'path'       => ['string|max:255',           '路由路径'],
-            'component'  => ['string|max:255',           '组件路径'],
-            'icon'       => ['string|max:64',            '图标'],
-            'api_method' => ['in:GET,POST,PUT,DELETE,PATCH', '接口方法'],
-            'api_path'   => ['string|max:255',           '接口路径'],
-            'visible'    => ['int|in:0,1',               '是否显示'],
-            'keep_alive' => ['int|in:0,1',               '是否缓存'],
-            'sort'       => ['int|min:0|max:9999',       '排序'],
-            'status'     => ['int|in:0,1',               '状态'],
-        ])->validated();
     }
 }

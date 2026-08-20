@@ -14,6 +14,7 @@
         "openspout/openspout": "^5.10",
         "predis/predis": "^2.2",
         "webman/redis-queue": "^2.1",
+        "webman/validation": "^2.2",
         "workerman/crontab": "^1.0",
         "workerman/webman-framework": "^2.0",
         "zoujingli/ip2region": "^3.0"

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
+use app\admin\validation\Dept\StoreRequest;
+use app\admin\validation\Dept\TreeRequest;
+use app\admin\validation\Dept\UpdateRequest;
 use app\common\service\DeptService;
 use app\common\support\Result;
-use app\common\support\Validator;
 use support\Response;
 use Webman\Http\Request;
 
@@ -28,20 +30,15 @@ class DeptController
      * 用户列表的部门筛选也用这个接口，所以两个权限点任一即可，
      * 否则只有用户管理权限的人打不开筛选下拉。
      *
-     * @param Request $request 查询参数：`keyword` 名称/编码模糊匹配、`status` 0 停用 1 启用
+     * @param TreeRequest $request 查询参数见 {@see TreeRequest}
      *
      * @return Response 200，树形数组，子节点在 `children`
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`，`details` 里是字段级错误）
      */
-    public function tree(Request $request): Response
+    public function tree(TreeRequest $request): Response
     {
-        $filters = Validator::make($request->all(), [
-            'keyword' => ['string|max:64', '关键词'],
-            'status'  => ['in:0,1',        '状态'],
-        ])->validated();
-
-        return Result::ok(DeptService::tree($filters));
+        return Result::ok(DeptService::tree($request->validated()));
     }
 
     /**
@@ -66,16 +63,16 @@ class DeptController
      *
      * `POST /admin/depts` · 权限点 `sys:dept:create` · 自动落操作日志
      *
-     * @param Request $request 请求体见 {@see self::validate()}，其中 `name` 与 `code` 必填
+     * @param StoreRequest $request 请求体见 {@see StoreRequest}，其中 `name` 与 `code` 必填
      *
      * @return Response 201，返回新建的部门对象（含 id）
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`，`details` 里是字段级错误）
      * @throws \app\common\exception\ConflictException  部门编码已存在（409 + `20201`）
      */
-    public function store(Request $request): Response
+    public function store(StoreRequest $request): Response
     {
-        $data = self::validate($request);
+        $data = $request->validated();
 
         return Result::created(DeptService::create($data)->toArray());
     }
@@ -88,8 +85,8 @@ class DeptController
      * 改 `parent_id` 等于移动整棵子树，service 会挡住「把自己挂到自己子孙下面」
      * 这种会形成环的操作。
      *
-     * @param Request $request 请求体见 {@see self::validate()}
-     * @param int     $id      部门 ID
+     * @param UpdateRequest $request 请求体见 {@see UpdateRequest}
+     * @param int           $id      部门 ID
      *
      * @return Response 200，返回更新后的部门对象
      *
@@ -98,9 +95,9 @@ class DeptController
      * @throws \app\common\exception\ConflictException  部门编码已被其他部门占用（409 + `20201`）
      * @throws \app\common\exception\BusinessException  上级部门是自己或自己的子部门（400 + `20202`）
      */
-    public function update(Request $request, int $id): Response
+    public function update(UpdateRequest $request, int $id): Response
     {
-        $data = self::validate($request);
+        $data = $request->validated();
 
         return Result::ok(DeptService::update($id, $data)->toArray());
     }
@@ -126,31 +123,5 @@ class DeptController
         DeptService::delete($id);
 
         return Result::noContent();
-    }
-
-    /**
-     * 新增与编辑共用的入参校验
-     *
-     * 抽出来是为了让两个入口的可填字段与约束**只有一份**：分开写迟早出现
-     * 「新建时校验了、编辑时没校验」这种不对称。
-     *
-     * @param Request $request 请求体：`parent_id` 上级部门（0 为顶级）、`name` 部门名称（必填，≤64）、
-     *                         `code` 部门编码（必填，唯一，仅限编码字符）、`leader_id` 负责人用户 ID、
-     *                         `sort` 排序（0-9999，升序）、`status` 0 停用 1 启用
-     *
-     * @return array 只含白名单内字段的数组，未声明的字段会被丢弃
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`，`details` 里是字段级错误）
-     */
-    private static function validate(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'parent_id' => ['int|min:0',                '上级部门'],
-            'name'      => ['required|string|max:64',   '部门名称'],
-            'code'      => ['required|code|max:64',     '部门编码'],
-            'leader_id' => ['int|min:0',                '负责人'],
-            'sort'      => ['int|min:0|max:9999',       '排序'],
-            'status'    => ['int|in:0,1',               '状态'],
-        ])->validated();
     }
 }

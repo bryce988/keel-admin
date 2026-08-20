@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
+use app\admin\validation\Role\DataScopeRequest;
+use app\admin\validation\Role\ListRequest;
+use app\admin\validation\Role\StoreRequest;
+use app\admin\validation\Role\UpdateRequest;
 use app\common\service\RoleService;
 use app\common\service\UserService;
 use app\common\support\Paginator;
 use app\common\support\Result;
-use app\common\support\Validator;
 use support\Response;
 use Webman\Http\Request;
 
@@ -32,17 +35,11 @@ class RoleController
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      */
-    public function index(Request $request): Response
+    public function index(ListRequest $request): Response
     {
-        $filters = Validator::make($request->all(), [
-            'keyword'    => ['string|max:64', '关键词'],
-            'status'     => ['in:0,1',        '状态'],
-            'data_scope' => ['in:1,2,3,4,5',  '数据范围'],
-        ])->validated();
-
         return Paginator::response(
-            RoleService::listQuery($filters),
-            $request,
+            RoleService::listQuery($request->validated()),
+            $request->request(),   // 分页与排序参数不在 ListRequest 白名单里，走原始 Request
             sortable: RoleService::SORTABLE,
             defaultField: 'sort',
             defaultOrder: 'asc',
@@ -93,7 +90,7 @@ class RoleController
      *
      * 新建的角色**不带任何权限**，要到授权抽屉里逐项勾选。
      *
-     * @param Request $request 请求体见 {@see self::validate()}
+     * @param StoreRequest $request 请求体见 {@see StoreRequest}
      *
      * @return Response 201，返回新建的角色（含 id）
      *
@@ -101,9 +98,9 @@ class RoleController
      * @throws \app\common\exception\ConflictException  角色编码已存在（409 + `20301`）
      * @throws \app\common\exception\BusinessException  继承关系形成环（400 + `20306`）
      */
-    public function store(Request $request): Response
+    public function store(StoreRequest $request): Response
     {
-        return Result::created(RoleService::create(self::validate($request))->toArray());
+        return Result::created(RoleService::create($request->validated())->toArray());
     }
 
     /**
@@ -114,8 +111,8 @@ class RoleController
      * 内置角色不允许修改：它们被 `scripts/seed.php` 按编码 upsert，
      * 改了下次播种又会被覆盖回去，白改一场。
      *
-     * @param Request $request 请求体见 {@see self::validate()}
-     * @param int     $id      角色 ID
+     * @param UpdateRequest $request 请求体见 {@see UpdateRequest}
+     * @param int           $id      角色 ID
      *
      * @return Response 200，返回更新后的角色
      *
@@ -125,9 +122,9 @@ class RoleController
      * @throws \app\common\exception\ConflictException  角色编码已被占用（409 + `20301`）
      * @throws \app\common\exception\BusinessException  继承关系形成环（400 + `20306`）
      */
-    public function update(Request $request, int $id): Response
+    public function update(UpdateRequest $request, int $id): Response
     {
-        return Result::ok(RoleService::update($id, self::validate($request))->toArray());
+        return Result::ok(RoleService::update($id, $request->validated())->toArray());
     }
 
     /**
@@ -199,12 +196,9 @@ class RoleController
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      * @throws \app\common\exception\NotFoundException   角色不存在（404 + `10404`）
      */
-    public function grantDataScope(Request $request, int $id): Response
+    public function grantDataScope(DataScopeRequest $request, int $id): Response
     {
-        $data = Validator::make($request->all(), [
-            'data_scope' => ['required|int|in:1,2,3,4,5', '数据范围'],
-            'dept_ids'   => ['array',                     '部门'],
-        ])->validated();
+        $data = $request->validated();
 
         RoleService::grantDataScope($id, $data['data_scope'], (array) ($data['dept_ids'] ?? []));
 
@@ -313,29 +307,5 @@ class RoleController
         RoleService::removeMember($id, $userId);
 
         return Result::noContent();
-    }
-
-    /**
-     * 新增与编辑共用的入参校验
-     *
-     * @param Request $request 请求体：`name` 角色名称（必填，≤64）、`code` 角色编码（必填，唯一）、
-     *                         `parent_id` 继承自哪个角色（0 为不继承，RBAC1）、
-     *                         `data_scope` 数据范围 1-5、`sort` 排序、`status` 0 停用 1 启用、`remark` 备注
-     *
-     * @return array 只含白名单内字段的数组
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
-     */
-    private static function validate(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'name'       => ['required|string|max:64', '角色名称'],
-            'code'       => ['required|code|max:64',   '角色编码'],
-            'parent_id'  => ['int|min:0',              '继承自'],
-            'data_scope' => ['int|in:1,2,3,4,5',       '数据范围'],
-            'sort'       => ['int|min:0|max:9999',     '排序'],
-            'status'     => ['int|in:0,1',             '状态'],
-            'remark'     => ['string|max:255',         '备注'],
-        ])->validated();
     }
 }

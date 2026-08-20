@@ -9,7 +9,10 @@ use app\common\service\UserService;
 use app\common\support\OpLog;
 use app\common\support\Paginator;
 use app\common\support\Result;
-use app\common\support\Validator;
+use app\admin\validation\User\ListRequest;
+use app\admin\validation\User\StoreRequest;
+use app\admin\validation\User\UpdateRequest;
+use app\admin\validation\User\UpdateStatusRequest;
 use support\Response;
 use Webman\Http\Request;
 
@@ -31,17 +34,17 @@ class UserController
      * **字段权限**（手机号/邮箱是明文还是掩码）在 `rowMapper()` 里按当前用户
      * 持有的 `sys:field:*` 决定。控制器只管把筛选条件递下去。
      *
-     * @param Request $request 查询参数见 {@see self::filters()}
+     * @param ListRequest $request 查询参数：`keyword`/`status`/`dept_id`（校验见该类 rules）
      *
      * @return Response 200，`{list, total, page, page_size}`
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      */
-    public function index(Request $request): Response
+    public function index(ListRequest $request): Response
     {
         return Paginator::response(
-            UserService::listQuery(self::filters($request)),
-            $request,
+            UserService::listQuery($request->validated()),
+            $request->request(),   // 分页参数走原始 Request，不在 ListRequest 白名单里
             sortable: UserService::SORTABLE,
             defaultField: 'id',
             defaultOrder: 'asc',
@@ -79,7 +82,7 @@ class UserController
      *
      * 不传 `password` 时由 service 按密码策略生成。
      *
-     * @param Request $request 请求体见 {@see self::validate()}，外加 `role_ids` 角色 ID 数组
+     * @param StoreRequest $request 请求体见该类 rules，外加 `role_ids` 角色 ID 数组
      *
      * @return Response 201，返回新建的用户
      *
@@ -87,9 +90,9 @@ class UserController
      * @throws \app\common\exception\ConflictException 账号已存在（409 + `20101`）
      * @throws \app\common\exception\BusinessException 角色互斥（400 + `20304`）、超出角色数上限（400 + `20305`）
      */
-    public function store(Request $request): Response
+    public function store(StoreRequest $request): Response
     {
-        $data = self::validate($request);
+        $data = $request->validated();
         $roleIds = array_map('intval', (array) $request->post('role_ids', []));
 
         return Result::created(UserService::create($data, $roleIds));
@@ -103,8 +106,8 @@ class UserController
      * `role_ids` 的三态是刻意的：**不传**表示不动角色，传**空数组**表示清空。
      * 合并成一种语义的话，「只改个手机号」的请求会把这个人的角色全清掉。
      *
-     * @param Request $request 请求体见 {@see self::validate()}；`role_ids` 可选
-     * @param int     $id      用户 ID
+     * @param UpdateRequest $request 请求体见该类 rules；`role_ids` 可选
+     * @param int           $id      用户 ID
      *
      * @return Response 200，返回更新后的用户详情
      *
@@ -114,9 +117,9 @@ class UserController
      * @throws \app\common\exception\ConflictException  账号已被占用（409 + `20101`）
      * @throws \app\common\exception\BusinessException  角色互斥（400 + `20304`）、超出角色数上限（400 + `20305`）
      */
-    public function update(Request $request, int $id): Response
+    public function update(UpdateRequest $request, int $id): Response
     {
-        $data = self::validate($request);
+        $data = $request->validated();
 
         // 没传 role_ids 就不动角色；传了空数组则表示清空
         $roleIds = $request->post('role_ids') === null
@@ -157,8 +160,8 @@ class UserController
      * 停用是可逆的下线动作，比删除安全——账号停用后立即无法登录，
      * 但历史数据的归属与日志里的操作人都还在。
      *
-     * @param Request $request 请求体：`status` 0 停用 1 启用（必填）
-     * @param int     $id      用户 ID
+     * @param UpdateStatusRequest $request 请求体：`status` 0 停用 1 启用（必填）
+     * @param int                 $id      用户 ID
      *
      * @return Response 204，无响应体
      *
@@ -168,11 +171,9 @@ class UserController
      * @throws \app\common\exception\BusinessException  不能停用自己的账号（400 + `20105`）、
      *                                                      名下还有待交接的数据（400 + `20104`）
      */
-    public function setStatus(Request $request, int $id): Response
+    public function setStatus(UpdateStatusRequest $request, int $id): Response
     {
-        $data = Validator::make($request->all(), [
-            'status' => ['required|int|in:0,1', '状态'],
-        ])->validated();
+        $data = $request->validated();
 
         UserService::setStatus($id, $data['status']);
 
@@ -238,21 +239,21 @@ class UserController
      *
      * `GET /admin/users/export` · 权限点 `sys:user:export` · 自动落操作日志
      *
-     * 筛选条件与列表接口共用 {@see self::filters()}，导出的就是界面上筛出来的那批，不是全表。
+     * 筛选条件与列表接口共用 {@see ListRequest}，导出的就是界面上筛出来的那批，不是全表。
      * 数据权限与字段脱敏同样生效——**导出不是绕开字段权限的后门**，
      * 没有手机号权限的人导出来也是掩码。
      *
      * 路由里这条必须排在 `/users/{id}` 之前，否则 `export` 会被当成 id 匹配掉。
      *
-     * @param Request $request 查询参数见 {@see self::filters()}
+     * @param ListRequest $request 查询参数：`keyword`/`status`/`dept_id`
      *
      * @return Response 200，xlsx 文件流，文件名 `用户列表_YYYYmmdd_HHiiss.xlsx`
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      */
-    public function export(Request $request): Response
+    public function export(ListRequest $request): Response
     {
-        $path = UserService::export(self::filters($request));
+        $path = UserService::export($request->validated());
 
         OpLog::target('导出用户 ' . basename($path));
 
@@ -324,53 +325,4 @@ class UserController
         return Result::ok($result);
     }
 
-    // ---------------------------------------------------------------- 内部
-
-    /**
-     * 列表与导出共用的查询条件
-     *
-     * 共用一份是必须的：分开写迟早出现「界面上筛出 20 条，导出来 2000 条」。
-     *
-     * @param Request $request 查询参数：`keyword` 账号/姓名/手机号模糊匹配、
-     *                         `status` 0 停用 1 启用 2 锁定、`dept_id` 所属部门（含下级）
-     *
-     * @return array 只含白名单内字段的数组
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
-     */
-    private static function filters(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'keyword' => ['string|max:64', '关键词'],
-            'status'  => ['in:0,1,2',      '状态'],
-            'dept_id' => ['int|min:1',     '部门'],
-        ])->validated();
-    }
-
-    /**
-     * 新增与编辑共用的入参校验
-     *
-     * @param Request $request 请求体：`username` 账号（必填，2-64，唯一）、`real_name` 姓名（必填）、
-     *                         `phone` 手机号、`email` 邮箱、`dept_id` 部门、`post_id` 岗位、
-     *                         `status` 0 停用 1 启用 2 锁定、`remark` 备注、
-     *                         `password` 初始密码（留空则由 service 按策略生成）
-     *
-     * @return array 只含白名单内字段的数组
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
-     */
-    private static function validate(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'username'  => ['required|string|min:2|max:64', '账号'],
-            'real_name' => ['required|string|max:64',       '姓名'],
-            'phone'     => ['phone',                        '手机号'],
-            'email'     => ['email|max:128',                '邮箱'],
-            'dept_id'   => ['int|min:0',                    '部门'],
-            'post_id'   => ['int|min:0',                    '岗位'],
-            'status'    => ['int|in:0,1,2',                 '状态'],
-            'remark'    => ['string|max:255',               '备注'],
-            'password'  => ['string|max:64',                '密码'],
-        ])->validated();
-    }
 }

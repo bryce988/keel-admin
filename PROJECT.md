@@ -63,7 +63,7 @@
 | 缓存 | **predis**（纯 PHP） | 会话、字典缓存、接口限流，封装在 `support\Cache` |
 | Redis 扩展 | **phpredis**（`pecl install redis`） | 队列插件的 `RedisConnection extends \Redis`，没有扩展连投递都会致命错误——不是性能优化而是硬依赖 |
 | 日志 | `webman/log`（Monolog） | 按天切分，配置见 `config/log.php` |
-| 校验 | `respect/validation` | 统一在 Request 层校验，控制器不写校验逻辑 |
+| 校验 | **`webman/validation`**（illuminate/validation） | 规则写在 `app/{端}/validation/` 的 FormRequest 里，注入即校验；转型、一字段一条消息、422 字段级 details 封装在 `app\common\support\Validator`，见 §7.5 |
 | 鉴权 | `firebase/php-jwt` | 无状态 JWT，见 §7.5 |
 | 定时任务 | `workerman/crontab` ^1.0 | `app/process/TaskProcess`，**count 必须为 1**，见 §14.7 |
 | 队列 | `webman/redis-queue` ^2.1 | 耗时任务异步化；消费进程见 `app/queue/`，配置在 `config/plugin/` |
@@ -139,7 +139,7 @@ app/
 ├── admin/                # 管理后台（一期唯一实现的端）
 │   ├── controller/       # 只做参数编排与响应，不写业务
 │   ├── service/          # 后台专有逻辑
-│   └── validate/         # 请求校验规则
+│   └── validation/       # FormRequest，一个写/查动作一个类，按业务模块分子目录
 ├── client/               # App / 小程序（二期，一期建空壳）
 ├── open/                 # 开放平台与第三方回调（二期）
 ├── internal/             # 内部服务调用（预留）
@@ -394,10 +394,42 @@ throw new BusinessException('名称已存在', 40001);   // 推荐：由异常�
 | 异常类型 | HTTP | code | 说明 |
 |---|---|---|---|
 | `BusinessException` | 200 | 业务码 | 可预期的业务错误，前端提示即可 |
-| `ValidationException` | 200 | 42200 | 参数校验失败，返回字段级错误 |
+| `ValidationException` | 422 | 10422 | 参数校验失败，`details` 是 `{字段: [消息]}`，见 docs/api.md §3 |
 | `UnauthorizedException` | 401 | 40100 | 未登录或 token 失效 |
 | `ForbiddenException` | 403 | 40300 | 已登录但无权限 |
 | 其他未捕获异常 | 500 | 50000 | **生产环境不返回堆栈**，只返回 traceId，详情进日志 |
+
+**参数校验**：一个写/查动作一个 FormRequest 类，放在 `app/{端}/validation/{模块}/`，
+控制器把 `Request` 换成它即可——webman 的参数注入会构造它，**构造即校验，失败直接 422，
+控制器方法不会执行**。校验发生在所有中间件之后，所以无权限的人先拿到 403，不会看到字段级校验反馈。
+
+```php
+final class StoreRequest extends FormRequest
+{
+    protected function rules(): array
+    {
+        return ['username' => ['required|string|min:2|max:64', '账号']];   // [规则, 中文名]
+    }
+}
+
+public function store(StoreRequest $request): Response
+{
+    $data = $request->validated();   // 只含声明过的键，integer→int、string→trim
+}
+```
+
+三条约定：
+
+- 规则名用 Laravel 原名（`integer` / `numeric` / `boolean` / `size`），项目另注册了 `code` 与 `phone`
+- 新增与编辑**共用一份规则**（`UpdateRequest extends StoreRequest`），
+  分开写迟早出现「新建校验了、编辑没校验」这种不对称；必填项有差异时覆写一个钩子，
+  别复制整张规则表（范例见 `Param\StoreRequest::isCreating()`）
+- 写接口读取未声明校验的字段（如 `role_ids`）**必须用 `$request->post()`，不是 `input()`**。
+  webman 的 `all()` 是 `get() + post()`，查询串会盖过请求体——
+  用 `input()` 的话一个 `?role_ids=` 就能绕过请求体把用户的角色清空
+
+只做格式合法性。账号是否重复、部门有没有下级这类业务规则留在 service 层，
+它们失败是 409/400 而不是 422，交互完全不同。
 
 **JWT**：access token 有效期 2 小时，refresh token 7 天；token 内只放 `uid`、`type` 与两个版本号，
 权限从 Redis 缓存读取，不塞进 token（避免授权变更后 token 内权限过期）。

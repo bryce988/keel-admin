@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
+use app\admin\validation\Dict\ListItemRequest;
+use app\admin\validation\Dict\ListTypeRequest;
+use app\admin\validation\Dict\StoreItemRequest;
+use app\admin\validation\Dict\StoreTypeRequest;
+use app\admin\validation\Dict\UpdateItemRequest;
+use app\admin\validation\Dict\UpdateTypeRequest;
 use app\common\service\DictService;
 use app\common\support\BatchResult;
 use app\common\support\OpLog;
 use app\common\support\Paginator;
 use app\common\support\Result;
-use app\common\support\Validator;
 use support\Response;
 use Webman\Http\Request;
 
@@ -77,16 +82,11 @@ class DictController
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      */
-    public function index(Request $request): Response
+    public function index(ListTypeRequest $request): Response
     {
-        $filters = Validator::make($request->all(), [
-            'keyword' => ['string|max:64', '关键词'],
-            'status'  => ['in:0,1',        '状态'],
-        ])->validated();
-
         return Paginator::response(
-            DictService::typeQuery($filters),
-            $request,
+            DictService::typeQuery($request->validated()),
+            $request->request(),   // 分页与排序参数不在 ListTypeRequest 白名单里，走原始 Request
             sortable: DictService::TYPE_SORTABLE,
             defaultField: 'id',
             defaultOrder: 'asc',
@@ -99,16 +99,16 @@ class DictController
      *
      * `POST /admin/dicts` · 权限点 `sys:dict:create` · 自动落操作日志
      *
-     * @param Request $request 请求体见 {@see self::validateType()}
+     * @param StoreTypeRequest $request 请求体见 {@see StoreTypeRequest}
      *
      * @return Response 201，返回新建的字典类型（含 id）
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      * @throws \app\common\exception\ConflictException  字典编码已存在（409 + `20501`）
      */
-    public function store(Request $request): Response
+    public function store(StoreTypeRequest $request): Response
     {
-        return Result::created(DictService::createType(self::validateType($request))->toArray());
+        return Result::created(DictService::createType($request->validated())->toArray());
     }
 
     /**
@@ -119,8 +119,8 @@ class DictController
      * **已有字典项时不允许改编码**：编码是字典项的外键，改了等于把下面所有项孤立掉，
      * 而引用它的业务数据仍然存着旧编码。
      *
-     * @param Request $request 请求体见 {@see self::validateType()}
-     * @param int     $id      字典类型 ID
+     * @param UpdateTypeRequest $request 请求体见 {@see UpdateTypeRequest}
+     * @param int               $id      字典类型 ID
      *
      * @return Response 200，返回更新后的字典类型
      *
@@ -128,9 +128,9 @@ class DictController
      * @throws \app\common\exception\NotFoundException 字典不存在（404 + `10404`）
      * @throws \app\common\exception\ConflictException  编码已被占用，或该字典下已有项、编码不可改（409 + `20501` / `20502`）
      */
-    public function update(Request $request, int $id): Response
+    public function update(UpdateTypeRequest $request, int $id): Response
     {
-        return Result::ok(DictService::updateType($id, self::validateType($request))->toArray());
+        return Result::ok(DictService::updateType($id, $request->validated())->toArray());
     }
 
     /**
@@ -172,16 +172,11 @@ class DictController
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      */
-    public function allItems(Request $request, string $code): Response
+    public function allItems(ListItemRequest $request, string $code): Response
     {
-        $filters = Validator::make($request->all(), [
-            'keyword' => ['string|max:64', '关键词'],
-            'status'  => ['in:0,1',        '状态'],
-        ])->validated();
-
         return Paginator::response(
-            DictService::itemQuery($code, $filters),
-            $request,
+            DictService::itemQuery($code, $request->validated()),
+            $request->request(),   // 分页与排序参数不在 ListItemRequest 白名单里，走原始 Request
             sortable: DictService::ITEM_SORTABLE,
             defaultField: 'sort',
             defaultOrder: 'asc',
@@ -194,16 +189,16 @@ class DictController
      *
      * `POST /admin/dict-items` · 权限点 `sys:dict:create` · 自动落操作日志
      *
-     * @param Request $request 请求体见 {@see self::validateItem()}
+     * @param StoreItemRequest $request 请求体见 {@see StoreItemRequest}
      *
      * @return Response 201，返回新建的字典项（含 id）
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      * @throws \app\common\exception\NotFoundException 所属字典不存在（404 + `10404`）
      */
-    public function storeItem(Request $request): Response
+    public function storeItem(StoreItemRequest $request): Response
     {
-        return Result::created(DictService::createItem(self::validateItem($request))->toArray());
+        return Result::created(DictService::createItem($request->validated())->toArray());
     }
 
     /**
@@ -214,8 +209,8 @@ class DictController
      * **已被引用时不允许改 `value`**：业务表里存的是这个值，改了等于让历史数据
      * 指向一个不存在的选项，而界面上只会显示成空白。改文案（`label`）不受限制。
      *
-     * @param Request $request 请求体见 {@see self::validateItem()}
-     * @param int     $id      字典项 ID
+     * @param UpdateItemRequest $request 请求体见 {@see UpdateItemRequest}
+     * @param int               $id      字典项 ID
      *
      * @return Response 200，返回更新后的字典项
      *
@@ -223,9 +218,9 @@ class DictController
      * @throws \app\common\exception\NotFoundException 字典项不存在（404 + `10404`）
      * @throws \app\common\exception\ConflictException  已被 N 条数据引用，值不可修改（409 + `20502`）
      */
-    public function updateItem(Request $request, int $id): Response
+    public function updateItem(UpdateItemRequest $request, int $id): Response
     {
-        return Result::ok(DictService::updateItem($id, self::validateItem($request))->toArray());
+        return Result::ok(DictService::updateItem($id, $request->validated())->toArray());
     }
 
     /**
@@ -274,54 +269,5 @@ class DictController
         return Result::ok(
             BatchResult::run($ids, fn (int $id) => DictService::deleteItem($id))->toArray()
         );
-    }
-
-    /**
-     * 字典类型的入参校验（新增与编辑共用）
-     *
-     * @param Request $request 请求体：`name` 字典名称（必填，≤64）、`code` 字典编码（必填，唯一）、
-     *                         `status` 0 停用 1 启用、`remark` 备注
-     *
-     * @return array 只含白名单内字段的数组
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
-     */
-    private static function validateType(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'name'   => ['required|string|max:64', '字典名称'],
-            'code'   => ['required|code|max:64',   '字典编码'],
-            'status' => ['int|in:0,1',             '状态'],
-            'remark' => ['string|max:255',         '备注'],
-        ])->validated();
-    }
-
-    /**
-     * 字典项的入参校验（新增与编辑共用）
-     *
-     * `tag_type` 允许空串——没有颜色的字典项渲染成默认灰标签，
-     * 强制必填会逼着人给「是/否」这种中性选项硬安一个颜色。
-     *
-     * @param Request $request 请求体：`type_code` 所属字典编码（必填）、`label` 显示文案（必填）、
-     *                         `value` 存储值（必填，业务表里存的就是它）、
-     *                         `tag_type` 标签颜色（空 / success / warning / danger / primary / info）、
-     *                         `sort` 排序、`status` 0 停用 1 启用、`remark` 备注
-     *
-     * @return array 只含白名单内字段的数组
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
-     */
-    private static function validateItem(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'type_code' => ['required|code|max:64',   '所属字典'],
-            'label'     => ['required|string|max:64', '显示文案'],
-            'value'     => ['required|string|max:64', '存储值'],
-            // 空串合法：没有 tag_type 的字典项渲染成默认灰标签
-            'tag_type'  => ['string|in:,success,warning,danger,primary,info', '标签颜色'],
-            'sort'      => ['int|min:0|max:9999',     '排序'],
-            'status'    => ['int|in:0,1',             '状态'],
-            'remark'    => ['string|max:255',         '备注'],
-        ])->validated();
     }
 }

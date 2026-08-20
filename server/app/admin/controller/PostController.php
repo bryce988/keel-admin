@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
+use app\admin\validation\Post\ListRequest;
+use app\admin\validation\Post\StoreRequest;
+use app\admin\validation\Post\UpdateRequest;
 use app\common\service\PostService;
 use app\common\support\BatchResult;
 use app\common\support\OpLog;
 use app\common\support\Paginator;
 use app\common\support\Result;
-use app\common\support\Validator;
 use support\Response;
 use Webman\Http\Request;
 
@@ -34,17 +36,11 @@ class PostController
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      */
-    public function index(Request $request): Response
+    public function index(ListRequest $request): Response
     {
-        $filters = Validator::make($request->all(), [
-            'keyword' => ['string|max:64', '关键词'],
-            'status'  => ['in:0,1',        '状态'],
-            'dept_id' => ['int|min:1',     '部门'],
-        ])->validated();
-
         return Paginator::response(
-            PostService::listQuery($filters),
-            $request,
+            PostService::listQuery($request->validated()),
+            $request->request(),   // 分页与排序参数不在 ListRequest 白名单里，走原始 Request
             sortable: PostService::SORTABLE,
             defaultField: 'sort',
             defaultOrder: 'asc',
@@ -74,16 +70,16 @@ class PostController
      *
      * `POST /admin/posts` · 权限点 `sys:post:create` · 自动落操作日志
      *
-     * @param Request $request 请求体见 {@see self::validate()}
+     * @param StoreRequest $request 请求体见 {@see StoreRequest}
      *
      * @return Response 201，返回新建的岗位对象（含 id）
      *
      * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
      * @throws \app\common\exception\ConflictException  岗位编码已存在（409 + `20201`）
      */
-    public function store(Request $request): Response
+    public function store(StoreRequest $request): Response
     {
-        return Result::created(PostService::create(self::validate($request))->toArray());
+        return Result::created(PostService::create($request->validated())->toArray());
     }
 
     /**
@@ -91,8 +87,8 @@ class PostController
      *
      * `PUT /admin/posts/{id}` · 权限点 `sys:post:update` · 自动落操作日志
      *
-     * @param Request $request 请求体见 {@see self::validate()}
-     * @param int     $id      岗位 ID
+     * @param UpdateRequest $request 请求体见 {@see UpdateRequest}
+     * @param int           $id      岗位 ID
      *
      * @return Response 200，返回更新后的岗位对象
      *
@@ -100,9 +96,9 @@ class PostController
      * @throws \app\common\exception\NotFoundException   岗位不存在，或不在你的数据范围内（404 + `10404`）
      * @throws \app\common\exception\ConflictException  岗位编码已被其他岗位占用（409 + `20201`）
      */
-    public function update(Request $request, int $id): Response
+    public function update(UpdateRequest $request, int $id): Response
     {
-        return Result::ok(PostService::update($id, self::validate($request))->toArray());
+        return Result::ok(PostService::update($id, $request->validated())->toArray());
     }
 
     /**
@@ -155,29 +151,5 @@ class PostController
         return Result::ok(
             BatchResult::run($ids, fn (int $id) => PostService::delete($id))->toArray()
         );
-    }
-
-    /**
-     * 新增与编辑共用的入参校验
-     *
-     * @param Request $request 请求体：`name` 岗位名称（必填，≤64）、`code` 岗位编码（必填，唯一）、
-     *                         `dept_id` 所属部门、`default_role_id` 默认角色（新人入职按岗位带角色）、
-     *                         `sort` 排序、`status` 0 停用 1 启用、`remark` 备注
-     *
-     * @return array 只含白名单内字段的数组
-     *
-     * @throws \app\common\exception\ValidationException 参数不合法（422 + `10422`）
-     */
-    private static function validate(Request $request): array
-    {
-        return Validator::make($request->all(), [
-            'name'            => ['required|string|max:64', '岗位名称'],
-            'code'            => ['required|code|max:64',   '岗位编码'],
-            'dept_id'         => ['int|min:0',              '所属部门'],
-            'default_role_id' => ['int|min:0',              '默认角色'],
-            'sort'            => ['int|min:0|max:9999',     '排序'],
-            'status'          => ['int|in:0,1',             '状态'],
-            'remark'          => ['string|max:255',         '备注'],
-        ])->validated();
     }
 }
