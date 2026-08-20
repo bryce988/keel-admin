@@ -14,7 +14,6 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
-import PermissionMatrix from './PermissionMatrix.vue'
 
 /**
  * 菜单与权限点（RBAC 的**定义**层）
@@ -25,7 +24,6 @@ import PermissionMatrix from './PermissionMatrix.vue'
  */
 const dictStore = useDictStore()
 
-const tab = ref<'tree' | 'matrix'>('tree')
 const tableRef = ref<ProTableInstance | null>(null)
 const drawerRef = ref<FormDrawerInstance | null>(null)
 
@@ -192,76 +190,67 @@ onMounted(() => {
 
 <template>
   <div class="page">
-    <el-tabs v-model="tab" class="menu-tabs">
-      <el-tab-pane label="权限点定义" name="tree" />
-      <el-tab-pane label="角色 × 权限矩阵" name="matrix" />
-    </el-tabs>
+    <SearchForm
+      v-model="query"
+      :fields="searchFields"
+      @search="tableRef?.reload()"
+      @reset="tableRef?.reload()"
+    />
 
-    <template v-if="tab === 'tree'">
-      <SearchForm
-        v-model="query"
-        :fields="searchFields"
-        @search="tableRef?.reload()"
-        @reset="tableRef?.reload()"
-      />
+    <ProTable
+      ref="tableRef"
+      v-model:params="query"
+      :request="fetchMenuTree"
+      :param-parsers="paramParsers"
+      :columns="columns"
+      tree
+    >
+      <template #toolbar>
+        <el-button
+          v-permission="'sys:menu:create'"
+          type="primary"
+          :icon="Plus"
+          @click="onCreate(0, 1)"
+        >
+          新增顶级目录
+        </el-button>
+      </template>
 
-      <ProTable
-        ref="tableRef"
-        v-model:params="query"
-        :request="fetchMenuTree"
-        :param-parsers="paramParsers"
-        :columns="columns"
-        tree
-      >
-        <template #toolbar>
+      <!-- 只有目录和菜单挂图标，其余类型留白 -->
+      <template #icon="{ row }">
+        <el-icon v-if="iconComp(row.icon)" :size="16">
+          <component :is="iconComp(row.icon)" />
+        </el-icon>
+        <span v-else class="muted">—</span>
+      </template>
+
+      <!-- 只有目录和菜单才有路由，按钮/接口/数据类节点这一列留白比显示空串清楚 -->
+      <template #path="{ row }">
+        <span v-if="row.path">{{ row.path }}</span>
+        <span v-else class="muted">—</span>
+      </template>
+
+      <template #actions="{ row }">
+        <div class="table-actions">
+          <el-button link type="primary" @click="onView(row)">详情</el-button>
           <el-button
+            v-if="row.type <= 2"
             v-permission="'sys:menu:create'"
+            link
             type="primary"
-            :icon="Plus"
-            @click="onCreate(0, 1)"
+            @click="onCreate(row.id, row.type === 1 ? 2 : 3)"
           >
-            新增顶级目录
+            新增下级
           </el-button>
-        </template>
-
-        <!-- 只有目录和菜单挂图标，其余类型留白 -->
-        <template #icon="{ row }">
-          <el-icon v-if="iconComp(row.icon)" :size="16">
-            <component :is="iconComp(row.icon)" />
-          </el-icon>
-          <span v-else class="muted">—</span>
-        </template>
-
-        <!-- 只有目录和菜单才有路由，按钮/接口/数据类节点这一列留白比显示空串清楚 -->
-        <template #path="{ row }">
-          <span v-if="row.path">{{ row.path }}</span>
-          <span v-else class="muted">—</span>
-        </template>
-
-        <template #actions="{ row }">
-          <div class="table-actions">
-            <el-button link type="primary" @click="onView(row)">详情</el-button>
-            <el-button
-              v-if="row.type <= 2"
-              v-permission="'sys:menu:create'"
-              link
-              type="primary"
-              @click="onCreate(row.id, row.type === 1 ? 2 : 3)"
-            >
-              新增下级
-            </el-button>
-            <el-button v-permission="'sys:menu:update'" link type="primary" @click="onEdit(row)">
-              编辑
-            </el-button>
-            <el-button v-permission="'sys:menu:delete'" link type="danger" @click="onDelete(row)">
-              删除
-            </el-button>
-          </div>
-        </template>
-      </ProTable>
-    </template>
-
-    <PermissionMatrix v-else />
+          <el-button v-permission="'sys:menu:update'" link type="primary" @click="onEdit(row)">
+            编辑
+          </el-button>
+          <el-button v-permission="'sys:menu:delete'" link type="danger" @click="onDelete(row)">
+            删除
+          </el-button>
+        </div>
+      </template>
+    </ProTable>
 
     <FormDrawer
       ref="drawerRef"
@@ -392,10 +381,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.menu-tabs {
-  margin-bottom: 4px;
-}
-
 .muted {
   color: var(--el-text-color-placeholder);
 }

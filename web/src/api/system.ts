@@ -161,19 +161,8 @@ export interface MenuNodeRow {
   children?: MenuNodeRow[]
 }
 
-export interface PermissionMatrix {
-  roles: Array<{ id: number; name: string; code: string; is_builtin: boolean }>
-  /** permission_id → 拥有它的角色 id 列表 */
-  granted: Record<string, number[]>
-  tree: MenuNodeRow[]
-}
-
 export function fetchMenuTree(params?: Record<string, unknown>) {
   return request.get<unknown, MenuNodeRow[]>('/admin/menus/tree', { params })
-}
-
-export function fetchPermissionMatrix() {
-  return request.get<unknown, PermissionMatrix>('/admin/menus/matrix')
 }
 
 export function createMenu(data: Record<string, unknown>) {

@@ -169,8 +169,6 @@ Route::group('/admin', function () {
     // ---------------- 菜单与权限点（只定义，不授权）----------------
     Route::get('/menus/tree', [MenuController::class, 'tree'])
         ->setParams(['perm' => 'sys:menu:list']);
-    Route::get('/menus/matrix', [MenuController::class, 'matrix'])
-        ->setParams(['perm' => 'sys:menu:list']);
     Route::get('/menus/{id:\d+}', [MenuController::class, 'show'])
         ->setParams(['perm' => 'sys:menu:list']);
     Route::post('/menus', [MenuController::class, 'store'])->setParams([

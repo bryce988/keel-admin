@@ -192,7 +192,7 @@ start.php                 # 启动入口
 | `/system/user` | 用户管理 | `sys:user:list` | 账号、角色分配、停用 |
 | `/system/dept` | 部门管理 | `sys:dept:list` | 组织树、岗位 |
 | `/system/role` | 角色管理 | `sys:role:list` | 功能权限、数据权限、字段权限 |
-| `/system/menu` | 菜单与权限 | `sys:menu:list` | 权限点字典、角色权限矩阵 |
+| `/system/menu` | 菜单与权限 | `sys:menu:list` | 权限点字典（目录/菜单/按钮/接口/字段五类） |
 | `/system/dict` | 数据字典 | `sys:dict:list` | 字典类型与字典项 |
 | `/system/param` | 参数配置 | `sys:param:edit` | 基础、安全、集成、高级参数 |
 | `/system/log` | 操作日志 | `sys:log:list` | 操作/登录/接口日志 |

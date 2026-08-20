@@ -6,7 +6,6 @@ namespace app\common\service;
 
 use app\common\exception\ConflictException;
 use app\common\model\SysPermissionModel;
-use app\common\model\SysRoleModel;
 use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;
@@ -147,39 +146,6 @@ class MenuService
 
         $node->delete();
         self::invalidatePermissionCache();
-    }
-
-    /**
-     * 角色 × 权限矩阵（只读审计视图）
-     *
-     * 「谁有哪些权限」平时要在角色页里一个个点开看，出事时根本来不及。
-     * 这里一次把全貌摊开，专门用于审计与交叉检查。
-     */
-    public static function matrix(): array
-    {
-        $roles = SysRoleModel::query()
-            ->where('status', 1)
-            ->orderBy('sort')
-            ->get(['id', 'name', 'code', 'is_builtin'])
-            ->map(fn (SysRoleModel $r) => [
-                'id'         => $r->id,
-                'name'       => $r->name,
-                'code'       => $r->code,
-                'is_builtin' => $r->is_builtin,
-            ])
-            ->all();
-
-        // 一次取全量关联，前端按 permission_id 查表；逐个权限点去 count 是 N+1
-        $granted = [];
-        foreach (Db::table('sys_role_permissions')->get() as $row) {
-            $granted[(int) $row->permission_id][] = (int) $row->role_id;
-        }
-
-        return [
-            'roles'   => $roles,
-            'granted' => $granted,
-            'tree'    => self::tree(),
-        ];
     }
 
     // ---------------------------------------------------------------- 内部

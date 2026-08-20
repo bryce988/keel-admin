@@ -33,12 +33,6 @@ class MenuController
         return Result::ok(MenuService::detail($id));
     }
 
-    /** 角色 × 权限矩阵，只读审计视图 */
-    public function matrix(Request $request): Response
-    {
-        return Result::ok(MenuService::matrix());
-    }
-
     public function store(Request $request): Response
     {
         return Result::created(MenuService::create(self::validate($request))->toArray());

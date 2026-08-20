@@ -434,7 +434,6 @@ PUT /admin/roles/3/data-scope
 | POST | `/admin/menus` | `sys:menu:create` | 新建节点 |
 | PUT | `/admin/menus/{id}` | `sys:menu:update` | 编辑 |
 | DELETE | `/admin/menus/{id}` | `sys:menu:delete` | 删除（被引用 409 + `20402`） |
-| GET | `/admin/menus/matrix` | `sys:menu:list` | 角色 × 权限矩阵（只读审计视图） |
 
 **本模块只定义权限点，不做授权**。`GET /admin/menus/tree` 返回的每个节点带 `granted_role_count`，仅供展示。
 
