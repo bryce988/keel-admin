@@ -1,18 +1,6 @@
 <?php
-
-declare(strict_types=1);
-
-namespace app\common\service;
-
-use app\common\constant\BizCode;
-use app\common\exception\UnauthorizedException;
-use app\common\support\Cache;
-use app\common\support\Env;
-use Firebase\JWT\ExpiredException;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-
 /**
+ * keel admin
  * JWT 签发与校验
  *
  * 设计要点（见 PROJECT.md §7.5）：
@@ -33,7 +21,21 @@ use Firebase\JWT\Key;
  * 所以「把这个人所有会话作废」用黑名单表达不了。曾经的后果是：
  * 改密/登出之后，泄露的 refresh token 在 7 天内仍能不断换出可用的 access token，
  * 「改密踢下线」形同虚设（实测 PoC：登出后 access 401，但 refresh 换新照样 200）。
+ *
+ * @author 火火
  */
+declare(strict_types=1);
+
+namespace app\common\service;
+
+use app\common\constant\BizCode;
+use app\common\exception\UnauthorizedException;
+use app\common\support\Cache;
+use app\common\support\Env;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
 class JwtService
 {
     private const ALG = 'HS256';

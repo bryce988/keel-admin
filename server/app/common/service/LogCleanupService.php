@@ -1,5 +1,16 @@
 <?php
-
+/**
+ * keel admin
+ * 过期日志清理
+ *
+ * 日志是全库增长最快的表，不清理迟早把磁盘吃满，而磁盘满了之后
+ * 连「写一条日志说磁盘满了」都做不到——所以这件事必须是自动的。
+ *
+ * 保留天数走系统参数 `sys.log.retainDays`（默认 180 天），
+ * 在参数配置页就能改，不用改代码也不用重启。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -8,15 +19,6 @@ use app\common\model\SysLoginLogModel;
 use app\common\model\SysOperationLogModel;
 use support\Log;
 
-/**
- * 过期日志清理
- *
- * 日志是全库增长最快的表，不清理迟早把磁盘吃满，而磁盘满了之后
- * 连「写一条日志说磁盘满了」都做不到——所以这件事必须是自动的。
- *
- * 保留天数走系统参数 `sys.log.retainDays`（默认 180 天），
- * 在参数配置页就能改，不用改代码也不用重启。
- */
 class LogCleanupService
 {
     private const RETAIN_KEY = 'sys.log.retainDays';

@@ -1,5 +1,19 @@
 <?php
-
+/**
+ * keel admin
+ * 个人中心
+ *
+ * 与 UserService 最本质的区别：这里没有「改别人」这条路径。
+ * 所有方法的第一个参数都是当前登录用户 id（由控制器从令牌取），
+ * 请求体里的 id 一律不看——越权在结构上就不成立，因此这些接口
+ * 也不需要任何权限点（route.php 里 `perm => ''`）。
+ *
+ * 单独开一个 service 而不是往 UserService 里加方法，就是为了让
+ * 「能改自己」和「能改别人」在代码上分家：后者每个入口都要过权限点与
+ * 数据权限，前者一个都不需要，混在一起迟早有人把两套规则接错。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -14,18 +28,6 @@ use app\common\support\Guard;
 use app\common\support\OpLog;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * 个人中心
- *
- * 与 UserService 最本质的区别：这里没有「改别人」这条路径。
- * 所有方法的第一个参数都是当前登录用户 id（由控制器从令牌取），
- * 请求体里的 id 一律不看——越权在结构上就不成立，因此这些接口
- * 也不需要任何权限点（route.php 里 `perm => ''`）。
- *
- * 单独开一个 service 而不是往 UserService 里加方法，就是为了让
- * 「能改自己」和「能改别人」在代码上分家：后者每个入口都要过权限点与
- * 数据权限，前者一个都不需要，混在一起迟早有人把两套规则接错。
- */
 class ProfileService
 {
     /** 我的登录记录允许排序的字段 */

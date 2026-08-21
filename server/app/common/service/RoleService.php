@@ -1,5 +1,15 @@
 <?php
-
+/**
+ * keel admin
+ * 角色（RBAC 的授权层）
+ *
+ * 三层职责分离：定义（菜单权限）→ 授权（本模块） → 分配（用户）。
+ * 这里决定「某个角色能干什么、能看到哪些数据」，不决定「谁是这个角色」——
+ * 那是用户管理的事。成员管理是本模块唯一一处碰到「人」的地方，
+ * 因为从角色视角批量加人是真实需求，但它复用的是同一套分配校验。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -15,14 +25,6 @@ use app\common\support\Guard;
 use app\common\support\OpLog;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * 角色（RBAC 的授权层）
- *
- * 三层职责分离：定义（菜单权限）→ 授权（本模块） → 分配（用户）。
- * 这里决定「某个角色能干什么、能看到哪些数据」，不决定「谁是这个角色」——
- * 那是用户管理的事。成员管理是本模块唯一一处碰到「人」的地方，
- * 因为从角色视角批量加人是真实需求，但它复用的是同一套分配校验。
- */
 class RoleService
 {
     public const SORTABLE = ['id', 'sort', 'status', 'created_at'];

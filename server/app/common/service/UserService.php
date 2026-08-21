@@ -1,5 +1,13 @@
 <?php
-
+/**
+ * keel admin
+ * 用户（RBAC 的分配层）
+ *
+ * ⚠️ 这里没有任何 `where dept_id in (...)`——数据权限由 SysUserModel 的全局 Scope 注入。
+ * 想验证效果：换个部门主管账号调同一个接口，返回的行数会自己变少。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -20,12 +28,6 @@ use app\common\support\OpLog;
 use app\common\support\Spreadsheet;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * 用户（RBAC 的分配层）
- *
- * ⚠️ 这里没有任何 `where dept_id in (...)`——数据权限由 SysUserModel 的全局 Scope 注入。
- * 想验证效果：换个部门主管账号调同一个接口，返回的行数会自己变少。
- */
 class UserService
 {
     /** 列表可排序字段白名单（数据库字段名） */

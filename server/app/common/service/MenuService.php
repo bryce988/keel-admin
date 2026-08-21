@@ -1,5 +1,16 @@
 <?php
-
+/**
+ * keel admin
+ * 菜单与权限点（RBAC 的定义层）
+ *
+ * 这里只定义「系统里存在哪些权限」，不做授权——把权限给谁是角色管理的事。
+ * 三层职责分离：定义（本模块）→ 授权（角色）→ 分配（用户）。
+ *
+ * 菜单树同时驱动前端路由：`path` 与 `component` 一改，用户刷新页面就生效，
+ * 不用发版。这也意味着改错了会让整个页面打不开，所以校验要严。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -12,15 +23,6 @@ use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;
 
-/**
- * 菜单与权限点（RBAC 的定义层）
- *
- * 这里只定义「系统里存在哪些权限」，不做授权——把权限给谁是角色管理的事。
- * 三层职责分离：定义（本模块）→ 授权（角色）→ 分配（用户）。
- *
- * 菜单树同时驱动前端路由：`path` 与 `component` 一改，用户刷新页面就生效，
- * 不用发版。这也意味着改错了会让整个页面打不开，所以校验要严。
- */
 class MenuService
 {
     /** 全量树，含停用节点与按钮/接口/数据类节点，供管理界面使用 */

@@ -1,5 +1,16 @@
 <?php
-
+/**
+ * keel admin
+ * 数据字典
+ *
+ * 字典是全站高频只读数据，走 Redis 缓存；
+ * 所有写入路径都必须 forget()，否则改了要等 5 分钟才生效——
+ * 表现为「明明改了标签颜色，界面就是老样子」，而且过一会儿又好了。
+ * 为了不漏，缓存失效统一收口在本类的 create/update/delete 里，
+ * 控制器与前端都不需要知道缓存的存在。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -22,15 +33,6 @@ use app\common\support\Guard;
 use app\common\support\OpLog;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * 数据字典
- *
- * 字典是全站高频只读数据，走 Redis 缓存；
- * 所有写入路径都必须 forget()，否则改了要等 5 分钟才生效——
- * 表现为「明明改了标签颜色，界面就是老样子」，而且过一会儿又好了。
- * 为了不漏，缓存失效统一收口在本类的 create/update/delete 里，
- * 控制器与前端都不需要知道缓存的存在。
- */
 class DictService
 {
     private const TTL = 300;

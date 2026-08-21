@@ -1,5 +1,14 @@
 <?php
-
+/**
+ * keel admin
+ * 系统参数
+ *
+ * ⚠️ 参数只落库 + 走缓存，绝不在运行期改 webman 配置：
+ * 常驻内存下 `config()` 改了只影响当前 worker，多进程之间立刻不一致，
+ * 表现为「同一个操作有时按新值有时按旧值」，极难排查（PROJECT.md §14）。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -11,13 +20,6 @@ use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;
 
-/**
- * 系统参数
- *
- * ⚠️ 参数只落库 + 走缓存，绝不在运行期改 webman 配置：
- * 常驻内存下 `config()` 改了只影响当前 worker，多进程之间立刻不一致，
- * 表现为「同一个操作有时按新值有时按旧值」，极难排查（PROJECT.md §14）。
- */
 class ParamService
 {
     private const TTL = 300;

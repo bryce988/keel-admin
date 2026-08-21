@@ -1,5 +1,14 @@
 <?php
-
+/**
+ * keel admin
+ * 图形验证码
+ *
+ * 用 SVG 生成，不依赖 GD 扩展，容器镜像更小。
+ * 验证码存 Redis 而不是进程内变量——多进程模型下进程内存各自独立，
+ * 生成和校验很可能落在不同进程上（PROJECT.md §14.1）。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -7,13 +16,6 @@ namespace app\common\service;
 use app\common\support\Cache;
 use app\common\support\Env;
 
-/**
- * 图形验证码
- *
- * 用 SVG 生成，不依赖 GD 扩展，容器镜像更小。
- * 验证码存 Redis 而不是进程内变量——多进程模型下进程内存各自独立，
- * 生成和校验很可能落在不同进程上（PROJECT.md §14.1）。
- */
 class CaptchaService
 {
     private const CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';

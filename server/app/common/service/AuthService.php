@@ -1,5 +1,12 @@
 <?php
-
+/**
+ * keel admin
+ * 认证业务
+ *
+ * 事务边界、业务规则都在 service 层，控制器只做参数编排。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -18,11 +25,6 @@ use app\common\support\Cache;
 use app\common\support\Env;
 use app\common\support\IpLocation;
 
-/**
- * 认证业务
- *
- * 事务边界、业务规则都在 service 层，控制器只做参数编排。
- */
 class AuthService
 {
     /**

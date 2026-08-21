@@ -1,5 +1,17 @@
 <?php
-
+/**
+ * keel admin
+ * 日志查询（只读）
+ *
+ * 日志只写不改不删，所以这里没有 create/update/delete——写入分别在
+ * OperationLogMiddleware 与 AuthService 里，本类只负责查和导。
+ *
+ * 两张表都带 `HasDataScope`：日志本身也受数据权限约束，
+ * 部门主管只能看到本部门的操作记录。这一点不能靠界面收敛，
+ * 「看不到但能查」的日志等于没有隔离。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -12,16 +24,6 @@ use app\common\support\Guard;
 use app\common\support\Spreadsheet;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * 日志查询（只读）
- *
- * 日志只写不改不删，所以这里没有 create/update/delete——写入分别在
- * OperationLogMiddleware 与 AuthService 里，本类只负责查和导。
- *
- * 两张表都带 `HasDataScope`：日志本身也受数据权限约束，
- * 部门主管只能看到本部门的操作记录。这一点不能靠界面收敛，
- * 「看不到但能查」的日志等于没有隔离。
- */
 class LogService
 {
     public const OPERATION_SORTABLE = ['id', 'created_at', 'duration', 'status'];

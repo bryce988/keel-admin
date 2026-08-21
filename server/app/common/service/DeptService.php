@@ -1,5 +1,14 @@
 <?php
-
+/**
+ * keel admin
+ * 部门
+ *
+ * 这张表是数据权限的载体：`ancestors` 祖级路径决定了「本部门及下属」
+ * 能看到哪些数据。所以移动部门时子孙的 ancestors 必须同步刷新，
+ * 漏刷的后果不是显示错乱，而是权限失效——用户看得到本不该看的数据。
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -12,13 +21,6 @@ use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;
 
-/**
- * 部门
- *
- * 这张表是数据权限的载体：`ancestors` 祖级路径决定了「本部门及下属」
- * 能看到哪些数据。所以移动部门时子孙的 ancestors 必须同步刷新，
- * 漏刷的后果不是显示错乱，而是权限失效——用户看得到本不该看的数据。
- */
 class DeptService
 {
     /** 某个部门及其所有下级的 id，走 ancestors 前缀匹配 */

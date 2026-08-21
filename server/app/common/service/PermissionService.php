@@ -1,5 +1,15 @@
 <?php
-
+/**
+ * keel admin
+ * 权限点解析
+ *
+ * 两级缓存：
+ * - 请求内用 Ctx，同一请求里多次判权不重复查
+ * - 跨请求用 Redis，key 里带 perm_version，授权一变更 key 就变，旧缓存自然失效，
+ *   用户无需重新登录即刻生效（PROJECT.md §15 验收项）
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\service;
@@ -11,14 +21,6 @@ use app\common\support\Cache;
 use app\common\support\Ctx;
 use app\common\support\Db;
 
-/**
- * 权限点解析
- *
- * 两级缓存：
- * - 请求内用 Ctx，同一请求里多次判权不重复查
- * - 跨请求用 Redis，key 里带 perm_version，授权一变更 key 就变，旧缓存自然失效，
- *   用户无需重新登录即刻生效（PROJECT.md §15 验收项）
- */
 class PermissionService
 {
     private const TTL = 600;
