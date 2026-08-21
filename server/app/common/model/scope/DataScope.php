@@ -123,6 +123,10 @@ final class DataScope implements Scope
 
         $ids = [];
         if ($deptId > 0) {
+            // ⚠️ 这两处**必须**用 Db::table 而不是 SysDeptModel：
+            // SysDeptModel 自己 use 了 HasDataScope，在 Scope 内部再查它就是自己触发自己，
+            // 无限递归。软删除条件因此也只能手写——拿不到模型的 SoftDeletes。
+            // 别顺手「统一成模型」，这是全仓唯一不能换的两处
             $self = Db::table('sys_depts')->where('id', $deptId)->first();
             if ($self) {
                 $prefix = ($self->ancestors === '' ? '' : $self->ancestors . ',') . $deptId;

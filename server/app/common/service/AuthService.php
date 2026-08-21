@@ -9,8 +9,12 @@ use app\common\exception\BusinessException;
 use app\common\exception\RateLimitException;
 use app\common\exception\UnauthorizedException;
 use app\common\exception\ValidationException;
+use app\common\model\SysDeptModel;
+use app\common\model\SysLoginLogModel;
+use app\common\model\SysPermissionModel;
+use app\common\model\SysRoleModel;
+use app\common\model\SysUserModel;
 use app\common\support\Cache;
-use app\common\support\Db;
 use app\common\support\Env;
 use app\common\support\IpLocation;
 
@@ -78,10 +82,11 @@ class AuthService
             throw new UnauthorizedException("账号已锁定，请 {$minutes} 分钟后重试", BizCode::ACCOUNT_LOCKED);
         }
 
-        $user = Db::table('sys_users')
-            ->whereNull('deleted_at')
-            ->where('username', $username)
-            ->first();
+        // withoutDataScope()：登录时 Ctx 里还没有用户，DataScope 本来就会放行，
+        // 但写出来才是把「这一步不依赖登录态」钉死在代码里——
+        // 将来 DataScope 若改成 fail-closed，这里不会跟着一起登不上去。
+        // 软删除条件由 SoftDeletes 自动带上，不再手写 whereNull('deleted_at')
+        $user = SysUserModel::withoutDataScope()->where('username', $username)->first();
 
         $ok = $user && password_verify($password, $user->password);
 
@@ -110,10 +115,9 @@ class AuthService
         // 接着继续横扫其他用户名
         Cache::del($failKey);
 
-        Db::table('sys_users')->where('id', $user->id)->update([
+        SysUserModel::withoutDataScope()->where('id', $user->id)->update([
             'last_login_at' => date('Y-m-d H:i:s'),
             'last_login_ip' => $ip,
-            'updated_at'    => date('Y-m-d H:i:s'),
         ]);
 
         self::writeLoginLog((int) $user->id, $username, $ip, $ua, true, '');
@@ -129,7 +133,9 @@ class AuthService
     /** 加载用户，供鉴权中间件使用 */
     public static function loadUser(int $uid): array
     {
-        $user = Db::table('sys_users')->whereNull('deleted_at')->where('id', $uid)->first();
+        // 这是「建立登录态」的那一步，不能依赖登录态，所以显式 withoutDataScope()；
+        // 软删除由 SoftDeletes 带上
+        $user = SysUserModel::withoutDataScope()->find($uid);
         if (!$user) {
             throw new UnauthorizedException('账号不存在或已被删除');
         }
@@ -137,11 +143,9 @@ class AuthService
             throw new UnauthorizedException('账号已被停用，请联系管理员', BizCode::ACCOUNT_DISABLED);
         }
 
-        $row = (array) $user;
-        // 密码哈希不进请求上下文：Ctx 里的东西会被日志、调试面板顺手打印出来
-        unset($row['password']);
-
-        return $row;
+        // 密码哈希不进请求上下文（Ctx 里的东西会被日志、调试面板顺手打印出来），
+        // 模型的 $hidden 已经把它挡在 toArray() 之外，这里不用再手动 unset
+        return $user->toArray();
     }
 
     /** 当前用户的资料 + 角色 + 权限 + 菜单树 */
@@ -149,41 +153,40 @@ class AuthService
     {
         $isSuper = (bool) $user['is_super'];
 
-        $roles = Db::table('sys_user_roles as ur')
-            ->join('sys_roles as r', 'r.id', '=', 'ur.role_id')
+        $roles = SysRoleModel::query()
+            ->join('sys_user_roles as ur', 'ur.role_id', '=', 'sys_roles.id')
             ->where('ur.user_id', $user['id'])
-            ->whereNull('r.deleted_at')
-            ->where('r.status', 1)
-            ->pluck('r.code')
+            ->where('sys_roles.status', 1)
+            ->pluck('sys_roles.code')
             ->toArray();
 
         // 权限点走 PermissionService，与鉴权中间件共用同一份缓存，避免两处逻辑漂移
         $permissions = PermissionService::codesOf($user);
 
         if ($isSuper) {
-            $nodes = Db::table('sys_permissions')->where('status', 1)->orderBy('sort')->get()->toArray();
+            $nodes = SysPermissionModel::query()->where('status', 1)->orderBy('sort')->get()->toArray();
             $dataScope = 1;
         } else {
-            $nodes = Db::table('sys_permissions as p')
-                ->join('sys_role_permissions as rp', 'rp.permission_id', '=', 'p.id')
+            $nodes = SysPermissionModel::query()
+                ->join('sys_role_permissions as rp', 'rp.permission_id', '=', 'sys_permissions.id')
                 ->join('sys_user_roles as ur', 'ur.role_id', '=', 'rp.role_id')
                 ->where('ur.user_id', $user['id'])
-                ->where('p.status', 1)
-                ->select('p.*')
+                ->where('sys_permissions.status', 1)
+                ->select('sys_permissions.*')
                 ->distinct()
-                ->orderBy('p.sort')
+                ->orderBy('sys_permissions.sort')
                 ->get()
                 ->toArray();
 
             // 多角色取范围最大者（data_scope 数值越小范围越大）
-            $dataScope = (int) (Db::table('sys_user_roles as ur')
-                ->join('sys_roles as r', 'r.id', '=', 'ur.role_id')
+            $dataScope = (int) (SysRoleModel::query()
+                ->join('sys_user_roles as ur', 'ur.role_id', '=', 'sys_roles.id')
                 ->where('ur.user_id', $user['id'])
-                ->min('r.data_scope') ?? 4);
+                ->min('sys_roles.data_scope') ?? 4);
         }
 
         $dept = $user['dept_id']
-            ? Db::table('sys_depts')->where('id', $user['dept_id'])->first()
+            ? SysDeptModel::withoutDataScope()->find($user['dept_id'])
             : null;
 
         return [
@@ -248,7 +251,7 @@ class AuthService
 
     public static function changePassword(array $user, string $oldPassword, string $newPassword): void
     {
-        $hash = (string) Db::table('sys_users')->where('id', $user['id'])->value('password');
+        $hash = (string) SysUserModel::withoutDataScope()->where('id', $user['id'])->value('password');
 
         if (!password_verify($oldPassword, $hash)) {
             throw new BusinessException('原密码错误', BizCode::OLD_PASSWORD_ERROR);
@@ -271,16 +274,15 @@ class AuthService
             );
         }
 
-        Db::table('sys_users')->where('id', $user['id'])->update([
+        SysUserModel::withoutDataScope()->where('id', $user['id'])->update([
             'password'       => password_hash($newPassword, PASSWORD_DEFAULT),
             'pwd_updated_at' => date('Y-m-d H:i:s'),
-            'updated_at'     => date('Y-m-d H:i:s'),
         ]);
 
         // 改密即作废该用户的全部会话，其他端的 access 与 refresh 一起失效。
         // 这是「改密踢下线」真正生效的地方——只吊销当前 jti 的话，
         // 别的设备上那对令牌照常能用，泄露的 refresh 还能一直换新
-        Db::table('sys_users')->where('id', $user['id'])->increment('token_version');
+        SysUserModel::withoutDataScope()->where('id', $user['id'])->increment('token_version');
     }
 
     public static function writeLoginLog(
@@ -291,23 +293,24 @@ class AuthService
         // 部门在这里查一次（主键查询，可忽略不计），而不是让五个调用点各传一遍——
         // 总有一处会传漏，而传漏的后果是那条日志谁都看不见（dept_id=0）
         $deptId = $userId > 0
-            ? (int) Db::table('sys_users')->where('id', $userId)->value('dept_id')
+            ? (int) SysUserModel::withoutDataScope()->where('id', $userId)->value('dept_id')
             : 0;
 
-        Db::table('sys_login_logs')->insert([
-            'user_id'    => $userId,
-            'username'   => $username,
-            'dept_id'    => $deptId,
-            'ip'         => $ip,
+        // created_at 由模型的 timestamps 自动写（该表 UPDATED_AT = null，只有创建时间）；
+        // 这张表没有审计列，模型已把 auditColumns() 覆写成空，登录失败时（无登录态）也能写
+        SysLoginLogModel::create([
+            'user_id'  => $userId,
+            'username' => $username,
+            'dept_id'  => $deptId,
+            'ip'       => $ip,
             // 离线库查，查不到给「未知」而不是留空——安全复核时一眼扫下来，
             // 空白分不清是「查不到」还是「没记」
-            'location'   => IpLocation::of($ip),
-            'browser'    => $browser,
-            'os'         => $os,
-            'type'       => $type,
-            'status'     => $success ? 1 : 0,
-            'msg'        => $msg,
-            'created_at' => date('Y-m-d H:i:s'),
+            'location' => IpLocation::of($ip),
+            'browser'  => $browser,
+            'os'       => $os,
+            'type'     => $type,
+            'status'   => $success ? 1 : 0,
+            'msg'      => $msg,
         ]);
     }
 

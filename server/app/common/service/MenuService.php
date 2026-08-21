@@ -7,6 +7,7 @@ namespace app\common\service;
 use app\common\constant\BizCode;
 use app\common\exception\ConflictException;
 use app\common\model\SysPermissionModel;
+use app\common\model\SysUserModel;
 use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;
@@ -160,7 +161,9 @@ class MenuService
      */
     private static function invalidatePermissionCache(): void
     {
-        Db::table('sys_users')->increment('perm_version');
+        // 理由同 PermissionService::bumpUsers()：用模型拿软删除 Scope，
+        // toBase() 绕开 updated_at 自动更新——这是全表递增，不该把整张用户表的更新时间推一遍
+        SysUserModel::withoutDataScope()->toBase()->increment('perm_version');
     }
 
     private static function assertValid(array $data, ?int $exceptId): void

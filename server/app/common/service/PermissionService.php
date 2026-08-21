@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\model\SysPermissionModel;
+use app\common\model\SysUserModel;
 use app\common\support\Cache;
 use app\common\support\Ctx;
 use app\common\support\Db;
@@ -72,21 +74,25 @@ class PermissionService
     /**
      * 从库里取该用户所有启用的权限标识
      *
-     * 用查询构造器而不是模型：这里在鉴权链路上，不该再触发数据权限 Scope。
+     * `sys_permissions` 与 `sys_roles` 都不接数据权限（它们是全局定义表，
+     * 不按部门隔离），所以用模型不会触发 Scope，也就不存在「鉴权链路上又去查权限」的循环。
+     *
+     * `r.deleted_at` 只能手写：软删除条件是**模型自己的**全局 Scope，
+     * join 进来的表拿不到——这是 join 的固有限制，不是这里偷懒。
      */
     private static function queryCodes(int $userId): array
     {
-        return Db::table('sys_permissions as p')
-            ->join('sys_role_permissions as rp', 'rp.permission_id', '=', 'p.id')
+        return SysPermissionModel::query()
+            ->join('sys_role_permissions as rp', 'rp.permission_id', '=', 'sys_permissions.id')
             ->join('sys_user_roles as ur', 'ur.role_id', '=', 'rp.role_id')
             ->join('sys_roles as r', 'r.id', '=', 'ur.role_id')
             ->where('ur.user_id', $userId)
-            ->where('p.status', 1)
+            ->where('sys_permissions.status', 1)
             ->where('r.status', 1)
             ->whereNull('r.deleted_at')
-            ->where('p.perm_code', '<>', '')
+            ->where('sys_permissions.perm_code', '<>', '')
             ->distinct()
-            ->pluck('p.perm_code')
+            ->pluck('sys_permissions.perm_code')
             ->all();
     }
 
@@ -100,7 +106,11 @@ class PermissionService
         if (!$userIds) {
             return;
         }
-        Db::table('sys_users')->whereIn('id', $userIds)->increment('perm_version');
+        // toBase()：走模型是为了拿到软删除 Scope（已删用户不必再刷），
+        // 但要绕开 Eloquent 自动更新 updated_at——perm_version 是缓存失效计数器，
+        // 不是「这个人的资料变了」。改一次角色权限就把名下所有用户的 updated_at 推一遍，
+        // 这一列就再也说明不了任何事情
+        SysUserModel::withoutDataScope()->toBase()->whereIn('id', $userIds)->increment('perm_version');
     }
 
     /** 某个角色下的所有用户都要刷新 */

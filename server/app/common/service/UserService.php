@@ -9,6 +9,7 @@ use app\common\exception\BusinessException;
 use app\common\exception\ForbiddenException;
 use app\common\exception\ValidationException;
 use app\common\model\SysDeptModel;
+use app\common\model\SysPostModel;
 use app\common\model\SysUserModel;
 use app\common\support\Arr;
 use app\common\support\BatchResult;
@@ -327,8 +328,13 @@ class UserService
      */
     public static function import(string $path): array
     {
-        $deptIds = Db::table('sys_depts')->whereNull('deleted_at')->pluck('id', 'code');
-        $postIds = Db::table('sys_posts')->whereNull('deleted_at')->pluck('id', 'code');
+        // 软删除由各自的 SoftDeletes 带上。
+        // ⚠️ withoutDataScope()：这里取的是全部部门/岗位，也就是说导入可以把人写到
+        // 自己数据范围之外的部门去。这不是本行引入的——create() / update() 同样没有
+        // 校验 dept_id 是否在操作者范围内，数据权限目前只管「读得到谁」不管「写到哪」。
+        // 补写入侧校验时这三处要一起改，别只改 create()
+        $deptIds = SysDeptModel::withoutDataScope()->pluck('id', 'code');
+        $postIds = SysPostModel::withoutDataScope()->pluck('id', 'code');
 
         $result = BatchResult::make();
 
