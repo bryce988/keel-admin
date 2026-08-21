@@ -21,7 +21,7 @@ const STORAGE_KEY = 'keel_tags_view'
 const HOME_PATH = '/dashboard'
 
 /*
- * 这里**没有**页签数量上限
+ * 这里没有页签数量上限
  *
  * 原来限 8 个、超出淘汰最早打开的并弹一条提示。实际用起来是
  * 「开着开着东西自己没了」——用户没做任何关闭动作却丢了上下文，
@@ -94,7 +94,7 @@ export const useTagsViewStore = defineStore('tagsView', {
     },
 
     /**
-     * 关闭并返回应跳转的**完整地址**（关闭的是当前页时才需要跳转）
+     * 关闭并返回应跳转的完整地址（关闭的是当前页时才需要跳转）
      *
      * 返回 fullPath 而不是 path：跳回去的那个页签也该带着它自己的筛选条件。
      */

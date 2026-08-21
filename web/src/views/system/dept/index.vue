@@ -16,7 +16,7 @@ import { BizCode } from '@/constants/bizCode'
 /**
  * 部门管理
  *
- * 组织架构树。这张表是**数据权限的载体**——`ancestors` 决定了「本部门及下属」
+ * 组织架构树。这张表是数据权限的载体——`ancestors` 决定了「本部门及下属」
  * 能看到哪些数据，所以移动部门是个重操作，后端会同步刷新整棵子树的祖级路径。
  */
 const dictStore = useDictStore()

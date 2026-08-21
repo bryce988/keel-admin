@@ -3,7 +3,7 @@ import request from '@/utils/request'
 
 /**
  * 接口数据结构一律 snake_case，与后端字段名逐字一致（docs/api.md §1.4）。
- * 只有 TS 变量、组件 props、store getter 这类**前端自己的标识符**才用小驼峰。
+ * 只有 TS 变量、组件 props、store getter 这类前端自己的标识符才用小驼峰。
  */
 export interface MenuNode {
   id: number

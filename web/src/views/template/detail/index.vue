@@ -19,7 +19,7 @@ import { categoryName, fetchDemoChildren, fetchDemoDetail, type DemoRow } from '
  *   1. 换掉 `../_demo`；id 从路由参数取，不要从上一页 props 传——
  *      详情页要能直接分享链接打开
  *   2. 左栏只放不会变的属性，右栏放列表、关联对象、变更记录
- *   3. 关联区块为 0 条时显示空状态 + 新建入口，**不要隐藏整个区块**，
+ *   3. 关联区块为 0 条时显示空状态 + 新建入口，不要隐藏整个区块，
  *      否则用户不知道这里本来能挂东西
  */
 const route = useRoute()
@@ -34,7 +34,7 @@ const childTableRef = ref<ProTableInstance | null>(null)
 /*
  * 关联区块的筛选条件里带着主记录 id
  *
- * ⚠️ 光改 childQuery 是**不够的**：ProTable 挂载时就已经用 master_id=0
+ * ⚠️ 光改 childQuery 是不够的：ProTable 挂载时就已经用 master_id=0
  * 取过一次数了，而它的约定是「筛选条件变化不自动请求，由页面显式 reload()」。
  * 少了下面那句 reload()，关联区块会永远是空的——而且不报错，
  * 看起来就像这条记录真的没有关联数据
@@ -133,7 +133,7 @@ onMounted(load)
 
             <!--
               关联区块为 0 条时 ProTable 自己会显示空状态。
-              区块本身**不隐藏**：隐藏了用户就不知道这里能挂东西
+              区块本身不隐藏：隐藏了用户就不知道这里能挂东西
             -->
             <ProTable
               ref="childTableRef"

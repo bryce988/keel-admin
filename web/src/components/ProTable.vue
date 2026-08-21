@@ -63,7 +63,7 @@ const props = withDefaults(
     params?: Record<string, unknown>
     /**
      * 从 URL 还原筛选值时的类型转换。
-     * URL 里的东西**永远是字符串**，而 el-select 的选项常常是数字，
+     * URL 里的东西永远是字符串，而 el-select 的选项常常是数字，
      * 不转的话下拉框会显示空白——所以数字型字段必须在这里登记：
      *   :param-parsers="{ status: Number, dept_id: Number }"
      */
@@ -108,7 +108,7 @@ const route = useRoute()
 const router = useRouter()
 
 /**
- * keep-alive 下组件失活后仍然活着，此时**绝不能写 URL**——
+ * keep-alive 下组件失活后仍然活着，此时绝不能写 URL——
  * 那会把当前正在看的另一个页签的地址栏改掉。
  */
 let alive = true
@@ -235,7 +235,7 @@ async function fetch() {
  *   tableRef.value?.reload()
  *
  * 而 params 是 prop，整体赋值后要等父组件重新渲染才会传进来。
- * 少了这一拍，fetch() 读到的是**上一次**的筛选值——
+ * 少了这一拍，fetch() 读到的是上一次的筛选值——
  * 表现为点部门树时数据总慢一拍，来回点两个部门就完全对调了。
  *
  * 修在这里而不是让每个页面自己 await：七个模块每个都记着这件事，迟早有人忘。

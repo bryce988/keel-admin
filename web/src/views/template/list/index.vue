@@ -31,7 +31,7 @@ const drawerRef = ref<FormDrawerInstance | null>(null)
 const query = ref<Record<string, unknown>>({ keyword: '', status: '' })
 
 /**
- * 数字型字段**必须**在这里登记
+ * 数字型字段必须在这里登记
  *
  * URL 里的值永远是字符串，不转的话刷新后 el-select 显示空白、
  * 树的选中态也对不上——这是最容易漏的一条。

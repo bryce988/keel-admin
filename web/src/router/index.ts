@@ -4,7 +4,7 @@ import { setUnauthorizedHandler } from '@/utils/request'
 import { buildRoutes, firstMenuPath } from './dynamic'
 
 /**
- * 五种页型模板，**只在开发环境注册**
+ * 五种页型模板，只在开发环境注册
  *
  * 两个目的，缺一不可：
  *   · 能打开——模板要真跑得起来才算数。只放在目录里不引用的话，
@@ -53,7 +53,7 @@ const templateRoutes: RouteRecordRaw[] = import.meta.env.DEV
 /**
  * 静态路由：登录页、布局壳、错误页
  *
- * 业务页面**不在这里**，由 /admin/auth/profile 下发的菜单树动态注册（见 dynamic.ts）。
+ * 业务页面不在这里，由 /admin/auth/profile 下发的菜单树动态注册（见 dynamic.ts）。
  * 没有下发的菜单在前端就不存在这条路由，直接敲 URL 会落到 404。
  */
 const staticRoutes: RouteRecordRaw[] = [
@@ -152,7 +152,7 @@ router.beforeEach(async (to) => {
      * 重新解析这次跳转，三个字段都要手写
      *
      * 两个都踩过的坑：
-     *   · `{ path: to.fullPath }` —— vue-router 的 `path` **不解析查询串**，
+     *   · `{ path: to.fullPath }` —— vue-router 的 `path` 不解析查询串，
      *     `/system/user?dept_id=2` 整个被当成路径，问号后面那段丢掉。
      *     表现是「带筛选条件的链接一刷新就退回无筛选状态」
      *   · `{ ...to }` —— 会把 `name` 一起带过去，而此刻 `to.name` 是
@@ -162,7 +162,7 @@ router.beforeEach(async (to) => {
      * 只带 path / query / hash 才两头都躲开。
      * replace 则是避免在历史里留下 404 那一跳。
      *
-     * 这条分支只在**整页加载**时走到，SPA 内部点击一切正常，
+     * 这条分支只在整页加载时走到，SPA 内部点击一切正常，
      * 所以这类 bug 很难联想到守卫上——改这里务必刷新验一遍。
      */
     return { path: to.path, query: to.query, hash: to.hash, replace: true }

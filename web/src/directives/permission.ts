@@ -7,9 +7,9 @@ import { useUserStore } from '@/stores/user'
  *   <el-button v-permission="'sys:user:create'">新增</el-button>
  *   <el-button v-permission.all="['sys:user:update', 'sys:user:grantRole']">改并授权</el-button>
  *
- * 默认多个权限点满足**任一**即显示，加 .all 修饰符要求全部满足。
+ * 默认多个权限点满足任一即显示，加 .all 修饰符要求全部满足。
  *
- * ⚠️ 这只是界面上的收敛，**不是安全边界**。按钮藏了不等于接口调不通，
+ * ⚠️ 这只是界面上的收敛，不是安全边界。按钮藏了不等于接口调不通，
  * 后端每个写接口都在路由上声明了权限点由中间件拦截（config/route.php）。
  */
 function check(binding: DirectiveBinding<string | string[]>): boolean {

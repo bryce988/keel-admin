@@ -26,7 +26,7 @@ const treeLoading = ref(false)
  * category_id 是筛选条件的一部分
  *
  * 放进 query 而不是单独一个 ref：这样它跟着 ProTable 一起同步进 URL，
- * 刷新后**树的选中高亮和表格数据一起回来**。单独放的话只有表格恢复，
+ * 刷新后树的选中高亮和表格数据一起回来。单独放的话只有表格恢复，
  * 树的高亮丢了，用户会以为筛选没生效。
  */
 const query = ref<Record<string, unknown>>({ keyword: '', status: '', category_id: '' })
@@ -49,7 +49,7 @@ const columns: ProColumn[] = [
 ]
 
 /**
- * 切换节点：重置到第 1 页，但**保留搜索关键词**
+ * 切换节点：重置到第 1 页，但保留搜索关键词
  *
  * 用户点另一个节点的意图是「换个范围再搜一次」，把关键词一起清掉
  * 等于替他撤销了刚输入的东西。reload() 本身就会回到第 1 页。

@@ -9,7 +9,7 @@ import { useDictStore } from '@/stores/dict'
 /**
  * 登录日志（只读）
  *
- * 登录**失败也要记**（含失败原因）——连续失败锁定的审计依据就在这里，
+ * 登录失败也要记（含失败原因）——连续失败锁定的审计依据就在这里，
  * 排查「我的账号是不是被人试密码了」也只能靠它。
  */
 const dictStore = useDictStore()

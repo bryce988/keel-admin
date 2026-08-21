@@ -22,7 +22,7 @@ import { useDictStore } from '@/stores/dict'
 import { BizCode } from '@/constants/bizCode'
 
 /**
- * 用户管理（RBAC 的**分配**层）
+ * 用户管理（RBAC 的分配层）
  *
  * 这里只把已有角色分给人，不在用户身上单独授权——用户身上一旦能独立加权限，
  * 「这个人为什么能看到这个」就再也说不清了。

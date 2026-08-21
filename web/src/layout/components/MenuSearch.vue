@@ -115,7 +115,7 @@ function choose(hit?: MenuHit) {
 /**
  * 全局快捷键
  *
- * 挂在 window 上而不是对话框内部：它的职责是**把对话框叫出来**，
+ * 挂在 window 上而不是对话框内部：它的职责是把对话框叫出来，
  * 装在对话框里就只有对话框开着时才生效，等于没有。
  */
 function onKeydown(e: KeyboardEvent) {
@@ -187,7 +187,7 @@ defineExpose({ open })
 </template>
 
 <!--
-  对话框外壳的样式**只能写在非 scoped 块里**
+  对话框外壳的样式只能写在非 scoped 块里
 
   el-dialog 被传送到 body，`.el-dialog` 与 `.el-dialog__header` 都是 EP 自己
   渲染的元素，上面一个 data-v 都没有（实测），scoped 选择器与 :deep() 都够不着——

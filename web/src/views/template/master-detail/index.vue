@@ -77,7 +77,7 @@ async function loadMasters() {
  * 选中主记录
  *
  * 先改 master_id 再 reload。ProTable 的 reload() 内部 await 了 nextTick，
- * 所以这里不用自己等——但**顺序不能反**，反了就是取上一条的从数据。
+ * 所以这里不用自己等——但顺序不能反，反了就是取上一条的从数据。
  */
 function select(row: DemoRow) {
   currentId.value = row.id
@@ -131,7 +131,7 @@ async function onDeleteChild(row: DemoChild) {
 }
 
 /*
- * 从区的增删改**不刷新主区**——除非主区展示了从表的聚合值（如「明细数」），
+ * 从区的增删改不刷新主区——除非主区展示了从表的聚合值（如「明细数」），
  * 那时才需要 loadMasters()。无脑刷主区会让用户的滚动位置和选中态一起跳掉。
  */
 

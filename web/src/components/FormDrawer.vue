@@ -32,7 +32,7 @@ import { BizError } from '@/utils/request'
  * 后台表单字段普遍偏多，弹窗撑不下就得在内部再套一层滚动，
  * 而抽屉天然是整列高度，长表单不用二次滚动，也不会把列表整个盖住。
  *
- * 统一的是**壳**——打开、深拷贝、校验、提交、loading、服务端错误回填、关闭；
+ * 统一的是壳——打开、深拷贝、校验、提交、loading、服务端错误回填、关闭；
  * 字段本身由调用方用插槽自由写。七个模块的表单字段差异很大
  * （菜单表单光 type 就有五种形态），做成 schema 驱动会变成一个没人愿意读的小框架。
  *
@@ -63,7 +63,7 @@ const props = withDefaults(
      * 例：`{ [BizCode.ACCOUNT_EXISTS]: 'username' }` —— 账号已存在时红框标在账号上，
      * 而不是只弹一句、用户还得自己找是哪一项（docs/api.md §1.3.1）
      *
-     * **码一律用 `@/constants/bizCode` 里的常量，不要写裸数字**：
+     * 码一律用 `@/constants/bizCode` 里的常量，不要写裸数字：
      * 后端改码时裸数字不报错也不告警，只是红框悄悄标错地方
      */
     errorFields?: Record<number, string>

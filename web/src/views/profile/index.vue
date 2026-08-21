@@ -9,7 +9,7 @@ import PasswordDrawer from './PasswordDrawer.vue'
 import PhoneDrawer from './PhoneDrawer.vue'
 
 /**
- * 个人中心（**详情页**页型的参考实现，PROJECT.md §9.5）
+ * 个人中心（详情页页型的参考实现，PROJECT.md §9.5）
  *
  * 左栏静态属性、右栏动态区块。左边这些（账号、部门、岗位、角色）在这里
  * 一律只读——它们由管理员在用户管理里改，个人中心能改的只有右边那几项。
