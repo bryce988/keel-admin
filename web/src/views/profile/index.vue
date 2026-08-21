@@ -188,7 +188,6 @@ onMounted(() => {
               :request="fetchMyLogins"
               :columns="loginColumns"
               :sync-url="false"
-              :page-size="10"
             />
           </el-tab-pane>
         </el-tabs>

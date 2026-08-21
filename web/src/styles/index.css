@@ -244,28 +244,43 @@ html.theme-switching *::after {
   box-shadow: none;
 }
 
-/* ---------------- 表格：表头浅灰底，行悬停浅蓝灰 ---------------- */
+/* ---------------- 表格：表头浅灰底，行悬停浅蓝灰 ----------------
+ * 表头底色改**令牌**而不是写 `.el-table th { background: ... }`。
+ *
+ * 写成后者会出这个 bug：固定列的表头是白的、其余是灰的，一排表头断成两截
+ * （用户管理页「账号」fixed:left、「操作」fixed:right 就是这么来的）。
+ * 因为 EP 对固定列的表头另有一条专门规则
+ * `.el-table__header-wrapper tr th.el-table-fixed-column--left/right`，
+ * 里面把 `--el-table-header-bg-color` 又贴了一遍，权重比 `.el-table th.xxx` 高，
+ * 于是那两列走的是令牌的默认值（白），跟我们改的 background 无关。
+ *
+ * 改令牌，两条 EP 规则拿到的就是同一个值，不用去跟它抢权重。
+ */
+.el-table {
+  --el-table-header-bg-color: var(--el-fill-color-lighter);
+}
+
 .el-table th.el-table__cell {
-  background: var(--el-fill-color-lighter);
   color: var(--el-text-color-primary);
   font-weight: 600;
 }
 
 /*
- * small 档的留白稍微放开一点
+ * 行高 41px，横向留白 16px
  *
- * 表格默认档位跟着全局走 small，字号 12px 才能与搜索栏、按钮对齐。
- * 但 EP 给 small 配的是 4px/8px 内边距——数据表这么挤，
- * 行与行几乎贴在一起，操作列的按钮也没有落脚的地方。
- * 这里只放开留白，不动字号：协调靠字号，可读靠留白，两件事分开调。
- * 觉得还是紧，把这两条删掉就回到 EP 原值。
+ * EP default 档给的是 8px 竖向 + 12px 横向，行与行贴得比较紧、
+ * 列与列之间也不够透气。9px/16px 出来的行高正好 41px，
+ * 与主流后台（量过 SaiAdmin 是 41px）一致，多列表格扫起来不费劲。
+ * 只动留白不动字号：协调靠字号，可读靠留白，两件事分开调。
+ *
+ * 用不带档位的选择器，密度下拉切到 large/small 时由 EP 自己的规则接管。
  */
-.el-table--small .el-table__cell {
-  padding: 7px 0;
+.el-table .el-table__cell {
+  padding: 9px 0;
 }
 
-.el-table--small .cell {
-  padding: 0 12px;
+.el-table .cell {
+  padding: 0 16px;
 }
 
 /* ---------------- 页面容器：面板之间用大间距 ---------------- */
@@ -300,21 +315,6 @@ html.theme-switching *::after {
   justify-content: center;
   gap: 8px;
   flex-wrap: nowrap;
-  /*
-   * 操作列比正文小一号（EP 基准是 14px）
-   *
-   * 改在这里而不是给每个按钮加 size="small"：七个页面二十来个按钮，
-   * 逐个加迟早漏一个，而且新页面还得记着这回事。
-   * 只压字号不用 size="small"——后者连 padding 一起改小，link 按钮本来就没有边框，
-   * 挤在一起反而更难点。
-   */
-  font-size: 12px;
-}
-
-/* 按钮的 font-size 是显式取变量的，不会继承父级，必须显式压下来 */
-.table-actions .el-button,
-.table-actions .el-dropdown {
-  font-size: 12px;
 }
 
 .table-actions .el-button + .el-button {

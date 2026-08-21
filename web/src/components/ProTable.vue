@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  reactive,
+  ref,
+  watch
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Refresh, Setting, Sort } from '@element-plus/icons-vue'
 import DictTag from './DictTag.vue'
@@ -90,6 +100,13 @@ const props = withDefaults(
     rowKey: 'id',
     selection: false,
     immediate: true,
+    /*
+     * 每页 20 条
+     *
+     * 表体是定高的（见下面的 measure），一屏大约放得下 11 行。
+     * 每页 10 条填不满，表格下方会空出一块；20 条正好让表体滚起来，
+     * 也和接口的默认值对上（docs/api.md §1.3、Paginator::DEFAULT_SIZE）。
+     */
     pageSize: 20,
     index: false,
     syncUrl: true,
@@ -120,13 +137,12 @@ const rows = ref<Record<string, any>[]>([])
 const total = ref(0)
 const selected = ref<Record<string, any>[]>([])
 /**
- * 表格密度，初始跟随全局尺寸（main.ts 配的是 small）
+ * 表格密度，必须跟着 main.ts 的全局尺寸走（现在是 default）
  *
- * 不能停在 EP 的 default：那一档字号是 14px，而全局改 small 之后
- * 搜索栏、按钮、分页全是 12px——同一屏出现两套字号，表格会显得从别处贴过来。
- * 用户仍可从工具栏的密度下拉调松。
+ * 两边一旦不一致，同一屏就会出现两套字号，表格看着像从别处贴过来的。
+ * 用户仍可从工具栏的密度下拉调紧或调松。
  */
-const size = ref<'large' | 'default' | 'small'>('small')
+const size = ref<'large' | 'default' | 'small'>('default')
 
 // 组件内部状态，用小驼峰；发请求时映射成接口的 snake_case
 const pager = reactive({
@@ -222,6 +238,8 @@ async function fetch() {
     total.value = 0
   } finally {
     loading.value = false
+    // 搜索栏展开/收起会把表格顶部推上推下，取完数重算一次
+    scheduleMeasure()
   }
 }
 
@@ -332,10 +350,78 @@ function writeUrlFromState(filters: Record<string, unknown>) {
   router.replace({ path: route.path, query })
 }
 
+/* ---------------------------------------------------------------- 表体滚动
+ * 表格自己撑到视口底部，行数变了只有表体滚，工具栏与分页不动
+ *
+ * 不这么做的话，每页从 10 切到 20，整块面板变高、分页被推到屏幕外，
+ * 用户得先把页面滚到底才能点下一页——而滚动时表头也跟着滚走了。
+ *
+ * 为什么用 JS 量而不是纯 CSS 的 flex 链：那需要从 .content 到 .page 到面板
+ * 一路都是定高 flex，而 `.page` 这个类同时用在概览、个人中心、表单页、详情页上，
+ * 那些页面本来就该整页滚。给它们统一加高度约束会把内容压没。
+ * 量一次高度只影响 ProTable 自己，别的页面一行不用改。
+ *
+ * 触发点：挂载、窗口尺寸变化、keep-alive 切回来、每次取数之后
+ * （搜索栏展开/收起会把表格顶部推下去，那时 top 变了要重算）。
+ *
+ * ⚠️ 用 `height` 不是 `max-height`。max-height 只封顶不定高：10 条时表格
+ * 自然高度没到顶（实测 462 < 514），换成 20 条才长到 514——中间这 52px
+ * 是长出来的，分页条就被一路推下去，正是要避免的那个现象。
+ * 定高之后行数再怎么变，表体永远是同一个高度，分页条一格不动；
+ * 数据不足时表体下方留白，那是 EP 的既有行为。
+ */
+const tableWrapRef = ref<HTMLElement>()
+const pagerRef = ref<HTMLElement>()
+const tableHeight = ref<number>()
+
+/** 与 layout/index.vue 的响应式断点一致：窄屏是整页滚，不锁高度 */
+const NARROW = 900
+
+const GAP = 12 // --keel-gap
+const PANEL_PAD = 16 // --keel-panel-pad
+const CONTENT_PAD = 16 // layout 的 .content padding
+const SAFETY = 2 // 面板与表格的描边余量
+
+function measure() {
+  const el = tableWrapRef.value
+  if (!el) return
+
+  if (window.innerWidth <= NARROW) {
+    tableHeight.value = undefined
+    return
+  }
+
+  const top = el.getBoundingClientRect().top
+
+  /*
+   * 表格下面要留多少
+   *
+   * ⚠️ GAP 只在**有分页条**时才算：那 12px 是 `.pagination` 的 margin-top，
+   * 没有分页条就没有这段外边距。树形模式（部门、菜单）走的正是这一支——
+   * 无脑加 GAP 会让这两个页面底部比别的模块多空 12px，肉眼看得出来。
+   *
+   * SAFETY 那 2px 是实测补的：不留的话内容区会多出 1px 溢出，
+   * 只为这 1px 长出一根滚动条，比表体不滚还难看。
+   */
+  const pagerH = pagerRef.value?.offsetHeight ?? 0
+  const reserve = (pagerH ? pagerH + GAP : 0) + PANEL_PAD + CONTENT_PAD + SAFETY
+  // 低于这个高度就没有滚动的意义了，还不如让它自然撑开
+  tableHeight.value = Math.max(180, window.innerHeight - top - reserve)
+}
+
+function scheduleMeasure() {
+  nextTick(measure)
+}
+
 onMounted(() => {
   restoreFromUrl()
   if (props.immediate) nextTick(fetch)
+  scheduleMeasure()
+  window.addEventListener('resize', measure)
 })
+
+onBeforeUnmount(() => window.removeEventListener('resize', measure))
+onActivated(scheduleMeasure)
 
 defineExpose({ reload, refresh, selected, loading })
 </script>
@@ -380,18 +466,20 @@ defineExpose({ reload, refresh, selected, loading })
       </div>
     </div>
 
-    <el-table
-      v-loading="loading"
-      :data="rows"
-      :row-key="rowKey"
-      :size="size"
-      :default-expand-all="tree && defaultExpandAll"
-      :tree-props="{ children: 'children' }"
-      border
-      stripe
-      @sort-change="onSortChange"
-      @selection-change="onSelectionChange"
-    >
+    <div ref="tableWrapRef">
+      <el-table
+        v-loading="loading"
+        :data="rows"
+        :height="tableHeight"
+        :row-key="rowKey"
+        :size="size"
+        :default-expand-all="tree && defaultExpandAll"
+        :tree-props="{ children: 'children' }"
+        border
+        stripe
+        @sort-change="onSortChange"
+        @selection-change="onSelectionChange"
+      >
       <el-table-column v-if="selection" type="selection" width="46" align="center" :reserve-selection="true" />
       <el-table-column v-if="index" type="index" label="#" width="56" align="center" />
 
@@ -433,9 +521,10 @@ defineExpose({ reload, refresh, selected, loading })
           <EmptyState v-else scene="empty" :action="false" />
         </slot>
       </template>
-    </el-table>
+      </el-table>
+    </div>
 
-    <div v-if="!tree" class="pagination">
+    <div v-if="!tree" ref="pagerRef" class="pagination">
       <el-pagination
         v-model:current-page="pager.pageNum"
         v-model:page-size="pager.pageSize"
