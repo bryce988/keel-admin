@@ -76,11 +76,11 @@ class DashboardService
         $today = date('Y-m-d') . ' 00:00:00';
 
         $userTotal    = SysUserModel::query()->count();
-        $userActive   = SysUserModel::query()->where('status', '<>', 0)->count();
+        $userActive   = SysUserModel::query()->where('status', '<>', SysUserModel::STATUS_DISABLED)->count();
         $loginToday   = SysLoginLogModel::query()->where('created_at', '>=', $today)->count();
-        $loginFailed  = SysLoginLogModel::query()->where('created_at', '>=', $today)->where('status', 0)->count();
+        $loginFailed  = SysLoginLogModel::query()->where('created_at', '>=', $today)->where('status', SysLoginLogModel::STATUS_FAIL)->count();
         $opToday      = SysOperationLogModel::query()->where('created_at', '>=', $today)->count();
-        $opFailed     = SysOperationLogModel::query()->where('created_at', '>=', $today)->where('status', 0)->count();
+        $opFailed     = SysOperationLogModel::query()->where('created_at', '>=', $today)->where('status', SysOperationLogModel::STATUS_FAIL)->count();
 
         return [
             [
@@ -108,7 +108,7 @@ class DashboardService
                 'label'  => '角色',
                 'value'  => SysRoleModel::query()->count(),
                 'unit'   => '个',
-                'hint'   => '权限点 ' . SysPermissionModel::query()->where('status', 1)->count() . ' 条',
+                'hint'   => '权限点 ' . SysPermissionModel::query()->enabled()->count() . ' 条',
                 'tone'   => 'warning',
                 'to'     => '/system/role',
                 'perm'   => 'sys:role:list',

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace app\common\model;
 
+use app\common\model\concern\HasStatus;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** 字典类型 */
 class SysDictTypeModel extends BaseModel
 {
+    use HasStatus;
+
     protected $table = 'sys_dict_types';
 
     protected $casts = ['status' => 'integer'];

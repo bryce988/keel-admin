@@ -15,8 +15,16 @@ class SysLoginLogModel extends BaseModel
 {
     use HasDataScope;
 
-    public const TYPE_LOGIN  = 1;
-    public const TYPE_LOGOUT = 2;
+    public const TYPE_LOGIN  = 1;   // 登录，成功失败都写
+    public const TYPE_LOGOUT = 2;   // 登出
+
+    /**
+     * 登录结果，1 是「成功」不是「启用」，跟开关型的 status 不是一回事
+     *
+     * 失败行是账号锁定的判定依据（按「账号 + IP」数连续失败次数），必须落库。
+     */
+    public const STATUS_SUCCESS = 1;
+    public const STATUS_FAIL    = 0;
 
     protected $table = 'sys_login_logs';
 

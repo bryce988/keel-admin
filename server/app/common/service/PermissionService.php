@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\common\service;
 
 use app\common\model\SysPermissionModel;
+use app\common\model\SysRoleModel;
 use app\common\model\SysUserModel;
 use app\common\support\Cache;
 use app\common\support\Ctx;
@@ -77,7 +78,7 @@ class PermissionService
      * `sys_permissions` 与 `sys_roles` 都不接数据权限（它们是全局定义表，
      * 不按部门隔离），所以用模型不会触发 Scope，也就不存在「鉴权链路上又去查权限」的循环。
      *
-     * `r.deleted_at` 只能手写：软删除条件是**模型自己的**全局 Scope，
+     * `r.deleted_at` 只能手写：软删除条件是模型自己的全局 Scope，
      * join 进来的表拿不到——这是 join 的固有限制，不是这里偷懒。
      */
     private static function queryCodes(int $userId): array
@@ -87,8 +88,8 @@ class PermissionService
             ->join('sys_user_roles as ur', 'ur.role_id', '=', 'rp.role_id')
             ->join('sys_roles as r', 'r.id', '=', 'ur.role_id')
             ->where('ur.user_id', $userId)
-            ->where('sys_permissions.status', 1)
-            ->where('r.status', 1)
+            ->where('sys_permissions.status', SysPermissionModel::STATUS_ENABLED)
+            ->where('r.status', SysRoleModel::STATUS_ENABLED)
             ->whereNull('r.deleted_at')
             ->where('sys_permissions.perm_code', '<>', '')
             ->distinct()

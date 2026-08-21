@@ -172,7 +172,7 @@ class UserService
 
         Guard::unique(SysUserModel::class, 'username', $data['username'], $id, '账号已存在', BizCode::ACCOUNT_EXISTS);
 
-        // 「踢出范围外」由新值那一判拦住；旧值这一判防的是读写范围哪天不再相等
+        // 踢出范围外由新值那一判拦住；旧值这一判防的是读写范围哪天不再相等
         Guard::inDeptScope((int) ($data['dept_id'] ?? $user->dept_id), (int) $user->dept_id);
 
         if ($roleIds !== null) {
@@ -221,11 +221,11 @@ class UserService
     {
         $user = self::findEditable($id);
 
-        if ($user->id === Ctx::userId() && $status === 0) {
+        if ($user->id === Ctx::userId() && $status === SysUserModel::STATUS_DISABLED) {
             throw new BusinessException('不能停用自己的账号', BizCode::CANNOT_OPERATE_SELF);
         }
 
-        if ($status === 0) {
+        if ($status === SysUserModel::STATUS_DISABLED) {
             self::assertNoPendingHandover($user);
         }
 
@@ -332,10 +332,9 @@ class UserService
      */
     public static function import(string $path): array
     {
-        // 软删除由各自的 SoftDeletes 带上。
-        // ⚠️ withoutDataScope()：这里刻意取全部部门/岗位，只为把「编码 → id」翻译出来。
-        // 翻译不等于放行——落到哪个部门由下面每一行的 Guard::inDeptScope() 判。
-        // 两件事分开做，是为了让「部门编码不存在」与「部门超出你的范围」给出不同的行内提示
+        // withoutDataScope()：这里取全部部门/岗位，只为把「编码 → id」翻译出来，
+        // 落到哪个部门由下面每一行的 Guard::inDeptScope() 判。分开做才能让
+        // 「部门编码不存在」与「部门超出你的范围」给出不同的行内提示
         $deptIds = SysDeptModel::withoutDataScope()->pluck('id', 'code');
         $postIds = SysPostModel::withoutDataScope()->pluck('id', 'code');
 
@@ -359,8 +358,8 @@ class UserService
                     throw new BusinessException("岗位编码「{$postCode}」不存在");
                 }
 
-                // create() 里也有同样一判，这里提前判一次只为把部门编码写进提示——
-                // 用户手上是 Excel，「所选部门超出你的数据范围」不告诉他改哪一列
+                // create() 里也有同样一判，这里提前判是为了把部门编码写进提示：
+                // 用户手上是 Excel，只说「超出数据范围」他不知道改哪一列
                 Guard::inDeptScope(
                     (int) ($deptIds[$deptCode] ?? 0),
                     message: $deptCode === ''

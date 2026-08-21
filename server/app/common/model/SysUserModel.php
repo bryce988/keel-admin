@@ -25,6 +25,16 @@ class SysUserModel extends BaseModel
     use SoftDeletes;
     use HasDataScope;
 
+    /**
+     * 账号状态，三档所以不用 HasStatus（那个是两档的开关）
+     *
+     * 判能不能登录只认 STATUS_DISABLED，别写 === STATUS_ACTIVE——
+     * 试用期是人事状态不是权限状态，那样写会把试用期员工挡在门外。
+     */
+    public const STATUS_DISABLED  = 0;   // 停用，不能登录，已签发的令牌下次请求即失效
+    public const STATUS_ACTIVE    = 1;   // 在职
+    public const STATUS_PROBATION = 2;   // 试用期，登录与权限跟在职一样，只是个标记
+
     protected $table = 'sys_users';
 
     /** 密码永远不进接口输出；需要校验时用 $model->password 直接取属性 */

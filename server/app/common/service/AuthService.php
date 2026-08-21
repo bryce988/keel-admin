@@ -105,7 +105,7 @@ class AuthService
             throw new UnauthorizedException('账号或密码错误', BizCode::ACCOUNT_OR_PASSWORD_ERROR);
         }
 
-        if ((int) $user->status === 0) {
+        if ((int) $user->status === SysUserModel::STATUS_DISABLED) {
             self::writeLoginLog((int) $user->id, $username, $ip, $ua, false, '账号已停用');
             throw new UnauthorizedException('账号已被停用，请联系管理员', BizCode::ACCOUNT_DISABLED);
         }
@@ -139,7 +139,7 @@ class AuthService
         if (!$user) {
             throw new UnauthorizedException('账号不存在或已被删除');
         }
-        if ((int) $user->status === 0) {
+        if ((int) $user->status === SysUserModel::STATUS_DISABLED) {
             throw new UnauthorizedException('账号已被停用，请联系管理员', BizCode::ACCOUNT_DISABLED);
         }
 
@@ -156,7 +156,7 @@ class AuthService
         $roles = SysRoleModel::query()
             ->join('sys_user_roles as ur', 'ur.role_id', '=', 'sys_roles.id')
             ->where('ur.user_id', $user['id'])
-            ->where('sys_roles.status', 1)
+            ->where('sys_roles.status', SysRoleModel::STATUS_ENABLED)
             ->pluck('sys_roles.code')
             ->toArray();
 
@@ -164,14 +164,14 @@ class AuthService
         $permissions = PermissionService::codesOf($user);
 
         if ($isSuper) {
-            $nodes = SysPermissionModel::query()->where('status', 1)->orderBy('sort')->get()->toArray();
+            $nodes = SysPermissionModel::query()->enabled()->orderBy('sort')->get()->toArray();
             $dataScope = 1;
         } else {
             $nodes = SysPermissionModel::query()
                 ->join('sys_role_permissions as rp', 'rp.permission_id', '=', 'sys_permissions.id')
                 ->join('sys_user_roles as ur', 'ur.role_id', '=', 'rp.role_id')
                 ->where('ur.user_id', $user['id'])
-                ->where('sys_permissions.status', 1)
+                ->where('sys_permissions.status', SysPermissionModel::STATUS_ENABLED)
                 ->select('sys_permissions.*')
                 ->distinct()
                 ->orderBy('sys_permissions.sort')
@@ -309,7 +309,7 @@ class AuthService
             'browser'  => $browser,
             'os'       => $os,
             'type'     => $type,
-            'status'   => $success ? 1 : 0,
+            'status'   => $success ? SysLoginLogModel::STATUS_SUCCESS : SysLoginLogModel::STATUS_FAIL,
             'msg'      => $msg,
         ]);
     }

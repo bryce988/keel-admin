@@ -94,7 +94,7 @@ class RoleService
     public static function options(): array
     {
         return SysRoleModel::query()
-            ->where('status', 1)
+            ->enabled()
             ->orderBy('sort')
             ->get(['id', 'name', 'code', 'data_scope'])
             ->map(fn (SysRoleModel $r) => [

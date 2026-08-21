@@ -108,7 +108,7 @@ class OperationLogMiddleware implements MiddlewareInterface
                 'user_agent' => mb_substr((string) $request->header('user-agent', ''), 0, 255),
                 'params'     => $this->maskParams($request),
                 'changes'    => Ctx::get('log.changes'),
-                'status'     => $success ? 1 : 0,
+                'status'     => $success ? SysOperationLogModel::STATUS_SUCCESS : SysOperationLogModel::STATUS_FAIL,
                 'error_msg'  => mb_substr($error, 0, 500),
                 'duration'   => (int) round((microtime(true) - $start) * 1000),
                 'created_at' => date('Y-m-d H:i:s'),

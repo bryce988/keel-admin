@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\common\model;
 
 use app\common\model\concern\HasDataScope;
+use app\common\model\concern\HasStatus;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -18,6 +19,7 @@ class SysDeptModel extends BaseModel
 {
     use SoftDeletes;
     use HasDataScope;
+    use HasStatus;
 
     protected $table = 'sys_depts';
 

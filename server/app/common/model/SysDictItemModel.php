@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\model;
 
+use app\common\model\concern\HasStatus;
 /**
  * 字典项
  *
@@ -12,6 +13,8 @@ namespace app\common\model;
  */
 class SysDictItemModel extends BaseModel
 {
+    use HasStatus;
+
     protected $table = 'sys_dict_items';
 
     protected $casts = [

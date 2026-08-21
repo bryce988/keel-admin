@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\model;
 
+use app\common\model\concern\HasStatus;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -12,10 +13,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * 角色是全局定义，不接数据权限 Scope——否则部门主管会看不到自己要授予的角色。
  * data_scope 决定的是「持有该角色的人能看到哪些数据」，不是「谁能看到这个角色」。
+ *
+ * data_scope 的五个取值用 DataScope 的 ALL / DEPT_TREE / DEPT / SELF / CUSTOM，
+ * 本类不重复定义——判定逻辑在那边，抄第二份迟早对不上。
  */
 class SysRoleModel extends BaseModel
 {
     use SoftDeletes;
+    use HasStatus;
 
     protected $table = 'sys_roles';
 

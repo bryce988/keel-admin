@@ -76,12 +76,12 @@ class DictService
             return json_decode($cached, true) ?: [];
         }
 
-        if (!SysDictTypeModel::where('code', $code)->where('status', 1)->exists()) {
+        if (!SysDictTypeModel::query()->where('code', $code)->enabled()->exists()) {
             throw new NotFoundException('字典不存在或已停用');
         }
 
         $items = SysDictItemModel::where('type_code', $code)
-            ->where('status', 1)
+            ->enabled()
             ->orderBy('sort')
             ->get()
             ->map(fn (SysDictItemModel $item) => [

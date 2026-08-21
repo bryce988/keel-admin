@@ -15,12 +15,17 @@ class SysOperationLogModel extends BaseModel
 {
     use HasDataScope;
 
-    public const ACTION_CREATE = 1;
-    public const ACTION_UPDATE = 2;
-    public const ACTION_DELETE = 3;
-    public const ACTION_EXPORT = 4;
-    public const ACTION_GRANT  = 5;
-    public const ACTION_OTHER  = 6;
+    /** 操作类型，由 config/route.php 的 log.action 声明，不写落到 ACTION_OTHER */
+    public const ACTION_CREATE = 1;   // 新增
+    public const ACTION_UPDATE = 2;   // 修改，含启用/停用这类状态变更
+    public const ACTION_DELETE = 3;   // 删除
+    public const ACTION_EXPORT = 4;   // 导出，数据离开系统，单独一类才追得到
+    public const ACTION_GRANT  = 5;   // 授权，改角色权限、改数据范围、给用户配角色
+    public const ACTION_OTHER  = 6;   // 其他，也是没声明 action 时的兜底值
+
+    /** 操作结果，1 是「成功」不是「启用」 */
+    public const STATUS_SUCCESS = 1;
+    public const STATUS_FAIL    = 0;
 
     protected $table = 'sys_operation_logs';
 

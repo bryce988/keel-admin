@@ -19,6 +19,18 @@ use Illuminate\Database\Eloquent\Model;
  * 同一个字段从数据库到前端只有一个名字，日志、报错、搜代码时不用在两种写法之间换算。
  *
  * 时间统一序列化为 'Y-m-d H:i:s'，不返回 ISO8601。
+ *
+ * SoftDeletes 不放在这里，只挂在四张主数据表上（用户、部门、角色、岗位）——
+ * 它们被日志和历史记录长期引用，硬删会留下查不到人的 id。其余的表加了会出问题：
+ *
+ * - 两张日志表：LogCleanupService 按保留天数 delete() 回收空间，改成软删就不报错地白删，表永远不缩
+ * - sys_permissions：被 sys_role_permissions 引用，软删后关联行指向一个查不到的节点
+ * - 字典与参数：Guard::unique() 会把软删的行算进唯一性检查（唯一索引不含 deleted_at），
+ *   删掉一个字典项再用同样的 value 新建就会撞 409，而冲突对象用户看不见
+ * - 中间表：授权本来就是 delete + insert 整体重建，软删只会积压旧行
+ *
+ * 要给某张表加软删，三处一起改：模型 use SoftDeletes、schema.sql 建表语句、
+ * migrate.php 的 $columnPatches（存量库靠它补列）。
  */
 abstract class BaseModel extends Model
 {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\model;
 
+use app\common\model\concern\HasStatus;
 /**
  * 菜单与权限点
  *
@@ -12,11 +13,13 @@ namespace app\common\model;
  */
 class SysPermissionModel extends BaseModel
 {
-    public const TYPE_DIR    = 1;
-    public const TYPE_MENU   = 2;
-    public const TYPE_BUTTON = 3;
-    public const TYPE_API    = 4;
-    public const TYPE_FIELD  = 5;
+    use HasStatus;
+
+    public const TYPE_DIR    = 1;   // 目录，只用来分组。无子节点时要剪掉，否则侧边栏有点开空白的死条目
+    public const TYPE_MENU   = 2;   // 菜单，对应一个前端页面。无子节点是正常叶子，不能剪
+    public const TYPE_BUTTON = 3;   // 按钮，前端用 v-permission 收敛界面，不是安全边界
+    public const TYPE_API    = 4;   // 接口，route.php 里 perm 声明的就是它，真正的拦截在这一层
+    public const TYPE_FIELD  = 5;   // 字段，控制敏感字段返回明文还是脱敏值，如 sys:field:user:phone
 
     protected $table = 'sys_permissions';
 

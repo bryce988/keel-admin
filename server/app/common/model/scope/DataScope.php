@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\model\scope;
 
+use app\common\model\SysRoleModel;
 use app\common\support\Ctx;
 use app\common\support\Db;
 use Illuminate\Database\Eloquent\Builder;
@@ -85,17 +86,14 @@ final class DataScope implements Scope
     }
 
     /**
-     * 当前用户**可写**的部门集合，`null` = 不限
+     * 当前用户可写的部门集合，null = 不限
      *
-     * 读侧由上面的 apply() 自动注入，写侧（前端传上来的 dept_id）做不到自动——
-     * 详见 PROJECT.md §6.4 里「为什么不挂 saving 事件」那两条。所以把算好的集合
-     * 公开出来，由 {@see \app\common\support\Guard::inDeptScope()} 显式断言，
-     * 两侧共用同一份计算（含 Ctx 缓存），不会出现「读得到但写不进」的错位。
+     * 规则：可写集合 = 可读集合，写完的记录自己必须还看得见。
+     * 读侧由 apply() 自动注入，写侧的 dept_id 是前端传的，做不到自动
+     * （为什么不挂 saving 事件见 PROJECT.md §6.4），由 Guard::inDeptScope() 显式判。
+     * 两侧共用这一份计算，不会出现读得到但写不进的错位。
      *
-     * 规则一句话：**可写集合 = 可读集合，写完的记录自己必须还看得见。**
-     *
-     * 「仅本人」退化成本部门：读侧按 owner 列过滤，而写侧要判的是一个还不存在的
-     * 新记录该落在哪个部门，没有「人」可依据，只能取本部门。
+     * 「仅本人」退化成本部门：写侧要判的是一条还不存在的记录该落在哪，没有人可依据。
      */
     public static function writableDeptIds(): ?array
     {
@@ -131,7 +129,7 @@ final class DataScope implements Scope
             ->join('sys_roles as r', 'r.id', '=', 'ur.role_id')
             ->where('ur.user_id', $userId)
             ->whereNull('r.deleted_at')
-            ->where('r.status', 1)
+            ->where('r.status', SysRoleModel::STATUS_ENABLED)
             ->min('r.data_scope') ?? self::SELF);
 
         Ctx::set('dataScope.level', $level);
@@ -154,7 +152,7 @@ final class DataScope implements Scope
 
         $ids = [];
         if ($deptId > 0) {
-            // ⚠️ 这两处**必须**用 Db::table 而不是 SysDeptModel：
+            // ⚠️ 这两处必须用 Db::table 而不是 SysDeptModel：
             // SysDeptModel 自己 use 了 HasDataScope，在 Scope 内部再查它就是自己触发自己，
             // 无限递归。软删除条件因此也只能手写——拿不到模型的 SoftDeletes。
             // 别顺手「统一成模型」，这是全仓唯一不能换的两处
