@@ -47,6 +47,8 @@ export const useUserStore = defineStore('user', {
 
   getters: {
     nickname: (s) => s.profile?.user.real_name || s.profile?.user.username || '',
+    /** 头像地址，没设过是空串——组件按空串回退到首字母 */
+    avatar: (s) => s.profile?.user.avatar ?? '',
     isSuper: (s) => s.profile?.user.is_super ?? false,
     menus: (s) => s.profile?.menus ?? []
   },

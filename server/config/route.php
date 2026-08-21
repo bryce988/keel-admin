@@ -73,6 +73,10 @@ Route::group('/admin', function () {
         'perm' => '',
         'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '修改个人资料'],
     ]);
+    Route::post('/profile/avatar', [ProfileController::class, 'avatar'])->setParams([
+        'perm' => '',
+        'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '更换头像'],
+    ]);
     Route::put('/profile/phone', [ProfileController::class, 'changePhone'])->setParams([
         'perm' => '',
         'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '换绑手机号'],

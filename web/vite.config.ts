@@ -25,7 +25,9 @@ export default defineConfig({
     // 容器内通过服务名访问后端；本机直跑时改成 http://127.0.0.1:8787
     proxy: {
       '/admin': { target: process.env.VITE_PROXY_TARGET || 'http://server:8787', changeOrigin: true },
-      '/ping':  { target: process.env.VITE_PROXY_TARGET || 'http://server:8787', changeOrigin: true }
+      '/ping':  { target: process.env.VITE_PROXY_TARGET || 'http://server:8787', changeOrigin: true },
+      // 上传的头像等文件由后端的 public/ 提供，不在前端产物里，得转发过去
+      '/uploads': { target: process.env.VITE_PROXY_TARGET || 'http://server:8787', changeOrigin: true }
     }
   }
 })

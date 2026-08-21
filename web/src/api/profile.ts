@@ -54,6 +54,22 @@ export function updateProfile(payload: { real_name: string; email: string; avata
   return request.put<unknown, ProfileInfo>('/admin/profile', payload)
 }
 
+/**
+ * 换头像
+ *
+ * 一步到位：上传成功后端就已经写库了，返回的 avatar 就是最终地址，
+ * **不需要再调 updateProfile**（docs/api.md §11.1）。
+ *
+ * 不设 Content-Type：交给浏览器自己带 multipart 的 boundary，手写会漏掉它，
+ * 后端解析不出文件，表现为「明明选了图却提示请选择图片」。
+ */
+export function uploadAvatar(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+
+  return request.post<unknown, { avatar: string }>('/admin/profile/avatar', form)
+}
+
 /** 换绑手机：用当前密码验证身份，不走短信（脚手架不绑死短信服务商） */
 export function changePhone(payload: { phone: string; password: string }) {
   return request.put<unknown, void>('/admin/profile/phone', payload)

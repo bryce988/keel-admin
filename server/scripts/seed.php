@@ -315,6 +315,8 @@ $params = [
     ['sys.footer',           'Powered by Keel', 'basic', 'string', '页脚文案'],
     ['sys.page.size',        '20',         'basic',    'int',    '默认分页条数'],
     ['sys.upload.maxSize',   '20971520',   'advanced', 'int',    '单文件上传上限（字节）'],
+    // 头像单开一档：全局的 20MB 对一张头像太宽松，而收进来就要长期占盘
+    ['sys.upload.avatarMaxSize', '2097152', 'advanced', 'int',   '头像上传上限（字节）'],
     ['sys.export.maxRows',   '50000',      'advanced', 'int',    '单次导出最大行数'],
     ['sys.log.retainDays',   '180',        'advanced', 'int',    '日志保留天数'],
     ['sys.cache.ttl',        '300',        'advanced', 'int',    '字典缓存秒数'],

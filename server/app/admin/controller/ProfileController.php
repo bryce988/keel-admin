@@ -18,6 +18,7 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
+use app\common\exception\BusinessException;
 use app\common\service\ProfileService;
 use app\common\support\Ctx;
 use app\common\support\Paginator;
@@ -53,6 +54,26 @@ class ProfileController
             'email'     => $request->post('email', ''),
             'avatar'    => $request->post('avatar'),
         ]));
+    }
+
+    /**
+     * 更换头像
+     * @url POST /admin/profile/avatar
+     * @perm -
+     * @description 登录即可，自动落操作日志。`multipart/form-data`，字段名 `file`。
+     * 一步到位：上传成功即写库，响应里的 `avatar` 就是最终地址，不需要再调 `PUT /admin/profile`
+     * （两段式要维护临时目录与孤儿文件清理，头像这一个场景撑不起那套开销，见 api.md §11.1）。
+     * @error 400 没选文件、扩展名不在白名单、超出 `sys.upload.avatarMaxSize`，或内容不是真图片
+     */
+    public function avatar(Request $request): Response
+    {
+        $file = $request->file('file');
+
+        if (!$file || !$file->isValid()) {
+            throw new BusinessException('请选择要上传的图片');
+        }
+
+        return Result::ok(['avatar' => ProfileService::changeAvatar(self::uid(), $file)]);
     }
 
     /**

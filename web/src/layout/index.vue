@@ -103,7 +103,9 @@ async function onUserCommand(cmd: string) {
 
         <el-dropdown @command="onUserCommand">
           <span class="user">
-            <el-avatar :size="30">{{ userStore.nickname.charAt(0) }}</el-avatar>
+            <el-avatar :size="30" :src="userStore.avatar || undefined">
+              {{ userStore.nickname.charAt(0) }}
+            </el-avatar>
             <span class="name">{{ userStore.nickname }}</span>
           </span>
           <template #dropdown>

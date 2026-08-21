@@ -142,7 +142,44 @@ sql "DELETE FROM sys_users WHERE username LIKE 'probe%';"
 sql "DELETE FROM sys_operation_logs WHERE target LIKE '%probe%';"
 ok "已清理验收探针账号"
 
-echo "════ 6. 授权变更即刻生效（无需重新登录）════"
+echo "════ 6. 换头像（上传校验三道关）════"
+TMPIMG=$(mktemp -d)
+# 造三个样本：正常 png / 扩展名不对 / 叫 png 但内容不是图片
+python3 - "$TMPIMG" <<'PY'
+import sys, zlib, struct
+d = sys.argv[1]
+def png(w, h):
+    raw = b''.join(b'\x00' + bytes((60, 134, 255)) * w for _ in range(h))
+    ch = lambda t, b: struct.pack('>I', len(b)) + t + b + struct.pack('>I', zlib.crc32(t + b))
+    return (b'\x89PNG\r\n\x1a\n'
+            + ch(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+            + ch(b'IDAT', zlib.compress(raw)) + ch(b'IEND', b''))
+open(d + '/ok.png', 'wb').write(png(32, 32))
+open(d + '/bad.php', 'wb').write(b'<?php echo 1;')
+open(d + '/fake.png', 'wb').write(b'not an image at all')
+PY
+avatar() { curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/admin/profile/avatar" \
+  -H "Authorization: Bearer $ADMIN" -F "file=@$1"; }
+
+OLD_AV=$(sql "SELECT IFNULL(avatar,'') FROM sys_users WHERE username='admin'")
+chk "上传正常 png → 200"          "$(avatar $TMPIMG/ok.png)" 200
+NEW_AV=$(sql "SELECT avatar FROM sys_users WHERE username='admin'")
+case "$NEW_AV" in /uploads/avatar/*) ok "库里已写入新头像 ($NEW_AV)";; *) bad "头像没写库: $NEW_AV";; esac
+chk "  该文件可被静态访问"        "$(code "$BASE$NEW_AV")" 200
+chk "扩展名不在白名单 → 400"      "$(avatar $TMPIMG/bad.php)" 400
+chk "叫 png 但不是图片 → 400"     "$(avatar $TMPIMG/fake.png)" 400
+chk "不带文件 → 400"              "$(code -X POST "$BASE/admin/profile/avatar" -H "Authorization: Bearer $ADMIN")" 400
+# 换一次，确认旧文件被删掉而不是越堆越多
+avatar $TMPIMG/ok.png > /dev/null
+[ -f "$ROOT/server/public$NEW_AV" ] && bad "换头像后旧文件仍在" || ok "换头像后旧文件已删除"
+# 还原：删掉本轮产生的文件与库里的值
+LAST_AV=$(sql "SELECT avatar FROM sys_users WHERE username='admin'")
+rm -f "$ROOT/server/public$LAST_AV"
+sql "UPDATE sys_users SET avatar='$OLD_AV' WHERE username='admin';"
+rm -rf "$TMPIMG"
+ok "已还原 admin 头像与上传文件"
+
+echo "════ 7. 授权变更即刻生效（无需重新登录）════"
 BEFORE=$(code -H "Authorization: Bearer $DEV" $BASE/admin/logs/login)
 PERM_ID=$(sql "SELECT id FROM sys_permissions WHERE perm_code='sys:log:login:list' LIMIT 1")
 CUR=$(sql "SELECT GROUP_CONCAT(permission_id) FROM sys_role_permissions WHERE role_id=3")
@@ -155,7 +192,7 @@ sql "DELETE FROM sys_role_permissions WHERE role_id=3 AND permission_id=$PERM_ID
 sql "UPDATE sys_users SET perm_version = perm_version + 1 WHERE id IN (SELECT user_id FROM sys_user_roles WHERE role_id=3);"
 chk "撤销后立刻恢复 403"           "$(code -H "Authorization: Bearer $DEV" $BASE/admin/logs/login)" 403
 
-echo "════ 7. 操作日志：字段级变更 + traceId ════"
+echo "════ 8. 操作日志：字段级变更 + traceId ════"
 curl -s -X PUT "$BASE/admin/profile" -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
   -d '{"real_name":"验收测试","email":""}' -o /dev/null
 LOG=$(sql "SELECT CONCAT(IFNULL(trace_id,''),'|',IFNULL(changes,'')) FROM sys_operation_logs ORDER BY id DESC LIMIT 1")

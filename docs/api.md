@@ -644,6 +644,7 @@ GET /admin/logs/operation/32 → 200 OK
 |---|---|---|---|
 | GET | `/admin/profile` | 登录态 | 个人资料 |
 | PUT | `/admin/profile` | 登录态 | 修改姓名、头像、邮箱（账号、部门、岗位、角色只读） |
+| POST | `/admin/profile/avatar` | 登录态 | 上传并更换头像，`multipart/form-data`，字段名 `file` |
 | PUT | `/admin/profile/password` | 登录态 | 修改密码，需原密码 |
 | PUT | `/admin/profile/phone` | 登录态 | 换绑手机，需当前密码 |
 | GET | `/admin/profile/logins` | 登录态 | 我的登录记录，分页 |
@@ -668,6 +669,37 @@ GET /admin/profile → 200 OK
 
 `phone` 沿用 §5 的字段级脱敏规则；换绑时提交的是完整号码。
 
+### 11.1 换头像
+
+```jsonc
+POST /admin/profile/avatar        // multipart/form-data，字段名 file
+→ 200 OK
+{ "avatar": "/uploads/avatar/202608/3f7a9c21d84b6e05.png" }
+```
+
+**一步到位，没有「先上传后保存」两段式**：上传成功即写库，响应里的 `avatar`
+就是最终地址，前端拿到直接换图，不用再调 `PUT /admin/profile`。
+两段式要额外维护临时目录与孤儿文件清理，而头像这一个场景撑不起那套开销。
+
+约束：
+
+| 项 | 值 | 说明 |
+|---|---|---|
+| 字段名 | `file` | 与 §5 的用户导入保持一致 |
+| 扩展名 | `jpg` `jpeg` `png` `gif` `webp` | **写死在代码里**，不做成参数——可配置的白名单等于给了配错的机会 |
+| 真实类型 | 必须是真图片 | 用 `getimagesize()` 二次确认，只看扩展名挡不住改名的文件 |
+| 大小上限 | 系统参数 `sys.upload.avatarMaxSize`，默认 2MB | 全局上限 `sys.upload.maxSize`（20MB）对头像太宽松，单开一个 |
+
+返回的是**相对路径**，不带域名——换域名、上 CDN 时库里的数据不用动。
+
+文件落在 `server/public/uploads/avatar/年月/`，由 webman 的 StaticFile 提供访问。
+按年月分目录是为了不让一个目录堆到几十万个文件。
+换头像时会删掉旧文件（只删 `uploads/avatar/` 下的，防止把别处的路径带进来）。
+
+> **部署注意**：nginx 需要把 `/uploads/` 转发到后端（`docker/nginx/default.conf` 已加）。
+> 上传目录不进 Git（`.gitignore` 已排除），生产用 bind mount 挂在宿主机上，
+> `deploy.sh` 只做 `git reset --hard` 不做 `git clean`，重新部署不会丢文件。
+
 **换绑手机为什么不用短信**：Keel 是不含业务逻辑的脚手架，绑死某家短信服务商
 等于替使用者做了选型。这里用当前密码验证身份，接短信的项目把
 `ProfileService::changePhone()` 里的密码校验换成验证码校验即可，其余不动。
@@ -681,7 +713,7 @@ GET /admin/profile → 200 OK
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/admin/upload` | 文件上传，返回 `{url, name, size}`；先入临时目录，业务保存后转正 |
+| POST | `/admin/upload` | 通用文件上传，返回 `{url, name, size}`；先入临时目录，业务保存后转正。**尚未实现**——目前只有 §11.1 的头像上传，它是一步到位的专用接口 |
 | GET | `/admin/common/regions` | 省市区数据（如需要） |
 | GET | `/ping` | 根探测（不属于任何应用），负载均衡健康检查用 |
 | GET | `/admin/ping` · `/client/ping` · `/open/ping` · `/internal/ping` | 各端存活探测，用于验证分端中间件与异常处理链路 |

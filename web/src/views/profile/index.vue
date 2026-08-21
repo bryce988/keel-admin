@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { fetchMyLogins, fetchProfile, updateProfile, type ProfileInfo } from '@/api/profile'
+import {
+  fetchMyLogins,
+  fetchProfile,
+  updateProfile,
+  uploadAvatar,
+  type ProfileInfo
+} from '@/api/profile'
 import type { ProColumn } from '@/components'
 import { useDictStore } from '@/stores/dict'
 import { useUserStore } from '@/stores/user'
@@ -30,6 +36,47 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+// ---------------------------------------------------------------- 头像
+
+/** 与后端白名单一致（ProfileService::AVATAR_EXTS）。这里只为提前拦一下，边界仍在服务端 */
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const AVATAR_MAX = 2 * 1024 * 1024
+
+const uploading = ref(false)
+
+/**
+ * 换头像
+ *
+ * 用 el-upload 的 before-upload 做拦截 + 自己发请求，不走它的 action：
+ * 组件自带的上传绕过了 utils/request，拿不到 token 也走不到统一的错误处理
+ * （CLAUDE.md：页面不直接调 axios，接口一律写在 api/*.ts 里）。
+ *
+ * 返回 false 阻止组件继续上传，剩下的事我们自己做。
+ */
+async function onAvatarPick(file: File) {
+  if (!AVATAR_TYPES.includes(file.type)) {
+    ElMessage.error('只支持 jpg / png / gif / webp')
+    return false
+  }
+  if (file.size > AVATAR_MAX) {
+    ElMessage.error('头像不能超过 2MB')
+    return false
+  }
+
+  uploading.value = true
+  try {
+    const { avatar } = await uploadAvatar(file)
+    // 后端已经写库了，这里只同步本地状态，不需要再调 updateProfile
+    if (info.value) info.value.avatar = avatar
+    userStore.patchUser({ avatar })
+    ElMessage.success('头像已更新')
+  } finally {
+    uploading.value = false
+  }
+
+  return false
 }
 
 // ---------------------------------------------------------------- 基本资料
@@ -92,7 +139,20 @@ onMounted(() => {
       <!-- 左栏：静态属性，全部只读 -->
       <el-card class="side" shadow="never">
         <div class="ident">
-          <el-avatar :size="64">{{ info?.real_name?.charAt(0) || '?' }}</el-avatar>
+          <!-- 头像是这一栏里唯一可改的东西，所以给它一个明确的悬停提示 -->
+          <el-upload
+            class="avatar-pick"
+            :show-file-list="false"
+            :before-upload="onAvatarPick"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+          >
+            <div v-loading="uploading" class="avatar-wrap">
+              <el-avatar :size="64" :src="info?.avatar || undefined">
+                {{ info?.real_name?.charAt(0) || '?' }}
+              </el-avatar>
+              <span class="avatar-mask">更换</span>
+            </div>
+          </el-upload>
           <div class="name">{{ info?.real_name || '—' }}</div>
           <div class="account">{{ info?.username }}</div>
           <el-tag v-if="info?.is_super" size="small" type="warning" effect="plain">
@@ -228,18 +288,47 @@ onMounted(() => {
 }
 
 .ident .account {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--el-text-color-secondary);
+}
+
+.avatar-pick {
+  cursor: pointer;
+}
+
+.avatar-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* 悬停才浮出「更换」，静止时就是一个普通头像，不打扰阅读 */
+.avatar-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 45%);
+  color: #fff;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.avatar-wrap:hover .avatar-mask {
+  opacity: 1;
 }
 
 /* dl 而不是 el-descriptions：这里是「标签 + 值」的窄栏，
    descriptions 的边框在 300px 宽度下会把值挤成两三行 */
 .meta {
   display: grid;
-  grid-template-columns: 60px 1fr;
+  grid-template-columns: 64px 1fr;
   gap: 10px 12px;
   margin: 0;
-  font-size: 13px;
 }
 
 .meta dt {
@@ -260,7 +349,7 @@ onMounted(() => {
 
 .tip {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--el-text-color-secondary);
   line-height: 1.6;
 }

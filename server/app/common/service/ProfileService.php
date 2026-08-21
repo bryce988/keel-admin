@@ -26,6 +26,7 @@ use app\common\model\SysUserModel;
 use app\common\support\Arr;
 use app\common\support\Guard;
 use app\common\support\OpLog;
+use Webman\Http\UploadFile;
 use Illuminate\Database\Eloquent\Builder;
 
 class ProfileService
@@ -178,5 +179,97 @@ class ProfileService
             'msg'        => $row->msg,
             'created_at' => $row->created_at?->format('Y-m-d H:i:s'),
         ];
+    }
+
+    // ================================================================ 头像
+
+    /** 允许的图片扩展名。**写死在代码里**，不做成参数——可配置的白名单等于给了配错的机会 */
+    private const AVATAR_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+    /** 上传目录，相对 public/。换头像时只删这个前缀下的旧文件，防止把别处的路径带进来 */
+    private const AVATAR_DIR = 'uploads/avatar';
+
+    /**
+     * 换头像
+     *
+     * 一步到位：校验通过就存盘并写库，不做「先传临时目录、保存时再转正」那一套。
+     * 两段式要额外维护临时目录与孤儿文件清理，而头像这一个场景撑不起那套开销。
+     *
+     * 三道校验缺一不可：
+     * - 扩展名白名单——挡住 .php/.svg 这类一眼就不该收的
+     * - `getimagesize()` 二次确认真是图片——只看扩展名挡不住改个名字的文件
+     * - 大小上限走系统参数 `sys.upload.avatarMaxSize`（默认 2MB），
+     *   全局的 `sys.upload.maxSize`（20MB）对头像太宽松
+     *
+     * @param  UploadFile  $file  控制器已确认非空且 isValid()
+     * @return string 新头像的相对路径，如 /uploads/avatar/202608/xxxx.png
+     */
+    public static function changeAvatar(int $userId, UploadFile $file): string
+    {
+        $ext = strtolower($file->getUploadExtension());
+        if (!in_array($ext, self::AVATAR_EXTS, true)) {
+            throw new BusinessException('只支持 ' . implode(' / ', self::AVATAR_EXTS) . '，收到的是 .' . $ext);
+        }
+
+        $max = (int) ParamService::value('sys.upload.avatarMaxSize', 2 * 1024 * 1024);
+        if ($file->getSize() > $max) {
+            throw new BusinessException('头像不能超过 ' . round($max / 1024 / 1024, 1) . 'MB');
+        }
+
+        // 扩展名可以随便改，图片头改不了。放在大小校验之后：别为一个 20MB 的伪造文件去解析
+        if (@getimagesize($file->getPathname()) === false) {
+            throw new BusinessException('这不是一张有效的图片');
+        }
+
+        /** @var SysUserModel $user */
+        $user = Guard::found(SysUserModel::withoutDataScope()->find($userId));
+
+        // 按年月分目录：一个目录堆到几十万个文件之后，连 ls 都要等半天
+        $dir  = self::AVATAR_DIR . '/' . date('Ym');
+        $name = bin2hex(random_bytes(8)) . '.' . $ext;
+
+        // move() 自己会建目录，失败抛 FileException（500）。这里接一下换成能看懂的话——
+        // 现实中这一步失败几乎只有一个原因：public/uploads 没写权限
+        try {
+            $file->move(public_path($dir . '/' . $name));
+        } catch (\Throwable $e) {
+            throw new BusinessException('头像保存失败，请检查 public/uploads 的写权限');
+        }
+
+        $old = (string) $user->avatar;
+        $url = '/' . $dir . '/' . $name;
+
+        OpLog::target("个人资料 {$user->username}");
+        OpLog::diff(['avatar' => $old], ['avatar' => $url]);
+
+        $user->avatar = $url;
+        $user->save();
+
+        self::removeOldAvatar($old);
+
+        return $url;
+    }
+
+    /**
+     * 删掉被替换下来的旧头像
+     *
+     * ⚠️ 只删 `uploads/avatar/` 前缀下的文件。库里的 avatar 理论上都是本服务写的，
+     * 但这个值曾经可以由 `PUT /admin/profile` 的请求体直接指定——
+     * 不加前缀判断的话，一个精心构造的值就能让这里去删别的文件。
+     * 失败不抛异常：头像已经换好了，为一个删不掉的旧文件让整个请求失败不值得。
+     */
+    private static function removeOldAvatar(string $url): void
+    {
+        if ($url === '' || !str_starts_with($url, '/' . self::AVATAR_DIR . '/')) {
+            return;
+        }
+
+        // 走 realpath 再比一次前缀，挡住 ../ 这类穿越
+        $base = realpath(public_path(self::AVATAR_DIR));
+        $path = realpath(public_path(ltrim($url, '/')));
+
+        if ($base && $path && str_starts_with($path, $base) && is_file($path)) {
+            @unlink($path);
+        }
     }
 }
