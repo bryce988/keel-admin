@@ -77,7 +77,10 @@ const rules: FormRules = {
   ]
 }
 
-const errorFields = { [BizCode.POST_CODE_EXISTS]: 'code' }
+const errorFields = {
+  [BizCode.POST_CODE_EXISTS]: 'code',
+  [BizCode.DATA_SCOPE_DENIED]: 'dept_id'
+}
 
 function onCreate() {
   editingId.value = 0
@@ -232,7 +235,7 @@ onMounted(() => {
         <el-form-item label="岗位编码" prop="code" :error="errors.code">
           <el-input v-model="form.code" maxlength="64" placeholder="如 POST-DEV" />
         </el-form-item>
-        <el-form-item label="所属部门" prop="dept_id">
+        <el-form-item label="所属部门" prop="dept_id" :error="errors.dept_id">
           <el-select v-model="form.dept_id" style="width: 100%">
             <el-option
               v-for="opt in deptOptions"

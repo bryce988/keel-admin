@@ -136,6 +136,7 @@ class UserService
     public static function create(array $data, array $roleIds = []): array
     {
         Guard::unique(SysUserModel::class, 'username', $data['username'], null, '账号已存在', BizCode::ACCOUNT_EXISTS);
+        Guard::inDeptScope((int) ($data['dept_id'] ?? 0));
 
         $plain = (string) ($data['password'] ?? '');
         if ($plain === '') {
@@ -170,6 +171,9 @@ class UserService
         $user = self::findEditable($id);
 
         Guard::unique(SysUserModel::class, 'username', $data['username'], $id, '账号已存在', BizCode::ACCOUNT_EXISTS);
+
+        // 「踢出范围外」由新值那一判拦住；旧值这一判防的是读写范围哪天不再相等
+        Guard::inDeptScope((int) ($data['dept_id'] ?? $user->dept_id), (int) $user->dept_id);
 
         if ($roleIds !== null) {
             RoleService::assertAssignable($id, $roleIds);
@@ -329,10 +333,9 @@ class UserService
     public static function import(string $path): array
     {
         // 软删除由各自的 SoftDeletes 带上。
-        // ⚠️ withoutDataScope()：这里取的是全部部门/岗位，也就是说导入可以把人写到
-        // 自己数据范围之外的部门去。这不是本行引入的——create() / update() 同样没有
-        // 校验 dept_id 是否在操作者范围内，数据权限目前只管「读得到谁」不管「写到哪」。
-        // 补写入侧校验时这三处要一起改，别只改 create()
+        // ⚠️ withoutDataScope()：这里刻意取全部部门/岗位，只为把「编码 → id」翻译出来。
+        // 翻译不等于放行——落到哪个部门由下面每一行的 Guard::inDeptScope() 判。
+        // 两件事分开做，是为了让「部门编码不存在」与「部门超出你的范围」给出不同的行内提示
         $deptIds = SysDeptModel::withoutDataScope()->pluck('id', 'code');
         $postIds = SysPostModel::withoutDataScope()->pluck('id', 'code');
 
@@ -355,6 +358,15 @@ class UserService
                 if ($postCode !== '' && !isset($postIds[$postCode])) {
                     throw new BusinessException("岗位编码「{$postCode}」不存在");
                 }
+
+                // create() 里也有同样一判，这里提前判一次只为把部门编码写进提示——
+                // 用户手上是 Excel，「所选部门超出你的数据范围」不告诉他改哪一列
+                Guard::inDeptScope(
+                    (int) ($deptIds[$deptCode] ?? 0),
+                    message: $deptCode === ''
+                        ? '未填部门编码，而你没有创建无部门用户的权限'
+                        : "部门编码「{$deptCode}」超出你的数据范围",
+                );
 
                 self::create([
                     'username'  => $username,

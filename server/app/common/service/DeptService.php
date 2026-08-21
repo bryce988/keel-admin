@@ -88,7 +88,7 @@ class DeptService
             });
         }
 
-        return self::buildTree($nodes, 0);
+        return self::buildTree($nodes);
     }
 
     public static function detail(int $id): array
@@ -104,6 +104,15 @@ class DeptService
         Guard::unique(SysDeptModel::class, 'code', $data['code'], null, '部门编码已存在', BizCode::DEPT_CODE_EXISTS);
 
         $parentId = (int) ($data['parent_id'] ?? 0);
+
+        // 部门这张表的归属列是自己的 id（见 SysDeptModel::deptColumn），所以判的是新上级。
+        // parent_id = 0 即建顶级部门，天然不在任何受限集合里 → 只有全部数据范围能建。
+        //
+        // ⚠️ 「建完自己看得见」这条只在「本部门及下属」范围下成立：那里的集合是按
+        // ancestors 前缀算的，新子部门下次查询自然落进来。「仅本部门 / 自定义部门」
+        // 的集合是固定 id 列表，建完的子部门不在里面——建完就看不见。
+        // 这不是校验能补的，是这两种范围本来就不该配 sys:dept:create 权限点
+        Guard::inDeptScope($parentId, message: '上级部门超出你的数据范围');
 
         return Db::transaction(function () use ($data, $parentId) {
             $dept = new SysDeptModel();
@@ -127,6 +136,10 @@ class DeptService
 
         $newParentId = (int) ($data['parent_id'] ?? $dept->parent_id);
         Guard::noCycle(SysDeptModel::class, $id, $newParentId, '上级部门不能是自己或其子部门', BizCode::DEPT_CYCLE);
+
+        // 挪走的落点也要在范围内，否则能把自己范围内的整棵子树挂到看不见的地方去。
+        // 被挪的部门自身无需再判：能 find 到就说明它已经过了读侧 Scope
+        Guard::inDeptScope($newParentId, message: '上级部门超出你的数据范围');
 
         $before = $dept->toArray();
 
@@ -230,14 +243,38 @@ class DeptService
         return array_values(array_filter($nodes, fn ($n) => isset($keep[$n['id']])));
     }
 
-    private static function buildTree(array $rows, int $parentId): array
+    /**
+     * 建树
+     *
+     * ⚠️ 根**不能**写死成 `parent_id = 0`：数据权限会把上级部门整个滤掉。
+     * 技术部主管（范围＝本部门及下级）拿到的行里最浅的一层就是技术部本身，
+     * 而它的 `parent_id` 指向看不见的总公司——按 0 找根一个节点都挂不上去，
+     * 返回空数组。表现是「部门管理页一片空白、用户表单里的部门下拉只剩『未分配』」，
+     * 而『未分配』又正好是写侧唯一不允许选的值（见 Guard::inDeptScope），
+     * 于是部门主管连一个用户都建不出来。
+     *
+     * 所以：父节点不在本次结果集里的，一律当根。
+     */
+    private static function buildTree(array $rows): array
+    {
+        $ids      = array_column($rows, 'id');
+        $byParent = [];
+
+        foreach ($rows as $row) {
+            $parent = in_array($row['parent_id'], $ids, true) ? $row['parent_id'] : 0;
+            $byParent[$parent][] = $row;
+        }
+
+        return self::attachChildren($byParent, 0);
+    }
+
+    /** @param  array<int, array<array>>  $byParent  父 id => 子节点，预先分好组避免 O(n²) */
+    private static function attachChildren(array $byParent, int $parentId): array
     {
         $tree = [];
-        foreach ($rows as $row) {
-            if ($row['parent_id'] !== $parentId) {
-                continue;
-            }
-            $children = self::buildTree($rows, $row['id']);
+
+        foreach ($byParent[$parentId] ?? [] as $row) {
+            $children = self::attachChildren($byParent, $row['id']);
             if ($children) {
                 $row['children'] = $children;
             }

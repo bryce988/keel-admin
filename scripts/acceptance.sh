@@ -109,7 +109,40 @@ curl -s -X PUT "$BASE/admin/roles/2/data-scope" -H "Authorization: Bearer $ADMIN
 sql "UPDATE sys_users SET dept_id=2 WHERE username='manager';"
 ok "已还原 manager 部门与角色数据范围"
 
-echo "════ 5. 授权变更即刻生效（无需重新登录）════"
+echo "════ 5. 写入侧数据权限（可写集合 = 可读集合）════"
+echo "  manager 在技术部(2)，范围「本部门及下级」；技术部没有子部门 → 可写集合 = {2}"
+# 这一节全部是 HTTP 断言：写侧的校验点在 service 里，只有真发请求才走得到
+mkuser() { curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/admin/users" \
+  -H "Authorization: Bearer $1" -H 'Content-Type: application/json' \
+  -d "{\"username\":\"$2\",\"real_name\":\"验收探针\",\"dept_id\":$3,\"status\":1}"; }
+bizcode() { curl -s "$@" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code","ERR"))'; }
+
+chk "建用户到上级部门(总公司) → 403" "$(mkuser "$MGR" probe_out 1)" 403
+chk "  且业务码是 10302 而非 10301"   "$(bizcode -X POST "$BASE/admin/users" -H "Authorization: Bearer $MGR" \
+  -H 'Content-Type: application/json' -d '{"username":"probe_out","real_name":"x","dept_id":1,"status":1}')" 10302
+# dept_id=0 不用特判，它天然不在任何受限集合里；拦它是因为写完自己就看不见了
+chk "建用户到「未分配」(0) → 403"     "$(mkuser "$MGR" probe_zero 0)" 403
+chk "建用户到本部门(技术部) → 201"    "$(mkuser "$MGR" probe_in 2)" 201
+PROBE_ID=$(sql "SELECT id FROM sys_users WHERE username='probe_in'")
+# 改新部门那一判：拦住「把范围内的人踢到范围外」，一步就失去对这条数据的控制
+chk "把范围内的人改去总公司 → 403"    "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$BASE/admin/users/$PROBE_ID" \
+  -H "Authorization: Bearer $MGR" -H 'Content-Type: application/json' \
+  -d '{"username":"probe_in","real_name":"验收探针","dept_id":1,"status":1}')" 403
+chk "  被拒后库里的部门没变"          "$(sql "SELECT dept_id FROM sys_users WHERE id=$PROBE_ID")" 2
+# 对照组：范围「全部数据」不受限，否则上面几条可能只是接口本身坏了
+chk "对照 admin 建到总公司 → 201"     "$(mkuser "$ADMIN" probe_admin 1)" 201
+
+echo "  部门树的根不能写死 parent_id=0——上级被数据权限滤掉后整棵树会塌成空"
+TREE_TOP=$(curl -s "$BASE/admin/depts/tree" -H "Authorization: Bearer $MGR" \
+  | python3 -c 'import sys,json;t=json.load(sys.stdin);print(t[0]["name"] if t else "空树")')
+chk "manager 的部门树以技术部为根"    "$TREE_TOP" "技术部"
+
+sql "DELETE FROM sys_user_roles WHERE user_id IN (SELECT id FROM sys_users WHERE username LIKE 'probe%');"
+sql "DELETE FROM sys_users WHERE username LIKE 'probe%';"
+sql "DELETE FROM sys_operation_logs WHERE target LIKE '%probe%';"
+ok "已清理验收探针账号"
+
+echo "════ 6. 授权变更即刻生效（无需重新登录）════"
 BEFORE=$(code -H "Authorization: Bearer $DEV" $BASE/admin/logs/login)
 PERM_ID=$(sql "SELECT id FROM sys_permissions WHERE perm_code='sys:log:login:list' LIMIT 1")
 CUR=$(sql "SELECT GROUP_CONCAT(permission_id) FROM sys_role_permissions WHERE role_id=3")
@@ -122,7 +155,7 @@ sql "DELETE FROM sys_role_permissions WHERE role_id=3 AND permission_id=$PERM_ID
 sql "UPDATE sys_users SET perm_version = perm_version + 1 WHERE id IN (SELECT user_id FROM sys_user_roles WHERE role_id=3);"
 chk "撤销后立刻恢复 403"           "$(code -H "Authorization: Bearer $DEV" $BASE/admin/logs/login)" 403
 
-echo "════ 6. 操作日志：字段级变更 + traceId ════"
+echo "════ 7. 操作日志：字段级变更 + traceId ════"
 curl -s -X PUT "$BASE/admin/profile" -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
   -d '{"real_name":"验收测试","email":""}' -o /dev/null
 LOG=$(sql "SELECT CONCAT(IFNULL(trace_id,''),'|',IFNULL(changes,'')) FROM sys_operation_logs ORDER BY id DESC LIMIT 1")

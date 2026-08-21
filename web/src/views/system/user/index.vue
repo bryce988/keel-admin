@@ -96,7 +96,11 @@ const rules: FormRules = {
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
 }
 
-const errorFields = { [BizCode.ACCOUNT_EXISTS]: 'username' }
+const errorFields = {
+  [BizCode.ACCOUNT_EXISTS]: 'username',
+  // 所选部门超出数据范围，红框标在部门选择器上而不是只弹一句
+  [BizCode.DATA_SCOPE_DENIED]: 'dept_id'
+}
 
 function onCreate() {
   editingId.value = 0
@@ -382,7 +386,7 @@ onMounted(() => {
           <el-form-item label="邮箱" prop="email">
             <el-input v-model="form.email" maxlength="128" />
           </el-form-item>
-          <el-form-item label="部门" prop="dept_id">
+          <el-form-item label="部门" prop="dept_id" :error="errors.dept_id">
             <el-select v-model="form.dept_id" style="width: 100%">
               <el-option v-for="d in deptOptions" :key="d.id" :label="d.name" :value="d.id" />
             </el-select>

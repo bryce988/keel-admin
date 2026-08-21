@@ -132,6 +132,43 @@ final class Guard
     }
 
     /**
+     * 写入的部门必须在自己的数据范围内
+     *
+     * 数据权限的读侧由全局 Scope 自动注入，写侧没有对称的自动机制
+     * （原因见 PROJECT.md §6.4），所以凡是 `dept_id` 来自请求体的地方都要显式调它。
+     * 规则是「写完自己还看得见」——拦的不是「改了别人的数据」，
+     * 而是把记录写到自己看不见的部门去，建完就找不回来，只能找超管收拾。
+     *
+     * `dept_id = 0` 只有「全部数据」范围能写：读侧 `whereIn($deptIds)` 永远匹配不到 0，
+     * 非全部范围的人写了 0 就是立刻看不见。
+     *
+     * ⚠️ **编辑要连旧值一起判**（`$currentDeptId`）。只判新值的话，部门主管能把
+     * 自己范围内的人「踢」到范围外去，一步就失去对这条数据的控制。
+     *
+     * 不存在的部门与范围外的部门抛同一个错：都只是「不在可写集合里」，
+     * 不额外查一次存在性，顺手堵掉「试探哪些部门 id 存在」。
+     *
+     * @param  int|null  $currentDeptId  编辑前的部门，新建传 null
+     */
+    public static function inDeptScope(
+        int $deptId,
+        ?int $currentDeptId = null,
+        string $message = '所选部门超出你的数据范围',
+    ): void {
+        $writable = DataScope::writableDeptIds();
+
+        if ($writable === null) {
+            return;   // 超管 / 全部数据 / 无登录态
+        }
+
+        foreach (array_filter([$deptId, $currentDeptId], static fn ($v) => $v !== null) as $id) {
+            if (!in_array((int) $id, $writable, true)) {
+                throw new ForbiddenException($message, BizCode::DATA_SCOPE_DENIED);
+            }
+        }
+    }
+
+    /**
      * 内置数据不可改动（内置角色 20302、内置参数 20601）
      *
      * 抛 403 而不是 400：这是「不允许你动」而不是「你传错了」，

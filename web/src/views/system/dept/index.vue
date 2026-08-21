@@ -91,7 +91,11 @@ const rules: FormRules = {
 }
 
 /** 业务码 → 字段，让「编码已存在」红框标在编码上而不是只弹一句 */
-const errorFields = { [BizCode.DEPT_CODE_EXISTS]: 'code' }
+const errorFields = {
+  [BizCode.DEPT_CODE_EXISTS]: 'code',
+  // 上级部门超出数据范围，红框标在上级选择器上
+  [BizCode.DATA_SCOPE_DENIED]: 'parent_id'
+}
 
 function onCreate(parentId = 0) {
   editingId.value = 0
@@ -213,7 +217,7 @@ onMounted(() => {
         </el-descriptions>
 
         <template v-else>
-        <el-form-item label="上级部门" prop="parent_id">
+        <el-form-item label="上级部门" prop="parent_id" :error="errors.parent_id">
           <el-tree-select
             v-model="form.parent_id"
             :data="parentOptions"

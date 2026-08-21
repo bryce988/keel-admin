@@ -74,6 +74,9 @@ class PostService
     {
         Guard::unique(SysPostModel::class, 'code', $data['code'], null, '岗位编码已存在', BizCode::POST_CODE_EXISTS);
 
+        // dept_id = 0 是「全公司通用」，天然不在任何受限集合里 → 只有全部数据范围能建
+        Guard::inDeptScope((int) ($data['dept_id'] ?? 0));
+
         return Db::transaction(function () use ($data) {
             $post = new SysPostModel();
             $post->fill($data);
@@ -91,6 +94,7 @@ class PostService
         $post = Guard::found(SysPostModel::find($id));
 
         Guard::unique(SysPostModel::class, 'code', $data['code'], $id, '岗位编码已存在', BizCode::POST_CODE_EXISTS);
+        Guard::inDeptScope((int) ($data['dept_id'] ?? $post->dept_id), (int) $post->dept_id);
 
         $before = $post->toArray();
 

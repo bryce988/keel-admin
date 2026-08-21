@@ -35,7 +35,7 @@ final class BizCode
     public const TOKEN_TYPE_MISMATCH = 10102;   // 员工 token 调 C 端，或反之
     public const PASSWORD_CHANGED = 10103;      // 密码已变更，全部令牌失效
     public const FORBIDDEN = 10301;             // 缺少功能权限点
-    public const DATA_SCOPE_DENIED = 10302;     // 数据权限不足（预留：读走 404 伪装，暂无抛出点）
+    public const DATA_SCOPE_DENIED = 10302;     // 数据权限不足（只在写路径抛：dept_id 超出可写范围；读路径走 404 伪装）
     public const FIELD_SCOPE_DENIED = 10303;    // 字段权限不足（预留，暂无抛出点）
     public const GENERAL_BAD_REQUEST = 10400;   // 通用业务错误（400 兜底，BusinessException 默认值）
     public const NOT_FOUND = 10404;             // 数据不存在或已被删除（含无权见的伪装）

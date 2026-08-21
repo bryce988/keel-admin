@@ -85,6 +85,37 @@ final class DataScope implements Scope
     }
 
     /**
+     * 当前用户**可写**的部门集合，`null` = 不限
+     *
+     * 读侧由上面的 apply() 自动注入，写侧（前端传上来的 dept_id）做不到自动——
+     * 详见 PROJECT.md §6.4 里「为什么不挂 saving 事件」那两条。所以把算好的集合
+     * 公开出来，由 {@see \app\common\support\Guard::inDeptScope()} 显式断言，
+     * 两侧共用同一份计算（含 Ctx 缓存），不会出现「读得到但写不进」的错位。
+     *
+     * 规则一句话：**可写集合 = 可读集合，写完的记录自己必须还看得见。**
+     *
+     * 「仅本人」退化成本部门：读侧按 owner 列过滤，而写侧要判的是一个还不存在的
+     * 新记录该落在哪个部门，没有「人」可依据，只能取本部门。
+     */
+    public static function writableDeptIds(): ?array
+    {
+        $user = Ctx::user();
+
+        // 与 apply() 的前两个分支保持一致：无登录态（命令行、seed）与超管都不限
+        if ($user === null || !empty($user['is_super'])) {
+            return null;
+        }
+
+        return match (self::level((int) $user['id'])) {
+            self::ALL       => null,
+            self::DEPT_TREE => self::deptTree((int) $user['dept_id']),
+            self::CUSTOM    => self::customDepts((int) $user['id']),
+            // DEPT 与 SELF 都只到本部门
+            default         => [(int) $user['dept_id']],
+        };
+    }
+
+    /**
      * 当前用户的数据范围，一个请求内只算一次
      *
      * 这里刻意用查询构造器而不是模型：模型自身挂着本 Scope，会无限递归。
