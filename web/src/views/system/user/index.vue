@@ -19,6 +19,7 @@ import {
 import { download } from '@/utils/request'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { useUserStore } from '@/stores/user'
 import { BizCode } from '@/constants/bizCode'
 
 /**
@@ -28,6 +29,15 @@ import { BizCode } from '@/constants/bizCode'
  * 「这个人为什么能看到这个」就再也说不清了。
  */
 const dictStore = useDictStore()
+const userStore = useUserStore()
+
+/** 「更多」下拉里三项各自的权限；一项都没有时整个下拉不渲染，免得点开是空的 */
+const can = computed(() => ({
+  resetPwd: userStore.can('sys:user:resetPwd'),
+  update: userStore.can('sys:user:update'),
+  remove: userStore.can('sys:user:delete')
+}))
+const canMore = computed(() => Object.values(can.value).some(Boolean))
 
 const tableRef = ref<ProTableInstance | null>(null)
 const drawerRef = ref<FormDrawerInstance | null>(null)
@@ -318,21 +328,27 @@ onMounted(() => {
               <el-button v-permission="'sys:user:update'" link type="primary" @click="onEdit(row)">
                 编辑
               </el-button>
-              <el-dropdown>
+              <!--
+                下拉项用 v-if 而不是 v-permission：el-dropdown-item 的根节点是
+                Fragment，运行时指令挂不上去（控制台会报 "Runtime directive used on
+                component with non-element root node"），指令拿到的 el 是 Vue 用来
+                定位片段的锚点文本节点，删掉它等于破坏 Vue 的 DOM 记账。
+              -->
+              <el-dropdown v-if="canMore">
                 <el-button link type="primary">更多</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item
-                      v-permission="'sys:user:resetPwd'"
+                      v-if="can.resetPwd"
                       :icon="Key"
                       @click="onResetPassword(row)"
                     >
                       重置密码
                     </el-dropdown-item>
-                    <el-dropdown-item v-permission="'sys:user:update'" @click="onToggleStatus(row)">
+                    <el-dropdown-item v-if="can.update" @click="onToggleStatus(row)">
                       {{ row.status === 0 ? '启用' : '停用' }}
                     </el-dropdown-item>
-                    <el-dropdown-item v-permission="'sys:user:delete'" divided @click="onDelete(row)">
+                    <el-dropdown-item v-if="can.remove" divided @click="onDelete(row)">
                       删除
                     </el-dropdown-item>
                   </el-dropdown-menu>
