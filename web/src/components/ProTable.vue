@@ -483,6 +483,12 @@ defineExpose({ reload, refresh, selected, loading })
       <el-table-column v-if="selection" type="selection" width="46" align="center" :reserve-selection="true" />
       <el-table-column v-if="index" type="index" label="#" width="56" align="center" />
 
+      <!--
+        表头一律居中，正文的对齐仍由列自己的 align 决定。
+        表头是标签、正文是数据，两者对齐方式本来就不必一致——
+        文字列左对齐读起来顺，而表头居中之后一排看下来是整齐的，
+        不会因为「状态」两个字缩在 90px 格子的左边而显得歪。
+      -->
       <el-table-column
         v-for="col in shownColumns"
         :key="col.prop"
@@ -491,6 +497,7 @@ defineExpose({ reload, refresh, selected, loading })
         :width="col.width"
         :min-width="col.minWidth"
         :align="col.align"
+        header-align="center"
         :fixed="col.fixed"
         :sortable="col.sortable ? 'custom' : false"
         :show-overflow-tooltip="col.showOverflowTooltip ?? true"

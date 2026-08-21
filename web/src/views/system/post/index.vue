@@ -40,7 +40,7 @@ const columns: ProColumn[] = [
   { prop: 'name', label: '岗位名称', minWidth: 150 },
   { prop: 'code', label: '岗位编码', minWidth: 150 },
   { prop: 'dept_name', label: '所属部门', minWidth: 130 },
-  { prop: 'sort', label: '排序', width: 80, align: 'center', sortable: true },
+  { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'remark', label: '备注', minWidth: 180, hidden: true },
   { prop: 'created_at', label: '创建时间', minWidth: 160, sortable: true, hidden: true },

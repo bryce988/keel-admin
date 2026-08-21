@@ -47,7 +47,7 @@ const columns: ProColumn[] = [
   { prop: 'name', label: '名称', minWidth: 160 },
   { prop: 'code', label: '编码', minWidth: 140 },
   { prop: 'owner', label: '负责人', width: 100 },
-  { prop: 'sort', label: '排序', width: 80, align: 'center', sortable: true },
+  { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   // 默认列不超过 8 列，多出来的用 hidden 收进列设置里（§9.1）
   { prop: 'remark', label: '备注', minWidth: 160, hidden: true },
