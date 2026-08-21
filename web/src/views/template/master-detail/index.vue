@@ -290,7 +290,7 @@ onMounted(loadMasters)
 }
 
 .master-list .name {
-  font-size: 13px;
+  color: var(--el-text-color-primary);
 }
 
 .master-list .code {

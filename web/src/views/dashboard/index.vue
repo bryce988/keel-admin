@@ -431,7 +431,6 @@ onMounted(() => {
 }
 
 .recent .title {
-  font-size: 13px;
   color: var(--el-text-color-primary);
 }
 

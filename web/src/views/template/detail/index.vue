@@ -212,7 +212,6 @@ onMounted(load)
   grid-template-columns: 64px 1fr;
   gap: 10px 12px;
   margin: 0;
-  font-size: 13px;
 }
 
 .meta dt {
