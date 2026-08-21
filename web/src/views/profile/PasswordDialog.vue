@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import type { FormRules } from 'element-plus'
 import { changePassword } from '@/api/profile'
 import { useSignOut } from '@/composables/useSignOut'
-import type { FormDrawerInstance } from '@/components'
+import type { FormShellInstance } from '@/components'
 import { BizCode } from '@/constants/bizCode'
 
 /**
@@ -17,7 +17,7 @@ import { BizCode } from '@/constants/bizCode'
  * 放在 views/profile/ 而不是 components/：components 是全局注册的通用件
  * （见 components/index.ts 的说明），这个是业务组件，按需 import。
  */
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const dialogRef = ref<FormShellInstance | null>(null)
 const signOut = useSignOut()
 
 const rules: FormRules = {
@@ -31,7 +31,7 @@ const rules: FormRules = {
     {
       trigger: 'blur',
       validator: (_rule, value, callback) => {
-        const form = (drawerRef.value as unknown as { form?: Record<string, any> })?.form
+        const form = (dialogRef.value as unknown as { form?: Record<string, any> })?.form
         callback(value && value !== form?.new_password ? new Error('两次输入的密码不一致') : undefined)
       }
     }
@@ -46,7 +46,7 @@ function submit(form: Record<string, any>) {
 }
 
 function open() {
-  drawerRef.value?.open({
+  dialogRef.value?.open({
     title: '修改密码',
     data: { old_password: '', new_password: '', confirm_password: '' }
   })
@@ -56,12 +56,11 @@ defineExpose({ open })
 </script>
 
 <template>
-  <FormDrawer
-    ref="drawerRef"
+  <FormDialog
+    ref="dialogRef"
     :submit="submit"
     :rules="rules"
     :error-fields="errorFields"
-    size="420px"
     label-width="80px"
     success-message="密码已修改，请重新登录"
     @success="signOut"
@@ -77,5 +76,5 @@ defineExpose({ open })
         <el-input v-model="form.confirm_password" type="password" show-password autocomplete="off" />
       </el-form-item>
     </template>
-  </FormDrawer>
+  </FormDialog>
 </template>

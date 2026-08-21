@@ -11,8 +11,8 @@ import {
 import type { ProColumn } from '@/components'
 import { useDictStore } from '@/stores/dict'
 import { useUserStore } from '@/stores/user'
-import PasswordDrawer from './PasswordDrawer.vue'
-import PhoneDrawer from './PhoneDrawer.vue'
+import PasswordDialog from './PasswordDialog.vue'
+import PhoneDialog from './PhoneDialog.vue'
 
 /**
  * 个人中心（详情页页型的参考实现，PROJECT.md §9.5）
@@ -104,8 +104,8 @@ async function save() {
 }
 
 // ---------------------------------------------------------------- 安全设置
-const pwdDrawer = ref<InstanceType<typeof PasswordDrawer> | null>(null)
-const phoneDrawer = ref<InstanceType<typeof PhoneDrawer> | null>(null)
+const pwdDialog = ref<InstanceType<typeof PasswordDialog> | null>(null)
+const phoneDialog = ref<InstanceType<typeof PhoneDialog> | null>(null)
 
 // ---------------------------------------------------------------- 登录记录
 const loginQuery = ref<Record<string, unknown>>({})
@@ -155,9 +155,21 @@ onMounted(() => {
           </el-upload>
           <div class="name">{{ info?.real_name || '—' }}</div>
           <div class="account">{{ info?.username }}</div>
-          <el-tag v-if="info?.is_super" size="small" type="warning" effect="plain">
-            超级管理员
-          </el-tag>
+          <!--
+            标的是 sys_users.is_super 这个开关，不是下面那个「角色」。
+            两者在种子数据里恰好都叫「超级管理员」，并排显示时看着像重复了，
+            所以这里改叫「超级权限」并挂上说明——它们本来就是两件事：
+            角色决定「被授予了哪些权限点」，is_super 是「跳过校验」，
+            后者由初始化脚本产生，界面上授不了也删不掉。
+          -->
+          <el-tooltip
+            content="该账号跳过一切权限点与数据范围校验，只能由初始化脚本产生"
+            placement="bottom"
+          >
+            <el-tag v-if="info?.is_super" size="small" type="danger" effect="plain">
+              超级权限
+            </el-tag>
+          </el-tooltip>
         </div>
 
         <el-divider />
@@ -219,7 +231,7 @@ onMounted(() => {
                     最后修改：{{ info?.pwd_updated_at || '从未修改' }}
                   </div>
                 </div>
-                <el-button link type="primary" @click="pwdDrawer?.open()">修改</el-button>
+                <el-button link type="primary" @click="pwdDialog?.open()">修改</el-button>
               </li>
               <li>
                 <div>
@@ -231,7 +243,7 @@ onMounted(() => {
                     <template v-else>未绑定，绑定后可用于身份标识与找回</template>
                   </div>
                 </div>
-                <el-button link type="primary" @click="phoneDrawer?.open()">
+                <el-button link type="primary" @click="phoneDialog?.open()">
                   {{ info?.phone ? '换绑' : '绑定' }}
                 </el-button>
               </li>
@@ -254,8 +266,8 @@ onMounted(() => {
       </el-card>
     </div>
 
-    <PasswordDrawer ref="pwdDrawer" />
-    <PhoneDrawer ref="phoneDrawer" @saved="load" />
+    <PasswordDialog ref="pwdDialog" />
+    <PhoneDialog ref="phoneDialog" @saved="load" />
   </div>
 </template>
 

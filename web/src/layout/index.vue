@@ -6,7 +6,7 @@ import { Expand, Fold, Moon, Sunny } from '@element-plus/icons-vue'
 import MenuSearch from './components/MenuSearch.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import TagsView from './components/TagsView.vue'
-import PasswordDrawer from '@/views/profile/PasswordDrawer.vue'
+import PasswordDialog from '@/views/profile/PasswordDialog.vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useSignOut } from '@/composables/useSignOut'
@@ -49,7 +49,7 @@ onMounted(() => window.addEventListener('keel:refresh-page', onRefresh))
 onUnmounted(() => window.removeEventListener('keel:refresh-page', onRefresh))
 
 /** 改密与登出的细节都在各自的组件/composable 里，这里只做分发 */
-const pwdDrawer = ref<InstanceType<typeof PasswordDrawer> | null>(null)
+const pwdDialog = ref<InstanceType<typeof PasswordDialog> | null>(null)
 
 async function onUserCommand(cmd: string) {
   if (cmd === 'logout') {
@@ -59,7 +59,7 @@ async function onUserCommand(cmd: string) {
   }
 
   if (cmd === 'password') {
-    pwdDrawer.value?.open()
+    pwdDialog.value?.open()
     return
   }
 
@@ -121,7 +121,7 @@ async function onUserCommand(cmd: string) {
       <!-- 多页签 -->
       <TagsView />
 
-      <PasswordDrawer ref="pwdDrawer" />
+      <PasswordDialog ref="pwdDialog" />
 
       <!-- 内容区 -->
       <main class="content">

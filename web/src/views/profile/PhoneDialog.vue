@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import type { FormRules } from 'element-plus'
 import { changePhone } from '@/api/profile'
-import type { FormDrawerInstance } from '@/components'
+import type { FormShellInstance } from '@/components'
 import { BizCode } from '@/constants/bizCode'
 
 /**
@@ -15,7 +15,7 @@ import { BizCode } from '@/constants/bizCode'
  */
 const emit = defineEmits<{ saved: [] }>()
 
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const dialogRef = ref<FormShellInstance | null>(null)
 
 const rules: FormRules = {
   phone: [
@@ -38,19 +38,18 @@ function submit(form: Record<string, any>) {
 }
 
 function open() {
-  drawerRef.value?.open({ title: '换绑手机号', data: { phone: '', password: '' } })
+  dialogRef.value?.open({ title: '换绑手机号', data: { phone: '', password: '' } })
 }
 
 defineExpose({ open })
 </script>
 
 <template>
-  <FormDrawer
-    ref="drawerRef"
+  <FormDialog
+    ref="dialogRef"
     :submit="submit"
     :rules="rules"
     :error-fields="errorFields"
-    size="420px"
     label-width="90px"
     success-message="手机号已更新"
     @success="emit('saved')"
@@ -66,5 +65,5 @@ defineExpose({ open })
         换绑后下次登录仍使用账号密码，手机号仅用于身份标识与找回。
       </el-alert>
     </template>
-  </FormDrawer>
+  </FormDialog>
 </template>

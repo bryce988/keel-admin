@@ -1,34 +1,30 @@
 <script lang="ts">
 /**
- * 表单抽屉
+ * 表单弹窗
  *
- * 新增、编辑、详情三种场景统一走它。用抽屉而不是弹窗：
- * 后台表单字段普遍偏多，弹窗撑不下就得在内部再套一层滚动，
- * 而抽屉天然是整列高度，长表单不用二次滚动，也不会把列表整个盖住。
+ * 与 {@link FormDrawer} 是同一套壳（`useFormShell`），只是容器换成居中弹窗。
+ * 用它的场景：字段少、动作单一、做完就想回到原来的位置——改密码、换绑手机
+ * 这一类。全高抽屉给两三个输入框用，空得晃眼。
  *
- * 字段少、动作单一的小表单（改密码、换绑手机）用 {@link FormDialog}，
- * 两者共用 `useFormShell` 里那套壳逻辑，只有容器不同（PROJECT.md §9.4）。
+ * 列表页的新增/编辑仍然用抽屉：那里字段多，而且抽屉不盖住列表，
+ * 改完能立刻看到那一行（PROJECT.md §9.4）。
  *
- *   <FormDrawer ref="drawer" :submit="save" :rules="rules" @success="tableRef?.refresh()">
- *     <template #default="{ form, errors, readonly }">
- *       <el-form-item label="账号" prop="username" :error="errors.username">
- *         <el-input v-model="form.username" :disabled="readonly" />
+ *   <FormDialog ref="dialog" :submit="save" :rules="rules" size="460px">
+ *     <template #default="{ form, errors }">
+ *       <el-form-item label="原密码" prop="old_password" :error="errors.old_password">
+ *         <el-input v-model="form.old_password" type="password" show-password />
  *       </el-form-item>
  *     </template>
- *   </FormDrawer>
- *
- *   drawer.value.open({ title: '新增用户' })                        // 新增
- *   drawer.value.open({ title: '编辑用户', data: row })              // 编辑
- *   drawer.value.open({ title: '岗位详情', data: row, mode: 'view' }) // 详情（只读）
+ *   </FormDialog>
  */
-export default { name: 'FormDrawer' }
+export default { name: 'FormDialog' }
 </script>
 
 <script setup lang="ts">
 import { useFormShell, type FormShellProps } from '@/composables/useFormShell'
 
 const props = withDefaults(defineProps<FormShellProps>(), {
-  size: '560px',
+  size: '460px',
   labelWidth: '96px',
   confirmText: '确 定'
 })
@@ -42,13 +38,13 @@ defineExpose({ open, close, form })
 </script>
 
 <template>
-  <el-drawer
+  <el-dialog
     v-model="visible"
     :title="title"
-    :size="size"
-    direction="rtl"
+    :width="size"
     destroy-on-close
     :close-on-click-modal="false"
+    align-center
     @closed="onClosed"
   >
     <el-form
@@ -70,7 +66,7 @@ defineExpose({ open, close, form })
         </el-button>
       </div>
     </template>
-  </el-drawer>
+  </el-dialog>
 </template>
 
 <style scoped>
