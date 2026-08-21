@@ -236,7 +236,8 @@ onUnmounted(() => {
 
 .strip {
   display: flex;
-  gap: 6px;
+  /* 间距 10px：页签之间靠得太近时，一排看下来是一整条色块而不是几个独立标签 */
+  gap: 10px;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
@@ -252,13 +253,15 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   flex: none;
-  height: 26px;
+  /* 30px / 13px：比正文的 14px 小半档，页签是导航不是内容，
+     但也不能像原来 26px / 12px 那样小到要凑近才看清 */
+  height: 30px;
   padding: 0 8px;
   border: 1px solid var(--el-border-color-light);
   border-radius: var(--keel-radius);
   background: var(--el-bg-color);
   color: var(--el-text-color-regular);
-  font-size: 12px;
+  font-size: 13px;
   text-decoration: none;
   transition: all 0.15s;
 }
@@ -285,8 +288,8 @@ onUnmounted(() => {
 }
 
 .tag .close {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   font-size: 12px;
 }
@@ -315,8 +318,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 26px;
-  height: 26px;
+  /* 与页签同高，视觉上属于这条横条而不是浮在上面 */
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 1px solid var(--el-border-color-light);
   border-radius: var(--keel-radius);
