@@ -4,6 +4,104 @@
    页面里禁止写死颜色，一律引用这里的变量（PROJECT.md §10）
    ============================================================ */
 
+/* ---------------------------------------------------------------- 主题色
+ * 覆盖 Element Plus 的五个品牌色。EP 默认那套偏灰偏软，在白底上对比度
+ * 全部不到 3:1；这套饱和度更高，五个颜色的对比度都往上走了一档，
+ * success / warning / danger 直接取 Tailwind 的 green-600 / orange-500 / red-600。
+ *
+ * light-3/5/7/8/9 与 dark-2 是 EP 的派生阶梯，必须一起写死。只改
+ * --el-color-primary 的话，标签底色、hover 态、禁用态仍是旧蓝，一个页面上两种蓝。
+ * 算法与 EP 官方主题一致：浅色阶梯是原色向 #fff 混 N×10%，深色阶梯向 #141414 混，
+ * dark-2 反向（浅色向黑 20%、深色向白 20%）。改主色时整块重算，别手改单个值。
+ *
+ * 本文件在 main.ts 里排在 EP 的两份 css 之后，所以这里能盖住它们。
+ */
+:root {
+  --el-color-primary: #3986ff;
+  --el-color-primary-light-3: #74aaff;
+  --el-color-primary-light-5: #9cc3ff;
+  --el-color-primary-light-7: #c4dbff;
+  --el-color-primary-light-8: #d7e7ff;
+  --el-color-primary-light-9: #ebf3ff;
+  --el-color-primary-dark-2: #2e6bcc;
+
+  --el-color-success: #16a34a;
+  --el-color-success-light-3: #5cbf80;
+  --el-color-success-light-5: #8bd1a5;
+  --el-color-success-light-7: #b9e3c9;
+  --el-color-success-light-8: #d0eddb;
+  --el-color-success-light-9: #e8f6ed;
+  --el-color-success-dark-2: #12823b;
+
+  --el-color-warning: #f97316;
+  --el-color-warning-light-3: #fb9d5c;
+  --el-color-warning-light-5: #fcb98b;
+  --el-color-warning-light-7: #fdd5b9;
+  --el-color-warning-light-8: #fee3d0;
+  --el-color-warning-light-9: #fef1e8;
+  --el-color-warning-dark-2: #c75c12;
+
+  --el-color-danger: #dc2626;
+  --el-color-danger-light-3: #e76767;
+  --el-color-danger-light-5: #ee9393;
+  --el-color-danger-light-7: #f5bebe;
+  --el-color-danger-light-8: #f8d4d4;
+  --el-color-danger-light-9: #fce9e9;
+  --el-color-danger-dark-2: #b01e1e;
+
+  --el-color-info: #5d5b6e;
+  --el-color-info-light-3: #8e8c9a;
+  --el-color-info-light-5: #aeadb7;
+  --el-color-info-light-7: #ceced4;
+  --el-color-info-light-8: #dfdee2;
+  --el-color-info-light-9: #efeff1;
+  --el-color-info-dark-2: #4a4958;
+}
+
+html.dark {
+  --el-color-primary: #3986ff;
+  --el-color-primary-light-3: #2e64b9;
+  --el-color-primary-light-5: #274d8a;
+  --el-color-primary-light-7: #1f365b;
+  --el-color-primary-light-8: #1b2b43;
+  --el-color-primary-light-9: #181f2c;
+  --el-color-primary-dark-2: #619eff;
+
+  --el-color-success: #16a34a;
+  --el-color-success-light-3: #15783a;
+  --el-color-success-light-5: #155c2f;
+  --el-color-success-light-7: #153f24;
+  --el-color-success-light-8: #14311f;
+  --el-color-success-light-9: #142219;
+  --el-color-success-dark-2: #45b56e;
+
+  --el-color-warning: #f97316;
+  --el-color-warning-light-3: #b45715;
+  --el-color-warning-light-5: #874415;
+  --el-color-warning-light-7: #593115;
+  --el-color-warning-light-8: #422714;
+  --el-color-warning-light-9: #2b1e14;
+  --el-color-warning-dark-2: #fa8f45;
+
+  --el-color-danger: #dc2626;
+  --el-color-danger-light-3: #a02121;
+  --el-color-danger-light-5: #781d1d;
+  --el-color-danger-light-7: #501919;
+  --el-color-danger-light-8: #3c1818;
+  --el-color-danger-light-9: #281616;
+  --el-color-danger-dark-2: #e35151;
+
+  /* info 深色下单独提亮：原色 #5d5b6e 在深底标签上对比度只有 2.61，
+     五个颜色里唯一不及格的一个。混 30% 白后 4.94，与 EP 默认的 5.24 相当 */
+  --el-color-info: #8e8c9a;
+  --el-color-info-light-3: #696872;
+  --el-color-info-light-5: #515057;
+  --el-color-info-light-7: #39383c;
+  --el-color-info-light-8: #2c2c2f;
+  --el-color-info-light-9: #202021;
+  --el-color-info-dark-2: #a5a3ae;
+}
+
 :root {
   --keel-sidebar-width: 210px;
   --keel-sidebar-collapsed: 64px;
