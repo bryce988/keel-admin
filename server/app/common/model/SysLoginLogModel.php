@@ -1,16 +1,38 @@
 <?php
-
+/**
+ * keel admin
+ * 登录日志 —— sys_login_logs
+ *
+ * 登录失败也要写（含失败原因）：连续失败锁定的判定依据就是这张表，
+ * 失败行不是可有可无的调试信息。
+ *
+ * 只有 created_at 没有 updated_at，也没有审计字段——日志只写不改。
+ * 保留天数到期后由 LogCleanupService 硬删回收空间，所以这张表不做软删。
+ *
+ * 字段说明以 database/schema.sql 的列注释为准，改表结构时两边一起改。
+ *
+ * @property int    $id         主键
+ * @property int    $user_id    用户 ID，账号不存在时为 0
+ * @property string $username   登录账号，冗余存储，用户改名后日志仍可读
+ * @property int    $dept_id    登录人部门，日志本身也受数据权限约束（见 deptColumn）
+ * @property string $ip         来源 IP
+ * @property string $location   IP 归属地
+ * @property string $browser    浏览器
+ * @property string $os         操作系统
+ * @property int    $type       记录类型：1 登录 · 2 登出（见 TYPE_*）
+ * @property int    $status     结果：1 成功 · 0 失败（见 STATUS_*，注意不是启用/停用）
+ * @property string $msg        失败原因
+ * @property Carbon $created_at 创建时间
+ *
+ * @author 火火
+ */
 declare(strict_types=1);
 
 namespace app\common\model;
 
 use app\common\model\concern\HasDataScope;
+use Illuminate\Support\Carbon;
 
-/**
- * 登录日志
- *
- * 登录失败也要写（含失败原因），连续失败锁定的审计依据就在这里。
- */
 class SysLoginLogModel extends BaseModel
 {
     use HasDataScope;

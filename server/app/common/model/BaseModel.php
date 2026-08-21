@@ -1,14 +1,6 @@
 <?php
-
-declare(strict_types=1);
-
-namespace app\common\model;
-
-use app\common\model\concern\HasAudit;
-use DateTimeInterface;
-use Illuminate\Database\Eloquent\Model;
-
 /**
+ * keel admin
  * 模型基类
  *
  * 职责边界（CLAUDE.md 硬性约定）：模型只放字段、关联、Scope，
@@ -31,7 +23,17 @@ use Illuminate\Database\Eloquent\Model;
  *
  * 要给某张表加软删，三处一起改：模型 use SoftDeletes、schema.sql 建表语句、
  * migrate.php 的 $columnPatches（存量库靠它补列）。
+ *
+ * @author 火火
  */
+declare(strict_types=1);
+
+namespace app\common\model;
+
+use app\common\model\concern\HasAudit;
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Model;
+
 abstract class BaseModel extends Model
 {
     use HasAudit;
