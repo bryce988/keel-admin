@@ -7,8 +7,10 @@ import DictSelect from './DictSelect.vue'
 import DictTag from './DictTag.vue'
 import EmptyState from './EmptyState.vue'
 import PageSkeleton from './PageSkeleton.vue'
+import BrandLogo from './BrandLogo.vue'
 
 export {
+  BrandLogo,
   ProTable,
   SearchForm,
   FormDrawer,

@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import BrandLogo from '@/components/BrandLogo.vue'
 import request, { BizError } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 
@@ -74,7 +75,7 @@ onMounted(loadCaptcha)
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-head">
-        <b>Keel</b>
+        <BrandLogo :size="40" />
         <p>多端后台系统的底座</p>
       </div>
 
@@ -134,14 +135,13 @@ onMounted(loadCaptcha)
   border-radius: 4px;
   box-shadow: var(--el-box-shadow-light);
 }
+/* 竖排 flex 而不是 text-align：标记是 inline-flex，按行内元素排会带上
+   基线下方的空隙，副标题跟它的间距就不是这里写的 6px 了 */
 .login-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-bottom: 24px;
-  text-align: center;
-}
-.login-head b {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 }
 .login-head p {
   margin: 6px 0 0;

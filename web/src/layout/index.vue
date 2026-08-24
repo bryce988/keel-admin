@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { Expand, Fold, Moon, Sunny } from '@element-plus/icons-vue'
+import BrandLogo from '@/components/BrandLogo.vue'
 import MenuSearch from './components/MenuSearch.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import TagsView from './components/TagsView.vue'
@@ -72,7 +73,7 @@ async function onUserCommand(cmd: string) {
     <!-- 侧边栏 -->
     <aside class="sidebar">
       <div class="brand">
-        <b>Keel</b>
+        <BrandLogo :text="!appStore.sidebarCollapsed" />
       </div>
       <el-scrollbar class="menu-scroll">
         <SidebarMenu />
@@ -180,12 +181,6 @@ async function onUserCommand(cmd: string) {
   flex: none;
   border-bottom: 1px solid var(--el-border-color-light);
   white-space: nowrap;
-}
-
-.brand b {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
 }
 
 .menu-scroll {

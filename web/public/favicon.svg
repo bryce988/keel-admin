@@ -1,0 +1,18 @@
+<!--
+  Keel 标记：船体肋骨的横剖 + 一根贯穿的龙骨主梁。
+  龙骨是全船肋骨唯一的附着点，正是这个脚手架对业务代码的关系。
+
+  坐标是按 32 格排满的：含笔宽的外框 x 2.5~29.5、y 2~30，四周只留 2。
+  别再往里缩——图标在 16px 下本来就没几个像素，留白吃掉的是可辨识度。
+
+  这里的颜色必须写死：favicon 是浏览器直接加载的静态资产，
+  拿不到页面里的 CSS 变量。值取自 styles/index.css 的 --el-color-primary，
+  改主色时这个文件要一起改（还有 apple-touch-icon.png / favicon.ico）。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7.5" fill="#3986ff" />
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 5.2 C 4.6 17.1, 9.7 25, 16 25.8 C 22.3 25, 27.4 17.1, 28 5.2" />
+    <path d="M16 3.5 V 28.5" />
+  </g>
+</svg>

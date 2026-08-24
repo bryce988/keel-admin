@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Keel Admin</title>
+
+    <!--
+      favicon 给三份是各有各的消费方，不是冗余：
+      svg 是主力（任意分辨率都清晰）；ico 兜住不认 svg 图标的浏览器，
+      顺带堵掉浏览器对 /favicon.ico 的自动请求（不放就是一条 404 日志）；
+      apple-touch-icon 是 iOS 加到主屏时用的，它不切圆角所以那张图是满底方形。
+    -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#3986ff" />
     <!--
       主题必须在首屏绘制前定下来
 
