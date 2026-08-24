@@ -2,7 +2,10 @@
 # 验收脚本：权限矩阵 · 数据权限五范围 · 字段级权限 · 多端隔离 · 操作日志
 #
 #   sh scripts/acceptance.sh          # 对本地 docker compose 环境
-#   BASE=http://线上:8080 sh ...      # 也可指向别的环境（需该环境的演示账号）
+#   BASE=http://预发:8080 sh ...      # 也可指向别的开发/预发环境
+#
+# 可覆盖的环境变量：BASE · DB_USERNAME · DB_PASSWORD · DB_DATABASE
+# （默认值与 docker-compose.yml 一致，本地开箱即用）
 #
 # 设计原则
 #   · **全程走 HTTP**，不直接查库断言：直接改库验不到中间件、Scope、脱敏这些应用层逻辑
@@ -13,7 +16,11 @@
 # 登录要过图形验证码，脚本直接从 Redis 读明文——这也是它只能用于开发/预发的原因。
 set -u
 BASE=${BASE:-http://localhost:8787}
-ROOT=/Users/huohuo/workspace/web/admin
+# 从脚本自身位置推出仓库根，别写死绝对路径——写死了别人 clone 下来跑不了
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+DB_USER=${DB_USERNAME:-keel}
+DB_PASS=${DB_PASSWORD:-keel123456}
+DB_NAME=${DB_DATABASE:-keel}
 PASS=0; FAIL=0
 
 ok()   { PASS=$((PASS+1)); printf '  \033[32m✓\033[0m %s\n' "$1"; }
@@ -23,14 +30,14 @@ chk()  { [ "$2" = "$3" ] && ok "$1 ($2)" || bad "$1 期望=$3 实际=$2"; }
 login() {
   CAP=$(curl -s "$BASE/admin/auth/captcha")
   KEY=$(printf '%s' "$CAP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["captcha_key"])')
-  CODE=$(cd $ROOT && docker compose exec -T redis redis-cli --no-raw GET "$KEY" | tr -d '"\r\n')
+  CODE=$(cd "$ROOT" && docker compose exec -T redis redis-cli --no-raw GET "$KEY" | tr -d '"\r\n')
   curl -s -X POST "$BASE/admin/auth/login" -H 'Content-Type: application/json' \
     -d "{\"username\":\"$1\",\"password\":\"$2\",\"captcha_key\":\"$KEY\",\"captcha_code\":\"$CODE\"}" \
     | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("access_token",""))'
 }
 code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 total() { curl -s "$@" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("total","ERR"))'; }
-sql()  { cd $ROOT && docker compose exec -T mysql mysql -ukeel -pkeel123456 --default-character-set=utf8mb4 -N keel -e "$1" 2>/dev/null; }
+sql()  { cd "$ROOT" && docker compose exec -T mysql mysql -u"$DB_USER" -p"$DB_PASS" --default-character-set=utf8mb4 -N "$DB_NAME" -e "$1" 2>/dev/null; }
 # 改完角色权限要顶 perm_version，否则命中的是 Redis 里的旧权限缓存
 bump() { sql "UPDATE sys_users SET perm_version=perm_version+1 WHERE id IN (SELECT user_id FROM sys_user_roles WHERE role_id=$1);"; }
 pid()  { sql "SELECT id FROM sys_permissions WHERE perm_code='$1' LIMIT 1"; }
