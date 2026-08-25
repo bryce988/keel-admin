@@ -6,8 +6,79 @@
 
 ## [未发布]
 
+### 新增
+- **CI**：`.github/workflows/ci.yml` 三个 job —— 前端类型检查与构建、后端 `php -l` 全量与
+  `composer validate`、以及起 docker compose 跑 `scripts/acceptance.sh` 的验收。
+  与 CONTRIBUTING 里「提交前跑一遍检查」是同一组命令，本地过了 CI 就会过
+- **`composer lint` / `composer check`**：`server/scripts/lint.php` 对 vendor 之外的全部 PHP 跑语法检查。
+  CONTRIBUTING 里写了很久的 `composer lint`、`composer test` 此前并不存在，跑起来直接报错
+- `docker compose exec web npm run check`：一条命令跑完 `vue-tsc` + `vite build`
+  （只跑 type-check 验不到模板结构，两步必须都跑）
+
+### 变更
+- **生产改为不可变镜像**（`docker/php/Dockerfile.prod`）：后端代码与 composer 依赖在**构建期**
+  烤进镜像，容器以只读根文件系统运行。此前生产把整个 `server/` 挂载进容器、并在每次启动时
+  执行 composer 安装，等于「线上跑的是 git 工作副本的当前状态」——不是任何一个可复现的产物，
+  也无法回滚到上一个镜像
+- **建表与播种改为一次性 job**：`docker-compose.prod.yml` 新增 `migrate` 服务
+  （migrate → install → seed），`server` 声明 `service_completed_successfully` 依赖它。
+  初始化失败会直接拦住发布，而不是像原来那样被 `|| echo` 吞掉、留下一个权限树残缺的线上环境
+  （表现是登录进去到处 403）
+- **生产不再启用文件监听**：`config/process.php` 的 `enable_file_monitor` 增加 `APP_ENV` 判断。
+  上游只按 `-d`（守护进程）判断，而容器里不能用 `-d`，于是生产一直开着文件监听——
+  每两秒扫一遍 `app/`，且**任何文件改动都会自动 reload 线上进程**
+- **前端 Element Plus 改为按需导入**（`unplugin-vue-components` + `unplugin-auto-import`）：
+  主 JS 从 1275 KB / gzip 414 KB 降到 816 KB / gzip 269 KB（-36%），
+  主 CSS 从 367 KB / gzip 50 KB 降到 164 KB / gzip 23 KB（-54%）
+- **`ProTable` 与表单壳改为泛型**：`ProTable<T>`、`useFormShell<T>`、`FormDrawer<T>` / `FormDialog<T>`，
+  行类型与表单类型从 `api/*.ts` 一路推到模板。全仓 28 处 `Record<string, any>` 清零。
+  此前表格列、表单字段与接口字段对不上要等用户点开那一页才发现
+- 写接口的请求体类型收紧：`api/system.ts` 的 16 个 create/update 由 `Record<string, unknown>`
+  改为 `UserPayload` / `DeptPayload` 等（`Partial<行类型>`），字段名拼错在编译期就报错
+- `Cache` 不再在每次访问前 `PING`，改为失败后重连并重试一次。原写法给每一次缓存读写
+  固定加一个往返，而断连是罕见事件；Redis 若部署在网络对端（托管实例），这笔开销会显著放大
+- 前端生产镜像改用 `npm ci` 并拷入 `package-lock.json`：此前只拷 `package.json` 跑 `npm install`，
+  每次构建都重新解析版本范围，线上装到的依赖树可能与锁文件不是同一套
+- 菜单的 `visible` / `keep_alive` 前后端统一用布尔：接口返回的本就是布尔，
+  而表单打开时转成 1/0、提交时又送回数字，靠 PHP 的隐式转换兜住
+
+### 性能
+- **概览页 SQL 从 23 条降到 14 条**：`stats()` 与 `moduleSummary()` 此前各查一遍用户、部门、
+  岗位、角色；「总数」与「其中多少条满足某条件」也拆成了两条 `count()`。
+  后者不只是多一次往返——两次查询之间有人登录，就会出现「今日登录 7 次、失败 8 次」这种对不上的数
+- **字典列表的 N+1 收敛**：字典类型列表 14 → 5 条 SQL；字典项列表的引用数改为整页批量聚合，
+  查询条数与页大小无关（`page_size=100` 时从约 400 条降到 8 条）
+- **日志表补索引**：`sys_operation_logs` 增加 `(dept_id, created_at)`；
+  `sys_login_logs` 增加 `(created_at)` 与 `(dept_id, created_at)`，并删掉被前缀覆盖的单列 `idx_dept`。
+  登录日志此前按时间范围查询时 `possible_keys` 为 `NULL`（一个候选索引都没有）
+
+### 修复
+- **`scripts/migrate.php` 现在能补索引**：此前只能补列，往 `schema.sql` 的 `CREATE TABLE` 里
+  新加的 `KEY` 对存量库完全无效——开发机 `down -v` 重建后一切正常，线上一个索引都没加。
+  索引缺失不报错、不返回错数据，只是慢，等发现时已经是线上慢查询
+- **新增 `.dockerignore`**：此前构建上下文没有过滤，`COPY server/ ./` 会把宿主机的 `vendor/`
+  覆盖到构建期装好的那份上（可复现性归零），并把运行期日志、历史导出文件、陈旧的 `webman.pid`
+  一起打进镜像；宿主机存在 `server/.env` 时还会把生产密钥烤进镜像层
+- **生产的用户上传目录改为挂卷**：`public/uploads` 落到 `server-uploads` 卷。
+  改成不可变镜像后若不挂卷，每次发版重建镜像会把用户头像全部清掉
+- `ProTable` 的 `sort-change` 签名由 `prop: string` 改为 `prop: string | null`：
+  el-table 在「升序 → 降序 → 取消」的第三下会把它清空
+- 字典项的 `tag_type` 由 `string` 收紧为 Element Plus 的 tag type 联合，
+  后端存进拼错的值时不再只是静默显示成默认灰
+
+### 文档
+- `CONTRIBUTING.md` 的检查命令改成实际能跑的：此前四条命令有三条不存在
+  （`composer lint`、`composer test` 未定义，`pnpm lint` 既无脚本、包管理器也早已换成 npm）；
+  本地开发一节的 PHP 版本下限由 8.1 更正为 8.4，pnpm 改为 npm
+- `PROJECT.md` 的「没有 CI」一节改为 CI 说明，并明确列出 CI 里**仍然没有**的东西
+  （单元测试、ESLint / Prettier、依赖漏洞扫描）与暂不引入的理由
+
 ### 计划中
-- 进程数定值、前端拆包（主 chunk 1.27MB / gzip 412KB）—— 两件都需要真实业务的流量画像与页面数量才做得准
+- 进程数定值 —— 需要真实业务的流量画像才做得准
+- 单元测试、ESLint / Prettier、依赖漏洞扫描
+- 图标包（293 个，144 KB / gzip 38 KB）目前仍在主 chunk：布局外壳静态引用了其中约 25 个，
+  只要有一处静态 import，整包就会被钉在主 chunk 上，动态 import 会被 Rollup 并回去。
+  真要拆出去得把那 25 个图标抄成本地组件，与 EP 版本漂移的代价换 gzip 38 KB，暂不做
 
 ## [1.0.0] - 2026-08-24
 
