@@ -32,6 +32,7 @@ use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class DictService
 {
@@ -138,19 +139,40 @@ class DictService
         return $query;
     }
 
-    public static function typeRowMapper(): callable
+    /**
+     * 字典类型列表的整页映射
+     *
+     * 原先是逐行 `SysDictItemModel::where('type_code', $row->code)->count()`，
+     * 注释里写着「字典类型不多，逐行 count 更直白」——实测一页 10 个类型就是
+     * 14 条 SQL，其中 10 条是这个 count。分页把每行一次查询伪装成了常数开销，
+     * 但它是 O(页大小)，`page_size=100` 时就是 100 条。
+     *
+     * 现在整页一条 GROUP BY 拿全部计数。
+     */
+    public static function typeRowsMapper(): callable
     {
-        // 字典类型不多（十几个），逐行 count 比先聚合再拼装更直白，
-        // 真正的量级问题在字典项那侧，而那边是按 type_code 过滤后分页的
-        return fn (SysDictTypeModel $row): array => [
-            'id'         => $row->id,
-            'name'       => $row->name,
-            'code'       => $row->code,
-            'status'     => $row->status,
-            'remark'     => $row->remark,
-            'item_count' => SysDictItemModel::where('type_code', $row->code)->count(),
-            'created_at' => $row->created_at?->format('Y-m-d H:i:s'),
-        ];
+        return function (Collection $rows): array {
+            $codes = $rows->pluck('code')->all();
+
+            $counts = $codes === [] ? [] : SysDictItemModel::query()
+                ->whereIn('type_code', $codes)
+                ->groupBy('type_code')
+                ->selectRaw('COUNT(*) AS c')
+                ->addSelect('type_code')
+                ->pluck('c', 'type_code')
+                ->all();
+
+            return $rows->map(fn (SysDictTypeModel $row): array => [
+                'id'         => $row->id,
+                'name'       => $row->name,
+                'code'       => $row->code,
+                'status'     => $row->status,
+                'remark'     => $row->remark,
+                // 没有任何字典项的类型不会出现在 GROUP BY 结果里，兜底 0
+                'item_count' => (int) ($counts[$row->code] ?? 0),
+                'created_at' => $row->created_at?->format('Y-m-d H:i:s'),
+            ])->all();
+        };
     }
 
     public static function createType(array $data): SysDictTypeModel
@@ -243,22 +265,36 @@ class DictService
         return $query;
     }
 
-    public static function itemRowMapper(): callable
+    /**
+     * 字典项列表的整页映射
+     *
+     * 这里是本类里 N+1 最严重的一处：`refCount()` 会遍历 `USAGE[type_code]`，
+     * 逐行调用意味着 **每行 × 登记的模型数** 条查询。`enable_status` 登记了 4 个模型，
+     * 一页 20 行就是 80 条 SQL——而列表本身只有 2 条。
+     *
+     * 改成整页批量：每个登记的模型一条 GROUP BY，与页大小无关。
+     */
+    public static function itemRowsMapper(): callable
     {
-        return fn (SysDictItemModel $row): array => [
-            'id'        => $row->id,
-            'type_code' => $row->type_code,
-            'label'     => $row->label,
-            'value'     => $row->value,
-            'tag_type'  => $row->tag_type,
-            'sort'      => $row->sort,
-            'status'    => $row->status,
-            'remark'    => $row->remark,
-            // 界面据此把「值」输入框置灰，用户在提交前就知道改不了，
-            // 而不是填完点保存才收到 409
-            'ref_count' => self::refCount($row->type_code, $row->value),
-            'created_at' => $row->created_at?->format('Y-m-d H:i:s'),
-        ];
+        return function (Collection $rows): array {
+            $typeCode = (string) ($rows->first()?->type_code ?? '');
+            $refs     = self::refCounts($typeCode, $rows->pluck('value')->all());
+
+            return $rows->map(fn (SysDictItemModel $row): array => [
+                'id'        => $row->id,
+                'type_code' => $row->type_code,
+                'label'     => $row->label,
+                'value'     => $row->value,
+                'tag_type'  => $row->tag_type,
+                'sort'      => $row->sort,
+                'status'    => $row->status,
+                'remark'    => $row->remark,
+                // 界面据此把「值」输入框置灰，用户在提交前就知道改不了，
+                // 而不是填完点保存才收到 409
+                'ref_count' => $refs[$row->value] ?? 0,
+                'created_at' => $row->created_at?->format('Y-m-d H:i:s'),
+            ])->all();
+        };
     }
 
     public static function createItem(array $data): SysDictItemModel
@@ -349,15 +385,48 @@ class DictService
      */
     public static function refCount(string $typeCode, string $value): int
     {
-        $total = 0;
+        return self::refCounts($typeCode, [$value])[$value] ?? 0;
+    }
 
-        foreach (self::USAGE[$typeCode] ?? [] as [$modelClass, $column]) {
-            // 数据权限与软删除都要绕过：这里问的是「库里还有没有数据在用」，
-            // 跟当前登录人看得见什么无关，软删的行也仍然存着这个值
-            $total += $modelClass::query()->withoutGlobalScopes()->where($column, $value)->count();
+    /**
+     * 一批字典值各自被引用了多少行
+     *
+     * 每个登记的模型只发一条 `WHERE value IN (...) GROUP BY value`，
+     * 查询条数只跟登记表的长度有关，与传入多少个值无关。
+     *
+     * @param  list<string>  $values
+     * @return array<string, int>  值 => 引用行数，传入的每个值都有键（没被引用的是 0）
+     */
+    public static function refCounts(string $typeCode, array $values): array
+    {
+        $values = array_values(array_unique($values));
+        $out    = array_fill_keys($values, 0);
+
+        if ($values === [] || !isset(self::USAGE[$typeCode])) {
+            return $out;
         }
 
-        return $total;
+        foreach (self::USAGE[$typeCode] as [$modelClass, $column]) {
+            // 数据权限与软删除都要绕过：这里问的是「库里还有没有数据在用」，
+            // 跟当前登录人看得见什么无关，软删的行也仍然存着这个值
+            //
+            // $column 来自上面的 USAGE 常量（开发者写死的），不是请求参数，
+            // 但仍然用 addSelect 而不是拼进 selectRaw——少一处将来会被复制走的字符串拼接
+            $rows = $modelClass::query()->withoutGlobalScopes()
+                ->whereIn($column, $values)
+                ->groupBy($column)
+                ->selectRaw('COUNT(*) AS c')
+                ->addSelect($column)
+                ->pluck('c', $column);
+
+            foreach ($rows as $value => $count) {
+                // 字典值是 varchar，业务列常是 TINYINT，回来的键可能是 int。
+                // PHP 会把数字字符串键统一转成 int，两边因此仍然对得上
+                $out[$value] = ($out[$value] ?? 0) + (int) $count;
+            }
+        }
+
+        return $out;
     }
 
     /**

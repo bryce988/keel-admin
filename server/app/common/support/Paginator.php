@@ -23,7 +23,15 @@ final class Paginator
     /**
      * @param  Builder   $query      已经拼好筛选条件的查询
      * @param  string[]  $sortable   允许排序的数据库字段名白名单
-     * @param  callable|null  $map   行映射，不传则用模型的 toArray()（camelCase）
+     * @param  callable|null  $map   逐行映射，不传则用模型的 toArray()
+     * @param  callable|null  $mapPage  整页映射：拿到整个 Collection、返回 list<array>
+     *
+     * `$mapPage` 与 `$map` 二选一（同时给以 `$mapPage` 为准），它存在的唯一理由是
+     * **批量预取**。逐行映射器天生看不到同页的其他行，于是「每行再查一次」的写法
+     * 会被分页伪装成没问题——一页 20 行、每行 4 次关联查询就是 80 条 SQL，
+     * 而分页参数越小越看不出来。字典项列表的引用数就是这么来的（见 DictService）。
+     *
+     * 需要按行做点缀（格式化时间、拼字符串）时仍然用 `$map`，那是纯内存操作。
      */
     public static function response(
         Builder $query,
@@ -32,6 +40,7 @@ final class Paginator
         string $defaultField = 'id',
         string $defaultOrder = 'desc',
         ?callable $map = null,
+        ?callable $mapPage = null,
     ): Response {
         $pageNum  = max(1, (int) $request->get('page_num', 1));
         $pageSize = (int) $request->get('page_size', self::DEFAULT_SIZE);
@@ -48,13 +57,16 @@ final class Paginator
 
         $total = $query->toBase()->getCountForPagination();
 
-        $list = $total === 0
-            ? []
-            : $query->orderBy($field, $order)
+        $list = [];
+        if ($total > 0) {
+            $rows = $query->orderBy($field, $order)
                 ->forPage($pageNum, $pageSize)
-                ->get()
-                ->map($map ?? fn ($row) => $row->toArray())
-                ->all();
+                ->get();
+
+            $list = $mapPage !== null
+                ? array_values($mapPage($rows))
+                : $rows->map($map ?? fn ($row) => $row->toArray())->all();
+        }
 
         return Result::page($list, $total, $pageNum, $pageSize);
     }

@@ -79,7 +79,7 @@ class DictController
             sortable: DictService::TYPE_SORTABLE,
             defaultField: 'id',
             defaultOrder: 'asc',
-            map: DictService::typeRowMapper(),
+            mapPage: DictService::typeRowsMapper(),
         );
     }
 
@@ -138,7 +138,7 @@ class DictController
             sortable: DictService::ITEM_SORTABLE,
             defaultField: 'sort',
             defaultOrder: 'asc',
-            map: DictService::itemRowMapper(),
+            mapPage: DictService::itemRowsMapper(),
         );
     }
 
