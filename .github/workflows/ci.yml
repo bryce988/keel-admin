@@ -18,9 +18,14 @@ jobs:
     name: 前端类型检查与构建
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      # 升到 v7 前核对过 v5~v7 的破坏性变更，两条都不影响我们：
+      #   v5 会在 package.json 有 packageManager 字段时自动开缓存
+      #   v6 把自动缓存限制到 npm
+      # 这里 cache 与 cache-dependency-path 都是显式写的，
+      # web/package.json 里也没有 packageManager 字段
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -39,8 +44,9 @@ jobs:
     name: 后端语法检查
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      # setup-php 停在 v2：那是它当前的主版本（最新 2.37.x），不是落后版本
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -63,7 +69,7 @@ jobs:
     name: 权限与数据隔离验收
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # 开发编排里每个变量都有默认值，CI 不需要 .env。
       # 只起验收用得到的三个服务：web 容器要跑一次 npm install（一两分钟），
