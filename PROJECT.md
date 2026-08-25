@@ -93,8 +93,13 @@ keel-admin/
 
 **发版策略**：`web/` 与 `server/` 共用同一个 tag（如 `v1.2.0`），保证前后端接口对得上；单端修复用 patch 版本。
 
-**没有 CI**：目前靠本地 `vue-tsc` + `vite build` + `php -l` + `sh scripts/acceptance.sh`
-+ `sh scripts/check-bizcode.sh` 把关。
+**CI**：`.github/workflows/ci.yml` 三个 job——前端 `npm run check`（vue-tsc + vite build）、
+后端 `composer check`（validate + `php -l` 全量）、以及起 docker compose 跑 `scripts/acceptance.sh`
+的验收 job。跑的命令与 CONTRIBUTING 里「提交前跑一遍检查」完全一致，本地过了 CI 就会过。
+
+**CI 里没有的**：单元测试、ESLint / Prettier / Stylelint、依赖漏洞扫描。
+前两项要先定下规则再落地（现在直接开 lint 会产生一次覆盖全仓的格式化提交，
+把真实改动淹掉）；测试要等接了真实业务、有稳定的断言对象之后再补。
 仓库里也没有 Issue / PR 模板——把问题说清楚比填表格有用。
 GitHub 与 Gitee 都是主仓库，维护者一条 `git push` 同时推两边。
 

@@ -32,6 +32,19 @@
     "config": {
         "sort-packages": true
     },
+    "scripts": {
+        "lint": [
+            "@php scripts/lint.php"
+        ],
+        "check": [
+            "@composer validate --no-check-publish",
+            "@lint"
+        ]
+    },
+    "scripts-descriptions": {
+        "lint": "对 vendor/runtime 之外的所有 PHP 文件跑 php -l 语法检查",
+        "check": "composer validate + lint，提交前的后端自检"
+    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }

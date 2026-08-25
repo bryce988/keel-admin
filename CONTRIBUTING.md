@@ -28,21 +28,31 @@ cd keel-admin
 > **GitHub 与 Gitee 都是主仓库**，维护者一条 `git push` 同时推两边，内容始终一致。
 > Issue 与 PR 提到哪边都行，就近选一个即可。
 
-**后端**（PHP >= 8.1，Composer >= 2.0）
+**推荐：全部跑在容器里**（本机只需要 Docker）
+
+```bash
+cp .env.example .env         # 数据库、Redis、JWT 密钥都在这里
+docker compose up -d
+```
+
+前端 http://localhost:5173 · 后端 http://localhost:8787 · 默认账号 `admin` / `admin123`。
+
+**不用容器时**，后端要 PHP >= 8.4（`openspout ^5` 的下限）、Composer >= 2.0：
 
 ```bash
 cd server
 composer install
-cp .env.example .env         # 配置数据库与 Redis
+cp ../.env.example .env      # 配置数据库与 Redis
 php start.php start          # 调试模式，改代码自动 reload
 ```
 
-**前端**（Node >= 18，pnpm）
+前端要 Node >= 18。**用 npm，不要用 pnpm**——corepack 拉起的 pnpm 11 配 Node 20
+会报 `ERR_UNKNOWN_BUILTIN_MODULE`，仓库里也只有 `package-lock.json`：
 
 ```bash
 cd web
-pnpm install
-pnpm dev
+npm ci
+npm run dev
 ```
 
 **改了代码没生效？** webman 是常驻内存的：调试模式下 monitor 进程会自动 reload；生产模式下必须手动 `php start.php reload`。改了 `config/`、自定义进程或 `start.php` 则需要 `restart`。
@@ -132,12 +142,25 @@ git push git@gitee.com:yewang_top/keel-admin.git main
 - 数据权限由模型全局 Scope 统一注入，业务代码不得手写归属过滤，也不要随手 `withoutGlobalScope()`
 - **禁止**：静态变量或单例存请求态、`exit`/`die`、运行期改配置、使用 `$_GET`/`$_SESSION` 等超全局
 
-提交前跑一遍检查：
+提交前跑一遍检查（在容器里跑，本机不需要装 PHP/Node）：
 
 ```bash
-cd web && pnpm lint && pnpm type-check
-cd server && composer lint && composer test
+docker compose exec web npm run check          # vue-tsc 类型检查 + vite build
+docker compose exec server composer check      # composer validate + php -l 全量
+sh scripts/check-bizcode.sh                    # 业务码与 api.md 一致性（纯静态）
+sh scripts/acceptance.sh                       # 43 项权限与数据隔离断言
 ```
+
+四条都要跑，各自挡的是不同的东西：
+
+- `vue-tsc` **不解析模板结构**，改了 `.vue` 的 template 必须靠 `vite build` 才能验到，
+  所以 `npm run check` 是两步而不是只跑 type-check
+- `vite build` 又验不到没被 import 的 `.vue`。`views/template/` 靠开发环境专属路由加载，
+  改了那边要 `curl http://localhost:5173/src/views/template/xxx/index.vue`，模板写错会返回 500
+- `composer lint` 只是 `php -l` 语法检查，挡不住类型错误——真正的行为验证靠 `acceptance.sh`
+
+目前**没有单元测试**，也没有接 ESLint/Prettier（见 `PROJECT.md` 的技术债一节）。
+上面四条就是当前全部的门禁，CI 里跑的也是同样的命令。
 
 ---
 
