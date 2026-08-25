@@ -13,9 +13,12 @@ import { BizCode } from '@/constants/bizCode'
  * 换成验证码输入、服务端 `ProfileService::changePhone()` 里换掉那次
  * `password_verify` 即可，其余不动。
  */
+/** 这个对话框自己的表单形状，没有对应的行类型 */
+type PhoneForm = { phone: string; password: string }
+
 const emit = defineEmits<{ saved: [] }>()
 
-const dialogRef = ref<FormShellInstance | null>(null)
+const dialogRef = ref<FormShellInstance<PhoneForm> | null>(null)
 
 const rules: FormRules = {
   phone: [
@@ -33,8 +36,8 @@ const rules: FormRules = {
  */
 const errorFields = { [BizCode.OLD_PASSWORD_ERROR]: 'password', [BizCode.PHONE_TAKEN]: 'phone' }
 
-function submit(form: Record<string, any>) {
-  return changePhone({ phone: form.phone, password: form.password })
+function submit(form: Partial<PhoneForm>) {
+  return changePhone({ phone: form.phone ?? '', password: form.password ?? '' })
 }
 
 function open() {

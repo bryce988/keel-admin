@@ -39,7 +39,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'enable_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<DemoRow>[] = [
   { prop: 'name', label: '名称', minWidth: 160 },
   { prop: 'code', label: '编码', minWidth: 140 },
   { prop: 'owner', label: '负责人', width: 100 },

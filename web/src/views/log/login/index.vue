@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-import { exportLoginLogs, fetchLoginLogs, splitDateRange } from '@/api/log'
+import { exportLoginLogs, fetchLoginLogs, splitDateRange, type LoginLogRow } from '@/api/log'
 import type { ProColumn, ProTableInstance, SearchField, TableQuery } from '@/components'
 import { useDictStore } from '@/stores/dict'
 
@@ -36,7 +36,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '结果', type: 'dict', dict: 'log_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<LoginLogRow>[] = [
   { prop: 'created_at', label: '时间', width: 165, sortable: true },
   { prop: 'username', label: '账号', minWidth: 120 },
   { prop: 'ip', label: 'IP', width: 140 },

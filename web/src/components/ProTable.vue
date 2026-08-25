@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends object">
 import {
   computed,
   nextTick,
@@ -8,7 +8,8 @@ import {
   onMounted,
   reactive,
   ref,
-  watch
+  watch,
+  type Ref
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Refresh, Setting, Sort } from '@element-plus/icons-vue'
@@ -26,8 +27,22 @@ import DictTag from './DictTag.vue'
  *   </ProTable>
  *
  * 分页参数与响应结构遵循 docs/api.md §1.3，不在页面里各写各的。
+ *
+ * ## 行类型是泛型的
+ *
+ * `T` 从 `request` 的返回值推断，页面通常不用显式写。推断出来之后：
+ * `#actions="{ row }"` 里的 `row`、`columns` 的 `formatter(row)`、
+ * `@selection-change` 的入参，全都是真实的行类型而不是 `Record<string, any>`。
+ *
+ * 这不是「更严格一点」的洁癖：接口少了一个字段、或者字段改了名，
+ * 以前要等用户点开那一页、看到一列空白才发现，现在 `vue-tsc` 直接报错。
+ * 改成泛型时就在 views/template 里逮到 4 处 row 类型对不上的地方。
+ *
+ * 内部访问单元格用 `cellValue()` 做一次收口的类型断言：`T` 只约束到 object，
+ * 而 `interface Foo { a: string }` 在 TS 里并不满足 `Record<string, unknown>`
+ * （接口不会隐式获得索引签名），约束写严了反而让调用方全都传不进来。
  */
-export interface ProColumn {
+export interface ProColumn<Row = Record<string, unknown>> {
   prop: string
   label: string
   width?: number | string
@@ -39,15 +54,15 @@ export interface ProColumn {
   slot?: string
   /** 直接按数据字典渲染标签 */
   dict?: string
-  formatter?: (row: Record<string, any>) => string
+  formatter?: (row: Row) => string
   showOverflowTooltip?: boolean
   /** 默认隐藏，可在「列设置」里打开 */
   hidden?: boolean
 }
 
 /** 接口结构，字段名与后端逐字一致（docs/api.md §1.3） */
-export interface PageResult<T = Record<string, any>> {
-  list: T[]
+export interface PageResult<Row = Record<string, unknown>> {
+  list: Row[]
   total: number
   page_num: number
   page_size: number
@@ -64,8 +79,8 @@ export interface TableQuery {
 const props = withDefaults(
   defineProps<{
     /** 取数函数。列表模式返回分页结构，树形模式返回数组 */
-    request: (params: TableQuery) => Promise<PageResult | Record<string, any>[]>
-    columns: ProColumn[]
+    request: (params: TableQuery) => Promise<PageResult<T> | T[]>
+    columns: ProColumn<T>[]
     /**
      * 筛选条件，变化时不自动请求，由页面显式调用 reload()。
      * 用 `v-model:params` 绑定才能在刷新后把 URL 里的条件还原回页面
@@ -116,8 +131,8 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'selection-change': [rows: Record<string, any>[]]
-  loaded: [result: PageResult]
+  'selection-change': [rows: T[]]
+  loaded: [result: PageResult<T>]
   'update:params': [value: Record<string, unknown>]
 }>()
 
@@ -133,9 +148,9 @@ onActivated(() => (alive = true))
 onDeactivated(() => (alive = false))
 
 const loading = ref(false)
-const rows = ref<Record<string, any>[]>([])
+const rows = ref([]) as Ref<T[]>
 const total = ref(0)
-const selected = ref<Record<string, any>[]>([])
+const selected = ref([]) as Ref<T[]>
 /**
  * 表格密度，必须跟着 main.ts 的全局尺寸走（现在是 default）
  *
@@ -225,7 +240,7 @@ async function fetch() {
     } as TableQuery)
 
     // 树接口直接返回数组，列表接口返回分页结构，在这里抹平差异
-    const result: PageResult = Array.isArray(raw)
+    const result: PageResult<T> = Array.isArray(raw)
       ? { list: raw, total: raw.length, page_num: 1, page_size: raw.length }
       : raw
 
@@ -270,20 +285,40 @@ function refresh() {
   return fetch()
 }
 
-function onSortChange({ prop, order }: { prop: string; order: string | null }) {
-  pager.sortField = order ? prop : undefined
+/**
+ * 排序变化
+ *
+ * `prop` 会是 `null`——el-table 在「升序 → 降序 → 取消」的第三下把它清空。
+ * 原来的签名写死 `prop: string`，一直没报错只是因为 el-table 当时没类型；
+ * 接了按需导入拿到真类型后立刻暴露。逻辑本身是对的（order 为空时不取 prop），
+ * 这里只是把签名改成事实。
+ */
+function onSortChange({ prop, order }: { prop: string | null; order: string | null }) {
+  pager.sortField = order && prop ? prop : undefined
   pager.sortOrder = order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : undefined
   reload()
 }
 
-function onSelectionChange(value: Record<string, any>[]) {
+function onSelectionChange(value: T[]) {
   selected.value = value
   emit('selection-change', value)
 }
 
-function cellText(row: Record<string, any>, col: ProColumn): string {
+/**
+ * 按列名取单元格值
+ *
+ * `T` 只约束到 `object`，直接 `row[prop]` 过不了类型检查。约束不能收紧到
+ * `Record<string, unknown>`——那样 `interface UserRow { id: number }` 这种
+ * 普通接口就传不进来了（TS 不给接口隐式索引签名，这是它与 type 别名的一个差异）。
+ * 所以在这里做一次断言，全组件只此一处。
+ */
+function cellValue(row: T, prop: string): unknown {
+  return (row as Record<string, unknown>)[prop]
+}
+
+function cellText(row: T, col: ProColumn<T>): string {
   if (col.formatter) return col.formatter(row)
-  const value = row[col.prop]
+  const value = cellValue(row, col.prop)
   return value === null || value === undefined || value === '' ? '-' : String(value)
 }
 
@@ -503,9 +538,13 @@ defineExpose({ reload, refresh, selected, loading })
         :show-overflow-tooltip="col.showOverflowTooltip ?? true"
       >
         <template #default="scope">
-          <slot v-if="col.slot" :name="col.slot" :row="scope.row" :index="scope.$index" />
-          <DictTag v-else-if="col.dict" :code="col.dict" :value="scope.row[col.prop]" />
-          <span v-else>{{ cellText(scope.row, col) }}</span>
+          <!--
+            el-table 的插槽把行给成 DefaultRow（约等于 any），到这里断言回 T：
+            断言只此一处，页面拿到的 row 就是真实类型了
+          -->
+          <slot v-if="col.slot" :name="col.slot" :row="(scope.row as T)" :index="scope.$index" />
+          <DictTag v-else-if="col.dict" :code="col.dict" :value="cellValue(scope.row as T, col.prop)" />
+          <span v-else>{{ cellText(scope.row as T, col) }}</span>
         </template>
       </el-table-column>
 

@@ -57,6 +57,37 @@ export interface UserDetail extends UserRow {
   role_ids: number[]
 }
 
+/**
+ * 写接口的请求体类型
+ * =================
+ *
+ * 原来这些函数的入参一律是 `Record<string, unknown>`，等于放弃了类型：
+ * 表单里把 `real_name` 打成 `realname`，前端一路绿灯，直到接口 422 才知道。
+ *
+ * 一律取 `Partial<行类型>`，而不是 `Partial<Omit<行类型, 只读字段>>`：
+ * 同一个 `<FormDrawer>` 既做新增/编辑也做详情（`mode: 'view'`），
+ * 详情模板要读 `created_at`、`is_builtin` 这些只读字段。把它们 Omit 掉，
+ * 编译期是干净了，代价是详情页取不到值——收紧类型不该把功能改窄。
+ *
+ * 只读字段传给后端是无害的：写接口都走 `StoreXxxRequest::validated()` 白名单，
+ * 不在白名单里的键根本到不了 service 层。
+ *
+ * 用 `Partial<行类型>` 而不是另写一份字段清单，是为了让它跟着行类型自动同步——
+ * 另写一份的话两边迟早对不上，而对不上的那天不会有任何报错。
+ */
+export type UserPayload = Partial<UserDetail> & {
+  /** 只在新增时出现，编辑表单里没有这一项 */
+  password?: string
+}
+
+export type DeptPayload = Partial<DeptNode>
+export type PostPayload = Partial<PostRow>
+export type MenuPayload = Partial<MenuNodeRow>
+export type RolePayload = Partial<RoleRow>
+export type DictTypePayload = Partial<DictTypeRow>
+export type DictItemPayload = Partial<DictItemRow>
+export type ParamPayload = Partial<ParamRow>
+
 export function fetchUsers(params: TableQuery) {
   return request.get<unknown, PageResult<UserRow>>('/admin/users', { params })
 }
@@ -66,11 +97,11 @@ export function fetchUser(id: number) {
 }
 
 /** 新建成功时返回 initial_password —— 只有这一次能拿到明文 */
-export function createUser(data: Record<string, unknown>) {
+export function createUser(data: UserPayload) {
   return request.post<unknown, UserDetail & { initial_password: string }>('/admin/users', data)
 }
 
-export function updateUser(id: number, data: Record<string, unknown>) {
+export function updateUser(id: number, data: UserPayload) {
   return request.put<unknown, UserDetail>(`/admin/users/${id}`, data)
 }
 
@@ -110,11 +141,11 @@ export function fetchDeptTree(params?: Record<string, unknown>) {
   return request.get<unknown, DeptNode[]>('/admin/depts/tree', { params })
 }
 
-export function createDept(data: Record<string, unknown>) {
+export function createDept(data: DeptPayload) {
   return request.post<unknown, DeptNode>('/admin/depts', data)
 }
 
-export function updateDept(id: number, data: Record<string, unknown>) {
+export function updateDept(id: number, data: DeptPayload) {
   return request.put<unknown, DeptNode>(`/admin/depts/${id}`, data)
 }
 
@@ -127,11 +158,11 @@ export function fetchPosts(params: TableQuery) {
   return request.get<unknown, PageResult<PostRow>>('/admin/posts', { params })
 }
 
-export function createPost(data: Record<string, unknown>) {
+export function createPost(data: PostPayload) {
   return request.post<unknown, PostRow>('/admin/posts', data)
 }
 
-export function updatePost(id: number, data: Record<string, unknown>) {
+export function updatePost(id: number, data: PostPayload) {
   return request.put<unknown, PostRow>(`/admin/posts/${id}`, data)
 }
 
@@ -165,11 +196,11 @@ export function fetchMenuTree(params?: Record<string, unknown>) {
   return request.get<unknown, MenuNodeRow[]>('/admin/menus/tree', { params })
 }
 
-export function createMenu(data: Record<string, unknown>) {
+export function createMenu(data: MenuPayload) {
   return request.post<unknown, MenuNodeRow>('/admin/menus', data)
 }
 
-export function updateMenu(id: number, data: Record<string, unknown>) {
+export function updateMenu(id: number, data: MenuPayload) {
   return request.put<unknown, MenuNodeRow>(`/admin/menus/${id}`, data)
 }
 
@@ -214,11 +245,11 @@ export function fetchRole(id: number) {
   return request.get<unknown, RoleDetail>(`/admin/roles/${id}`)
 }
 
-export function createRole(data: Record<string, unknown>) {
+export function createRole(data: RolePayload) {
   return request.post<unknown, RoleRow>('/admin/roles', data)
 }
 
-export function updateRole(id: number, data: Record<string, unknown>) {
+export function updateRole(id: number, data: RolePayload) {
   return request.put<unknown, RoleRow>(`/admin/roles/${id}`, data)
 }
 
@@ -272,12 +303,23 @@ export interface DictTypeRow {
   created_at: string
 }
 
+/**
+ * 字典项的标签色
+ *
+ * 取值就是 Element Plus 的 tag type 加一个空串（空 = 默认灰）。
+ * 原来这里是 `string`，`<el-tag :type="row.tag_type">` 一直没报错只是因为
+ * el-tag 当时没类型；接了按需导入之后 TS 立刻指出 string 不能赋给这个联合。
+ * 写死成 string 的问题不只是类型松：后端存进一个拼错的 "sucess"，
+ * 界面上只是标签变成默认灰，没有任何地方会告诉你写错了。
+ */
+export type DictTagType = '' | 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
 export interface DictItemRow {
   id: number
   type_code: string
   label: string
   value: string
-  tag_type: string
+  tag_type: DictTagType
   sort: number
   status: number
   remark: string
@@ -290,11 +332,11 @@ export function fetchDictTypes(params: TableQuery) {
   return request.get<unknown, PageResult<DictTypeRow>>('/admin/dicts', { params })
 }
 
-export function createDictType(data: Record<string, unknown>) {
+export function createDictType(data: DictTypePayload) {
   return request.post<unknown, DictTypeRow>('/admin/dicts', data)
 }
 
-export function updateDictType(id: number, data: Record<string, unknown>) {
+export function updateDictType(id: number, data: DictTypePayload) {
   return request.put<unknown, DictTypeRow>(`/admin/dicts/${id}`, data)
 }
 
@@ -307,11 +349,11 @@ export function fetchDictItems(code: string, params: TableQuery) {
   return request.get<unknown, PageResult<DictItemRow>>(`/admin/dicts/${code}/items/all`, { params })
 }
 
-export function createDictItem(data: Record<string, unknown>) {
+export function createDictItem(data: DictItemPayload) {
   return request.post<unknown, DictItemRow>('/admin/dict-items', data)
 }
 
-export function updateDictItem(id: number, data: Record<string, unknown>) {
+export function updateDictItem(id: number, data: DictItemPayload) {
   return request.put<unknown, DictItemRow>(`/admin/dict-items/${id}`, data)
 }
 
@@ -353,11 +395,11 @@ export function saveParams(items: Array<{ param_key: string; param_value: string
   return request.put<unknown, { saved_count: number }>('/admin/params', { items })
 }
 
-export function createParam(data: Record<string, unknown>) {
+export function createParam(data: ParamPayload) {
   return request.post<unknown, ParamRow>('/admin/params', data)
 }
 
-export function updateParam(id: number, data: Record<string, unknown>) {
+export function updateParam(id: number, data: ParamPayload) {
   return request.put<unknown, ParamRow>(`/admin/params/${id}`, data)
 }
 

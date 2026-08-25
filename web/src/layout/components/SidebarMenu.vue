@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import * as ElIcons from '@element-plus/icons-vue'
+import { resolveMenuIcon } from '@/utils/icons'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/stores/user'
@@ -10,10 +10,8 @@ const route = useRoute()
 const appStore = useAppStore()
 const userStore = useUserStore()
 
-/** 后端返回的 icon 是 Element Plus 图标名，这里动态解析 */
-function resolveIcon(name: string) {
-  return (ElIcons as Record<string, unknown>)[name] ?? ElIcons.Menu
-}
+/** 后端返回的 icon 是 Element Plus 图标名，这里动态解析（见 utils/icons.ts） */
+const resolveIcon = resolveMenuIcon
 
 const menus = computed(() => userStore.menus.filter((m) => m.visible))
 

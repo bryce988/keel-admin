@@ -6,8 +6,7 @@ import {
   fetchProfile,
   updateProfile,
   uploadAvatar,
-  type ProfileInfo
-} from '@/api/profile'
+  type ProfileInfo, type MyLoginRow } from '@/api/profile'
 import type { ProColumn } from '@/components'
 import { useDictStore } from '@/stores/dict'
 import { useUserStore } from '@/stores/user'
@@ -110,7 +109,7 @@ const phoneDialog = ref<InstanceType<typeof PhoneDialog> | null>(null)
 // ---------------------------------------------------------------- 登录记录
 const loginQuery = ref<Record<string, unknown>>({})
 
-const loginColumns: ProColumn[] = [
+const loginColumns: ProColumn<MyLoginRow>[] = [
   { prop: 'created_at', label: '时间', width: 165 },
   { prop: 'ip', label: 'IP', width: 130 },
   { prop: 'location', label: '登录地址', minWidth: 120 },

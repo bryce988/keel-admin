@@ -24,10 +24,10 @@
 export default { name: 'FormDrawer' }
 </script>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends object = Record<string, unknown>">
 import { useFormShell, type FormShellProps } from '@/composables/useFormShell'
 
-const props = withDefaults(defineProps<FormShellProps>(), {
+const props = withDefaults(defineProps<FormShellProps<T>>(), {
   size: '560px',
   labelWidth: '96px',
   confirmText: '确 定'
@@ -36,7 +36,7 @@ const props = withDefaults(defineProps<FormShellProps>(), {
 const emit = defineEmits<{ success: [result: unknown]; closed: [] }>()
 
 const { visible, title, loading, formRef, form, errors, readonly, open, close, onConfirm, onClosed } =
-  useFormShell(props, emit)
+  useFormShell<T>(props, emit)
 
 defineExpose({ open, close, form })
 </script>

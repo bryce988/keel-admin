@@ -38,7 +38,7 @@ const drawerRef = ref<FormDrawerInstance | null>(null)
 /** 从区的筛选条件里必须带 master_id，否则切主记录时取的还是上一条的从数据 */
 const childQuery = ref<Record<string, unknown>>({ master_id: 0 })
 
-const childColumns: ProColumn[] = [
+const childColumns: ProColumn<DemoChild>[] = [
   { prop: 'label', label: '标签', minWidth: 140 },
   { prop: 'value', label: '值', minWidth: 120 },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
@@ -106,7 +106,7 @@ function onEditChild(row: DemoChild) {
   drawerRef.value?.open({ title: '编辑明细', data: { ...row } })
 }
 
-function submitChild(form: Record<string, any>) {
+function submitChild(form: Partial<DemoChild>) {
   const payload = {
     master_id: currentId.value,
     label: form.label,

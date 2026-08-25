@@ -43,7 +43,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'enable_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<DemoRow>[] = [
   { prop: 'name', label: '名称', minWidth: 160 },
   { prop: 'code', label: '编码', minWidth: 140 },
   { prop: 'owner', label: '负责人', width: 100 },
@@ -88,7 +88,7 @@ function onView(row: DemoRow) {
 }
 
 /** 抛异常即视为失败，抽屉不关、用户可以直接改 */
-function submit(form: Record<string, any>) {
+function submit(form: Partial<DemoRow>) {
   const payload = {
     name: form.name,
     code: form.code,

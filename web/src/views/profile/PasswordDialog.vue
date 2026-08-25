@@ -17,7 +17,10 @@ import { BizCode } from '@/constants/bizCode'
  * 放在 views/profile/ 而不是 components/：components 是全局注册的通用件
  * （见 components/index.ts 的说明），这个是业务组件，按需 import。
  */
-const dialogRef = ref<FormShellInstance | null>(null)
+/** 这个对话框自己的表单形状，没有对应的行类型 */
+type PasswordForm = { old_password: string; new_password: string; confirm_password: string }
+
+const dialogRef = ref<FormShellInstance<PasswordForm> | null>(null)
 const signOut = useSignOut()
 
 const rules: FormRules = {
@@ -31,7 +34,9 @@ const rules: FormRules = {
     {
       trigger: 'blur',
       validator: (_rule, value, callback) => {
-        const form = (dialogRef.value as unknown as { form?: Record<string, any> })?.form
+        // FormShellInstance<PasswordForm> 直接暴露了 form，
+        // 不用再 `as unknown as { form?: Record<string, any> }` 绕一圈
+        const form = dialogRef.value?.form
         callback(value && value !== form?.new_password ? new Error('两次输入的密码不一致') : undefined)
       }
     }
@@ -41,8 +46,11 @@ const rules: FormRules = {
 /** 原密码错误是 400 + 20005，映射到输入框上，用户不用自己找是哪一项错了 */
 const errorFields = { [BizCode.OLD_PASSWORD_ERROR]: 'old_password' }
 
-function submit(form: Record<string, any>) {
-  return changePassword({ old_password: form.old_password, new_password: form.new_password })
+function submit(form: Partial<PasswordForm>) {
+  return changePassword({
+    old_password: form.old_password ?? '',
+    new_password: form.new_password ?? ''
+  })
 }
 
 function open() {

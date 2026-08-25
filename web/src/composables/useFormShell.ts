@@ -14,26 +14,36 @@ import { BizError } from '@/utils/request'
  * 抽成组件要避免的。composable 让两边都成立：名字对，逻辑仍只有一份。
  *
  * 两个组件因此只剩下容器与插槽转发，各二十来行模板。
+ *
+ * ## 表单数据是泛型的
+ *
+ * `T` 是被编辑对象的类型，页面在用的时候写 `<FormDrawer<PostRow> :submit="submit">`。
+ * 表单里的字段总是「对象的一部分」（新增时大半是空的，详情时是全的），
+ * 所以对外一律是 `Partial<T>` 而不是 `T`。
+ *
+ * 默认参数留成 `Record<string, unknown>`，不写泛型的调用方行为不变——
+ * 但那样 `#default="{ form }"` 里的 `form.xxx` 就还是 unknown，
+ * 字段名打错要等运行时才发现。新页面请把类型写上。
  */
 
 /** 打开表单时传的参数 */
-export interface FormShellOptions {
+export interface FormShellOptions<T extends object = Record<string, unknown>> {
   title: string
-  data?: Record<string, any>
+  data?: Partial<T>
   /** edit 可提交；view 只读，隐藏确定按钮 */
   mode?: 'edit' | 'view'
 }
 
 /** 页面拿 ref 用的实例类型，两个组件暴露的是同一套 */
-export interface FormShellInstance {
-  open: (options: FormShellOptions) => void
+export interface FormShellInstance<T extends object = Record<string, unknown>> {
+  open: (options: FormShellOptions<T>) => void
   close: () => void
-  form: Record<string, any>
+  form: Partial<T>
 }
 
-export interface FormShellProps {
+export interface FormShellProps<T extends object = Record<string, unknown>> {
   /** 提交函数，由页面提供；抛异常即视为失败，容器不关。详情模式下不会被调用 */
-  submit?: (form: Record<string, any>) => Promise<unknown>
+  submit?: (form: Partial<T>) => Promise<unknown>
   rules?: FormRules
   size?: string
   labelWidth?: string
@@ -57,12 +67,12 @@ export interface FormShellProps {
  * 取消之后更是回不去。JSON 拷贝对表单数据（字符串/数字/布尔/数组）足够，
  * 遇到 Date 或 undefined 需要自己在 data 里先转好。
  */
-function clone(value?: Record<string, any> | null): Record<string, any> {
+function clone<T extends object>(value?: Partial<T> | null): Partial<T> {
   return value ? JSON.parse(JSON.stringify(value)) : {}
 }
 
-export function useFormShell(
-  props: FormShellProps,
+export function useFormShell<T extends object = Record<string, unknown>>(
+  props: FormShellProps<T>,
   emit: {
     (e: 'success', result: unknown): void
     (e: 'closed'): void
@@ -73,13 +83,13 @@ export function useFormShell(
   const loading = ref(false)
   const mode = ref<'edit' | 'view'>('edit')
   const formRef = ref<FormInstance>()
-  const form: Ref<Record<string, any>> = ref({})
+  const form = ref({}) as Ref<Partial<T>>
   /** 服务端返回的字段级错误，插槽里绑到 el-form-item 的 :error 上 */
   const errors = ref<Record<string, string>>({})
 
   const readonly = computed(() => mode.value === 'view')
 
-  function open(options: FormShellOptions) {
+  function open(options: FormShellOptions<T>) {
     title.value = options.title
     mode.value = options.mode ?? 'edit'
     form.value = clone(options.data)

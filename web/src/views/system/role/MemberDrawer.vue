@@ -134,13 +134,14 @@ defineExpose({ open })
         <el-table-column prop="real_name" label="姓名" min-width="100" />
         <el-table-column prop="dept_name" label="部门" min-width="110" />
         <el-table-column label="操作" width="90" align="center">
-          <template #default="{ row }">
+          <!-- 裸 el-table 的插槽把行给成 DefaultRow，断言回 UserRow（ProTable 内部做了同样的事） -->
+          <template #default="scope">
             <el-button
               v-permission="'sys:user:grantRole'"
               link
               type="danger"
-              :disabled="row.is_super"
-              @click="onRemove(row)"
+              :disabled="(scope.row as UserRow).is_super"
+              @click="onRemove(scope.row as UserRow)"
             >
               移除
             </el-button>

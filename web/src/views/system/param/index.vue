@@ -10,7 +10,8 @@ import {
   saveParams,
   updateParam,
   PARAM_MASK,
-  type ParamRow
+  type ParamRow,
+  type ParamPayload
 } from '@/api/system'
 import type { FormDrawerInstance } from '@/components'
 import { BizCode } from '@/constants/bizCode'
@@ -114,7 +115,7 @@ async function onSave() {
 }
 
 // ---------------------------------------------------------------- 自定义参数的增删改
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const drawerRef = ref<FormDrawerInstance<ParamPayload> | null>(null)
 const editingId = ref(0)
 
 const rules: FormRules = {
@@ -146,7 +147,7 @@ function onEdit(row: ParamRow) {
   drawerRef.value?.open({ title: '编辑参数', data: { ...row } })
 }
 
-function submit(formData: Record<string, any>) {
+function submit(formData: ParamPayload) {
   const payload = {
     group: formData.group,
     name: formData.name,

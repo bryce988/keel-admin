@@ -74,7 +74,7 @@ export function categoryName(id: number): string {
   return CATEGORY_NAME[id] ?? '—'
 }
 
-export function fetchDemoList(params: Record<string, any>): Promise<PageResult<DemoRow>> {
+export function fetchDemoList(params: Record<string, unknown>): Promise<PageResult<DemoRow>> {
   const keyword = String(params.keyword ?? '').trim()
   const status = params.status
   const categoryId = Number(params.category_id ?? 0)
@@ -174,7 +174,7 @@ let children: DemoChild[] = rows
   )
 let nextChildId = 100000
 
-export function fetchDemoChildren(params: Record<string, any>): Promise<PageResult<DemoChild>> {
+export function fetchDemoChildren(params: Record<string, unknown>): Promise<PageResult<DemoChild>> {
   const list = children.filter((c) => c.master_id === Number(params.master_id))
 
   return delay({ list, total: list.length, page_num: 1, page_size: list.length || 1 })

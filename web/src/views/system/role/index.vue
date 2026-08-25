@@ -8,7 +8,8 @@ import {
   fetchRoleOptions,
   fetchRoles,
   updateRole,
-  type RoleRow
+  type RoleRow,
+  type RolePayload
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
@@ -26,7 +27,7 @@ import { BizCode } from '@/constants/bizCode'
 const dictStore = useDictStore()
 
 const tableRef = ref<ProTableInstance | null>(null)
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const drawerRef = ref<FormDrawerInstance<RolePayload> | null>(null)
 /**
  * 子组件的 ref 用 `InstanceType<typeof X>`，不要手写 `{ open: ... }`
  *
@@ -46,7 +47,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'enable_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<RoleRow>[] = [
   { prop: 'name', label: '角色名称', minWidth: 140, slot: 'name' },
   { prop: 'code', label: '角色编码', minWidth: 160 },
   { prop: 'data_scope', label: '数据范围', width: 130, align: 'center', dict: 'data_scope' },
@@ -99,7 +100,7 @@ function onView(row: RoleRow) {
   drawerRef.value?.open({ title: '角色详情', data: { ...row }, mode: 'view' })
 }
 
-function submit(form: Record<string, any>) {
+function submit(form: RolePayload) {
   const payload = {
     name: form.name,
     code: form.code,

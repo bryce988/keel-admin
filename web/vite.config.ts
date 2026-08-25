@@ -1,9 +1,42 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    /**
+     * Element Plus 按需导入
+     *
+     * 原来 `main.ts` 里是 `app.use(ElementPlus)` + `import 'element-plus/dist/index.css'`，
+     * 整个组件库进主 chunk：1.27MB / gzip 413KB。而且 element-plus 自身依赖
+     * `@element-plus/icons-vue`，全量导入会把 293 个图标一起带进来——
+     * 这也是为什么单独去掉图标的全局注册一点效果都没有，得先把这里改掉。
+     *
+     * 两个插件分工：
+     *   Components  扫模板里的 <el-xxx> 与 v-loading 这类指令，按需注入 import
+     *   AutoImport  扫脚本里未声明的 ElMessage / ElMessageBox 等，注入 import + 样式
+     *
+     * ⚠️ 已经显式 `import { ElMessage } from 'element-plus'` 的文件，AutoImport
+     * 不会介入（标识符已声明），也就不会帮它带上样式。那几个组件的样式在 main.ts
+     * 里单独 import 了一次，见那边的注释。
+     */
+    // dts 落在 src/types/ 下是有意的：tsconfig 的 include 只覆盖 src/**，
+    // 放在仓库根目录（插件默认）等于 vue-tsc 根本看不到这两份声明，
+    // 模板里那些自动导入的 <el-xxx> 就得不到类型。两份声明要提交进 Git——
+    // CI 是先 vue-tsc 再 vite build，不提交的话第一步跑在「声明还没生成」的状态上
+    AutoImport({
+      resolvers: [ElementPlusResolver()],
+      dts: 'src/types/auto-imports.d.ts',
+    }),
+    Components({
+      resolvers: [ElementPlusResolver()],
+      dts: 'src/types/components.d.ts',
+    }),
+  ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }
   },
@@ -20,7 +53,19 @@ export default defineConfig({
        */
       usePolling: process.env.VITE_USE_POLLING === '1',
       interval: 300,
-      ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**']
+      /*
+       * ⚠️ 生成的 d.ts 必须排除，否则开发时表现得像「点什么都没反应」：
+       * 打开一个此前没用过的组件（比如第一次点开编辑抽屉）→ unplugin 发现新组件
+       * → 重写 src/types/components.d.ts → 轮询监听捕捉到 → **整页 reload**，
+       * 抽屉刚弹出就被刷没了。控制台一条错误都没有，只有 [vite] connecting 一闪而过
+       */
+      ignored: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/.git/**',
+        '**/src/types/auto-imports.d.ts',
+        '**/src/types/components.d.ts'
+      ]
     },
     // 容器内通过服务名访问后端；本机直跑时改成 http://127.0.0.1:8787
     proxy: {

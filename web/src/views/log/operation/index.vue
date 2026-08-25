@@ -51,7 +51,7 @@ const searchFields: SearchField[] = [
   { prop: 'trace_id', label: 'TraceID', placeholder: '报错弹窗里的那串' }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<OperationLogRow>[] = [
   { prop: 'created_at', label: '时间', width: 165, sortable: true },
   { prop: 'username', label: '操作人', width: 100 },
   { prop: 'module', label: '模块', minWidth: 130 },

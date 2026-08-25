@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Plus } from '@element-plus/icons-vue'
 import type { ProColumn, ProTableInstance } from '@/components'
 // ⛔ 复制后把这一行换成你自己的 api/xxx.ts
-import { categoryName, fetchDemoChildren, fetchDemoDetail, type DemoRow } from '../_demo'
+import { categoryName, fetchDemoChildren, fetchDemoDetail, type DemoChild, type DemoRow } from '../_demo'
 
 /**
  * 【模板 ⑤】详情页 —— 左栏静态属性，右栏动态区块
@@ -41,7 +41,7 @@ const childTableRef = ref<ProTableInstance | null>(null)
  */
 const childQuery = ref<Record<string, unknown>>({ master_id: 0 })
 
-const childColumns: ProColumn[] = [
+const childColumns: ProColumn<DemoChild>[] = [
   { prop: 'label', label: '标签', minWidth: 140 },
   { prop: 'value', label: '值', minWidth: 120 },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },

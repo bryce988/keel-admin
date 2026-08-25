@@ -23,6 +23,9 @@ Thumbs.db
 # ===== 前端 web/ =====
 web/node_modules/
 web/dist/
+# 注：web/src/types/{auto-imports,components}.d.ts 是 unplugin 生成的，**要提交**。
+# CI 里先跑 vue-tsc 再跑 vite build，不提交的话第一步就没有这两份声明。
+
 web/dist-ssr/
 web/.vite/
 web/coverage/

@@ -13,7 +13,10 @@ import {
   updateDictItem,
   updateDictType,
   type DictItemRow,
-  type DictTypeRow
+  type DictTypeRow,
+  type DictTagType,
+  type DictTypePayload,
+  type DictItemPayload
 } from '@/api/system'
 import type {
   FormDrawerInstance,
@@ -87,7 +90,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'enable_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<DictItemRow>[] = [
   { prop: 'label', label: '显示文案', minWidth: 140 },
   { prop: 'value', label: '存储值', minWidth: 120, slot: 'value' },
   { prop: 'tag_type', label: '标签预览', width: 120, align: 'center', slot: 'preview' },
@@ -105,7 +108,7 @@ function requestItems(params: TableQuery) {
 }
 
 // ---------------------------------------------------------------- 类型的增改删
-const typeDrawerRef = ref<FormDrawerInstance | null>(null)
+const typeDrawerRef = ref<FormDrawerInstance<DictTypePayload> | null>(null)
 const editingTypeId = ref(0)
 
 const typeRules: FormRules = {
@@ -129,7 +132,7 @@ function onEditType(row: DictTypeRow) {
   typeDrawerRef.value?.open({ title: '编辑字典', data: { ...row } })
 }
 
-function submitType(form: Record<string, any>) {
+function submitType(form: DictTypePayload) {
   const payload = {
     name: form.name,
     code: form.code,
@@ -164,7 +167,7 @@ async function onDeleteType(row: DictTypeRow) {
 }
 
 // ---------------------------------------------------------------- 字典项的增改删
-const itemDrawerRef = ref<FormDrawerInstance | null>(null)
+const itemDrawerRef = ref<FormDrawerInstance<DictItemPayload> | null>(null)
 const editingItem = ref<DictItemRow | null>(null)
 
 const itemRules: FormRules = {
@@ -176,7 +179,7 @@ const itemRules: FormRules = {
 const typeErrorFields = { [BizCode.DICT_CODE_EXISTS]: 'code', [BizCode.DICT_ITEM_IN_USE]: 'code' }
 const itemErrorFields = { [BizCode.DICT_CODE_EXISTS]: 'value', [BizCode.DICT_ITEM_IN_USE]: 'value' }
 
-const TAG_TYPES = [
+const TAG_TYPES: { label: string; value: DictTagType }[] = [
   { label: '默认（灰）', value: '' },
   { label: 'success 绿', value: 'success' },
   { label: 'primary 蓝', value: 'primary' },
@@ -208,7 +211,7 @@ function onEditItem(row: DictItemRow) {
   itemDrawerRef.value?.open({ title: '编辑字典项', data: { ...row } })
 }
 
-function submitItem(form: Record<string, any>) {
+function submitItem(form: DictItemPayload) {
   const payload = {
     type_code: form.type_code || currentCode.value,
     label: form.label,

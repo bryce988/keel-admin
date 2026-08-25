@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import * as ElIcons from '@element-plus/icons-vue'
 import { Search } from '@element-plus/icons-vue'
+import { allIconNames, resolveIconOrNone } from '@/utils/icons'
 
 /**
  * 图标选择器
@@ -19,6 +19,10 @@ import { Search } from '@element-plus/icons-vue'
  *
  * 全局注册的组件进不了 tree-shaking（见 components/index.ts 的说明），
  * 这个只有菜单管理一个页面用，所以按需 import，不进 install。
+ *
+ * 这是全站唯一需要「全部图标」的地方。曾经试过把整包改成异步加载，
+ * 但拆不出去——原因见 utils/icons.ts 里那段说明，简单说是外壳里的静态 import
+ * 已经把整包钉在主 chunk 上了，异步只会多一个永远瞬时完成的 loading 态。
  */
 const props = withDefaults(
   defineProps<{
@@ -33,14 +37,12 @@ const emit = defineEmits<{ 'update:modelValue': [string] }>()
 const visible = ref(false)
 const keyword = ref('')
 
-const names = Object.keys(ElIcons).sort()
+const names = allIconNames()
 
-function iconComp(name: string) {
-  return (ElIcons as Record<string, unknown>)[name]
-}
+const iconComp = resolveIconOrNone
 
 /** 选中的图标可能是手填的、或 EP 升级后被移除的，解析不到就当没选 */
-const current = computed(() => (props.modelValue ? iconComp(props.modelValue) : undefined))
+const current = computed(() => resolveIconOrNone(props.modelValue))
 
 const results = computed(() => {
   const kw = keyword.value.trim().toLowerCase()

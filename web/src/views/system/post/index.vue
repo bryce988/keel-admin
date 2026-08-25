@@ -10,7 +10,8 @@ import {
   fetchPosts,
   updatePost,
   type DeptNode,
-  type PostRow
+  type PostRow,
+  type PostPayload
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
@@ -26,7 +27,7 @@ import { BizCode } from '@/constants/bizCode'
 const dictStore = useDictStore()
 
 const tableRef = ref<ProTableInstance | null>(null)
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const drawerRef = ref<FormDrawerInstance<PostPayload> | null>(null)
 
 const query = ref<Record<string, unknown>>({ keyword: '', status: '', dept_id: '' })
 const paramParsers = { status: Number, dept_id: Number }
@@ -36,7 +37,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'enable_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<PostRow>[] = [
   { prop: 'name', label: '岗位名称', minWidth: 150 },
   { prop: 'code', label: '岗位编码', minWidth: 150 },
   { prop: 'dept_name', label: '所属部门', minWidth: 130 },
@@ -100,7 +101,7 @@ function onView(row: PostRow) {
   drawerRef.value?.open({ title: '岗位详情', data: { ...row }, mode: 'view' })
 }
 
-function submit(form: Record<string, any>) {
+function submit(form: PostPayload) {
   const payload = {
     name: form.name,
     code: form.code,

@@ -7,7 +7,8 @@ import {
   deleteDept,
   fetchDeptTree,
   updateDept,
-  type DeptNode
+  type DeptNode,
+  type DeptPayload
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
@@ -22,7 +23,7 @@ import { BizCode } from '@/constants/bizCode'
 const dictStore = useDictStore()
 
 const tableRef = ref<ProTableInstance | null>(null)
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const drawerRef = ref<FormDrawerInstance<DeptPayload> | null>(null)
 
 const query = ref<Record<string, unknown>>({ keyword: '', status: '' })
 const paramParsers = { status: Number }
@@ -32,7 +33,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'enable_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<DeptNode>[] = [
   { prop: 'name', label: '部门名称', minWidth: 200, align: 'left' },
   { prop: 'code', label: '部门编码', minWidth: 140 },
   { prop: 'user_count', label: '用户数', width: 90, align: 'center' },
@@ -119,7 +120,7 @@ function onView(row: DeptNode) {
   })
 }
 
-function submit(form: Record<string, any>) {
+function submit(form: DeptPayload) {
   const payload = {
     parent_id: form.parent_id ?? 0,
     name: form.name,

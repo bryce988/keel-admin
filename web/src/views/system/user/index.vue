@@ -14,7 +14,8 @@ import {
   setUserStatus,
   updateUser,
   type DeptNode,
-  type UserRow
+  type UserRow,
+  type UserPayload
 } from '@/api/system'
 import { download } from '@/utils/request'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
@@ -40,7 +41,7 @@ const can = computed(() => ({
 const canMore = computed(() => Object.values(can.value).some(Boolean))
 
 const tableRef = ref<ProTableInstance | null>(null)
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const drawerRef = ref<FormDrawerInstance<UserPayload> | null>(null)
 
 const query = ref<Record<string, unknown>>({ keyword: '', status: '', dept_id: '' })
 const paramParsers = { status: Number, dept_id: Number }
@@ -50,7 +51,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'user_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<UserRow>[] = [
   { prop: 'username', label: '账号', minWidth: 120, sortable: true, fixed: 'left' },
   { prop: 'real_name', label: '姓名', minWidth: 100 },
   { prop: 'dept_name', label: '部门', minWidth: 110 },
@@ -142,7 +143,7 @@ async function onView(row: UserRow) {
   drawerRef.value?.open({ title: '用户详情', data: { ...detail }, mode: 'view' })
 }
 
-async function submit(form: Record<string, any>) {
+async function submit(form: UserPayload) {
   const payload = {
     username: form.username,
     real_name: form.real_name,

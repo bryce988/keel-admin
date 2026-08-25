@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import * as ElIcons from '@element-plus/icons-vue'
+import { resolveIconOrNone } from '@/utils/icons'
 import { Plus } from '@element-plus/icons-vue'
 import IconPicker from '@/components/IconPicker.vue'
 import {
@@ -10,7 +10,8 @@ import {
   fetchMenuTree,
   updateMenu,
   type MenuNodeRow,
-  type MenuType
+  type MenuType,
+  type MenuPayload
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
@@ -26,7 +27,7 @@ import { BizCode } from '@/constants/bizCode'
 const dictStore = useDictStore()
 
 const tableRef = ref<ProTableInstance | null>(null)
-const drawerRef = ref<FormDrawerInstance | null>(null)
+const drawerRef = ref<FormDrawerInstance<MenuPayload> | null>(null)
 
 const query = ref<Record<string, unknown>>({ keyword: '', type: '', status: '' })
 const paramParsers = { type: Number, status: Number }
@@ -37,7 +38,7 @@ const searchFields: SearchField[] = [
   { prop: 'status', label: '状态', type: 'dict', dict: 'enable_status', numeric: true }
 ]
 
-const columns: ProColumn[] = [
+const columns: ProColumn<MenuNodeRow>[] = [
   { prop: 'name', label: '名称', minWidth: 200, align: 'left' },
   // 放在名称之后：树形表格的展开箭头在第一列，图标列插到最前会把层级压没
   { prop: 'icon', label: '图标', width: 70, align: 'center', slot: 'icon' },
@@ -65,9 +66,7 @@ const isApi = computed(() => formType.value === TYPE_API)
  * 解析不到就当没图标——手填错的名字、或 EP 升级后被移除的图标都会走到这里，
  * 让它显示成「—」，而不是抛渲染错误把整行搞白
  */
-function iconComp(name: string) {
-  return (ElIcons as Record<string, unknown>)[name]
-}
+const iconComp = resolveIconOrNone
 
 // ---------------------------------------------------------------- 上级选择
 const treeData = ref<MenuNodeRow[]>([])
@@ -124,8 +123,8 @@ function blank(parentId = 0, type: MenuType = TYPE_MENU) {
     icon: '',
     api_method: 'GET',
     api_path: '',
-    visible: 1,
-    keep_alive: 1,
+    visible: true,
+    keep_alive: true,
     sort: 0,
     status: 1
   }
@@ -145,13 +144,7 @@ function onEdit(row: MenuNodeRow) {
   formType.value = row.type
   drawerRef.value?.open({
     title: '编辑权限点',
-    // 布尔要转回 0/1：后端字段是 TINYINT，表单用单选按钮绑数字更直观
-    data: {
-      ...row,
-      children: undefined,
-      visible: row.visible ? 1 : 0,
-      keep_alive: row.keep_alive ? 1 : 0
-    }
+    data: { ...row, children: undefined }
   })
 }
 
@@ -161,7 +154,7 @@ function onView(row: MenuNodeRow) {
   drawerRef.value?.open({ title: '权限点详情', data: { ...row, children: undefined }, mode: 'view' })
 }
 
-function submit(form: Record<string, any>) {
+function submit(form: MenuPayload) {
   return editingId.value ? updateMenu(editingId.value, form) : createMenu(form)
 }
 
@@ -288,7 +281,7 @@ onMounted(() => {
 
         <template v-else>
           <el-form-item label="节点类型" prop="type">
-            <el-radio-group v-model="form.type" @change="formType = form.type">
+            <el-radio-group v-model="form.type" @change="formType = form.type ?? TYPE_MENU">
               <el-radio-button :value="1">目录</el-radio-button>
               <el-radio-button :value="2">菜单</el-radio-button>
               <el-radio-button :value="3">按钮</el-radio-button>
@@ -337,16 +330,22 @@ onMounted(() => {
               <IconPicker v-model="form.icon" />
             </el-form-item>
             <el-form-item label="显示" prop="visible">
+              <!--
+                绑布尔而不是 0/1：接口返回的就是布尔（模型里 casts 成 boolean，
+                实测 /admin/menus/tree 回的是 true/false）。原来这里在打开表单时
+                把布尔转成 1/0、提交时又原样送回数字，靠 PHP 的隐式转换兜住。
+                类型收紧后这处不一致立刻暴露——改成两边都用布尔，中间不做转换
+              -->
               <el-radio-group v-model="form.visible">
-                <el-radio :value="1">显示</el-radio>
-                <el-radio :value="0">隐藏</el-radio>
+                <el-radio :value="true">显示</el-radio>
+                <el-radio :value="false">隐藏</el-radio>
               </el-radio-group>
               <span class="tip inline">详情页这类不进侧边栏的路由选隐藏</span>
             </el-form-item>
             <el-form-item v-if="formType === 2" label="页面缓存" prop="keep_alive">
               <el-radio-group v-model="form.keep_alive">
-                <el-radio :value="1">缓存</el-radio>
-                <el-radio :value="0">不缓存</el-radio>
+                <el-radio :value="true">缓存</el-radio>
+                <el-radio :value="false">不缓存</el-radio>
               </el-radio-group>
               <span class="tip inline">多页签切回来是否保留筛选与滚动位置</span>
             </el-form-item>
