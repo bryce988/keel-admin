@@ -126,7 +126,11 @@ CREATE TABLE IF NOT EXISTS `sys_login_logs` (
   `created_at` DATETIME        NOT NULL                COMMENT '创建时间',
   PRIMARY KEY (`id`),
   KEY `idx_username_time` (`username`, `created_at`),
-  KEY `idx_dept` (`dept_id`)
+  -- 日志查询固定带时间范围；数据权限再注入 dept_id。
+  -- 没有 idx_created 时「按时间翻登录日志」的 EXPLAIN 里 possible_keys 是 NULL。
+  -- 不加单列 idx_dept：它是 idx_dept_time 的最左前缀，纯属重复（只增表，写入开销要省）
+  KEY `idx_created` (`created_at`),
+  KEY `idx_dept_time` (`dept_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录日志';
 
 
@@ -247,7 +251,10 @@ CREATE TABLE IF NOT EXISTS `sys_operation_logs` (
   KEY `idx_user_time` (`user_id`, `created_at`),
   KEY `idx_trace` (`trace_id`),
   KEY `idx_created` (`created_at`),
-  KEY `idx_module` (`module`)
+  KEY `idx_module` (`module`),
+  -- 数据权限按 dept_id 过滤 + 查询固定带时间范围，两者要在同一个索引里。
+  -- 不写 (dept_id, created_at, id)：InnoDB 二级索引隐式包含主键，第三列是多余的
+  KEY `idx_dept_time` (`dept_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志';
 
 -- ---------------------------------------------------------------- 基础数据

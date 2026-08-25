@@ -126,7 +126,69 @@ foreach ($columnPatches as [$table, $column, $definition, $backfill]) {
     }
 }
 
+/**
+ * 存量表的索引补丁
+ *
+ * 与补列同一个道理，而且更容易被忽略：往 schema.sql 的 `CREATE TABLE` 里加一行 `KEY`，
+ * 在开发机上 `down -v` 重建后一切正常，线上却因为表已存在而**一个索引都没加**。
+ * 索引缺失不报错、不返回错数据，只是慢——数据量小的时候完全看不出来，
+ * 等到看出来的时候已经是线上慢查询了。
+ *
+ * MySQL 8 没有 `CREATE INDEX IF NOT EXISTS`，照旧查 information_schema。
+ *
+ * 每项：[表, 索引名, 列定义或 null（null = 删除这个索引）]
+ */
+$indexPatches = [
+    // 操作日志：日志查询固定带时间范围，数据权限再注入 dept_id。
+    // 原有索引里 dept_id 一个都没有 —— 部门主管翻日志时只能靠主键倒扫全表过滤。
+    //
+    // ⚠️ 不写成 (dept_id, created_at, id)：InnoDB 的二级索引**隐式包含主键**，
+    // 显式再加一列 id 是重复的，只会让索引定义看起来比实际复杂。
+    //
+    // 排序说明：列表默认 `ORDER BY id DESC`，这个索引服务不了排序，仍会 filesort。
+    // 它挡的是「先把几百万行缩到本部门最近 7 天」这一步，以及分页的 COUNT(*)——
+    // 那两步才是数据量上来后的主要成本。真要连排序一起吃掉，得把默认排序
+    // 改成 created_at DESC，那是接口行为变更，要先改 docs/api.md 再动代码。
+    ['sys_operation_logs', 'idx_dept_time', '(`dept_id`, `created_at`)'],
+
+    // 登录日志：连一个能服务纯时间范围的索引都没有（idx_username_time 的最左列是
+    // username，不带账号筛选时用不上）。EXPLAIN 里 possible_keys 直接是 NULL。
+    ['sys_login_logs', 'idx_created',   '(`created_at`)'],
+    ['sys_login_logs', 'idx_dept_time', '(`dept_id`, `created_at`)'],
+
+    // 上一条加完之后，原来的单列 idx_dept 就是它的最左前缀，纯属重复。
+    // 登录日志是只增表，每多一个索引就多一份写入开销，该删。
+    ['sys_login_logs', 'idx_dept', null],
+];
+
+$indexed = 0;
+
+foreach ($indexPatches as [$table, $index, $columns]) {
+    $exists = Db::conn()->selectOne(
+        'SELECT 1 FROM information_schema.STATISTICS
+          WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1',
+        [$database, $table, $index]
+    );
+
+    // 要加的已经在 / 要删的已经不在，两种情况都无事可做
+    if (($columns !== null) === (bool) $exists) {
+        continue;
+    }
+
+    try {
+        Db::conn()->unprepared($columns === null
+            ? "ALTER TABLE `{$table}` DROP INDEX `{$index}`"
+            : "ALTER TABLE `{$table}` ADD INDEX `{$index}` {$columns}");
+        $indexed++;
+        echo '  ✓ ' . ($columns === null ? '删除' : '补') . "索引 {$table}.{$index}\n";
+    } catch (Throwable $e) {
+        fwrite(STDERR, "✗ 索引调整失败 {$table}.{$index}：{$e->getMessage()}\n");
+        exit(1);
+    }
+}
+
 $tables = count(Db::conn()->select('SHOW TABLES'));
 echo "  ✓ 表结构已对齐（{$created} 条建表语句"
     . ($patched > 0 ? "，{$patched} 处补列" : '')
+    . ($indexed > 0 ? "，{$indexed} 处索引调整" : '')
     . "，当前 {$tables} 张表）\n";
