@@ -186,11 +186,35 @@ class JwtService
         return "jwt:pair:{$accessJti}";
     }
 
+    /**
+     * 签名密钥
+     *
+     * ⚠️ 长度下限**按算法推导**，不要写死一个数字。
+     *
+     * 这里原来写死 `< 16`，那是 firebase/php-jwt ^6 时代的判断。升到 ^7 之后，
+     * 库自己会校验 HMAC 密钥长度（JWT::validateHmacKeyLength）：HS256 要求
+     * 至少 256 位，也就是 32 字节。于是 16~31 字节的密钥能穿过我们这道检查、
+     * 栽在库里，抛出 `Provided key is too short @ JWT.php:701`——
+     * 一句指向第三方库行号的 500，拿到手完全不知道要改什么。
+     *
+     * 开发编排的默认值 `change-me-in-production`（23 字节）正好落在这个区间，
+     * 所以「clone 下来直接 docker compose up -d，不建 .env」的人一登录就 500。
+     * 作者本机一直有 .env，从没碰到过。
+     */
     private static function secret(): string
     {
+        // 与 php-jwt 同一套算法：HS256 → 256 位 → 32 字节
+        $minBytes = ((int) str_replace('HS', '', self::ALG)) / 8;
+
         $secret = (string) Env::get('JWT_SECRET', '');
-        if (strlen($secret) < 16) {
-            throw new \RuntimeException('JWT_SECRET 未配置或过短，请在 .env 中设置至少 16 位随机字符串');
+        if (strlen($secret) < $minBytes) {
+            throw new \RuntimeException(sprintf(
+                'JWT_SECRET 过短：%s 要求至少 %d 字节，当前 %d 字节。'
+                . '请在 .env 中设置，例如 openssl rand -hex 32',
+                self::ALG,
+                $minBytes,
+                strlen($secret)
+            ));
         }
 
         return $secret;

@@ -65,7 +65,10 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_DB: ${REDIS_DB:-0}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      # 默认值必须 >= 32 字节：HS256 的下限，短了会在登录时抛
+      # 「Provided key is too short」。README 说 clone 完 up -d 就能跑，
+      # 那就不能依赖用户先建 .env——这个默认值是那句话的一部分
+      JWT_SECRET: ${JWT_SECRET:-keel-dev-only-secret-change-me-in-production}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-7200}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-604800}
       LOGIN_FAIL_LIMIT: ${LOGIN_FAIL_LIMIT:-5}
