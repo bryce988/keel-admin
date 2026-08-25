@@ -65,9 +65,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 开发编排里每个变量都有默认值，CI 不需要 .env
-      - name: 起开发环境
-        run: docker compose up -d --wait --wait-timeout 300
+      # 开发编排里每个变量都有默认值，CI 不需要 .env。
+      # 只起验收用得到的三个服务：web 容器要跑一次 npm install（一两分钟），
+      # 而验收脚本全程走 8787 端口的后端接口，一次都不碰前端
+      - name: 起后端环境
+        run: docker compose up -d --wait --wait-timeout 300 mysql redis server
 
       - name: 等后端就绪
         run: |
@@ -76,8 +78,29 @@ jobs:
             sleep 5
           done
           echo "后端 300 秒内未就绪"
-          docker compose logs server
+          docker compose logs --no-color server
           exit 1
+
+      # entrypoint 里 install.php / seed.php 的失败是被 `|| echo` 吞掉的，
+      # 服务照样起得来。缺了种子数据的表现是「验收在登录那步失败」，
+      # 与网络问题、密码不对长得一模一样。这里提前把它区分出来。
+      - name: 确认种子数据就绪
+        run: |
+          need="admin manager dev01 ops01"
+          missing=""
+          for u in $need; do
+            n=$(docker compose exec -T mysql mysql -ukeel -pkeel123456 -N keel \
+                  -e "SELECT COUNT(*) FROM sys_users WHERE username='$u' AND deleted_at IS NULL" 2>/dev/null | tr -d '\r')
+            [ "$n" = "1" ] || missing="$missing $u"
+          done
+          perms=$(docker compose exec -T mysql mysql -ukeel -pkeel123456 -N keel \
+                    -e "SELECT COUNT(*) FROM sys_permissions" 2>/dev/null | tr -d '\r')
+          echo "权限点 $perms 条；缺失账号:${missing:-无}"
+          if [ -n "$missing" ] || [ "${perms:-0}" -lt 40 ]; then
+            echo "✗ 种子数据不完整，entrypoint 的 install/seed 很可能失败了："
+            docker compose logs --no-color server | tail -60
+            exit 1
+          fi
 
       - name: 跑验收脚本
         run: sh scripts/acceptance.sh
