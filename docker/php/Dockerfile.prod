@@ -1,0 +1,82 @@
+# Keel 后端生产镜像
+#
+# 与开发镜像（同目录 Dockerfile）的根本区别：**代码和依赖都烤进镜像**。
+# 开发那份是「空壳 PHP + bind mount + 启动时 composer install」，改代码即时生效，
+# 这在生产上意味着「线上跑的是 git 工作副本的当前状态」——不是任何一个可复现的产物，
+# 也没法回滚到「上一个镜像」。
+#
+# 构建上下文是**仓库根目录**（不是 docker/php）：
+#   docker build -f docker/php/Dockerfile.prod .
+#
+# 三个阶段共用一个装好扩展的 base，扩展只编译一次。
+
+# ---------------------------------------------------------------- base：PHP + 扩展
+FROM php:8.4-cli-alpine AS base
+
+ARG APK_MIRROR=""
+ARG COMPOSER_MIRROR=""
+
+RUN if [ -n "$APK_MIRROR" ]; then \
+      sed -i "s|dl-cdn.alpinelinux.org|$APK_MIRROR|g" /etc/apk/repositories; \
+    fi
+
+# 扩展清单与开发镜像保持一致，任何一边加扩展都要同步另一边：
+#   pcntl    webman 必需
+#   pdo_mysql 数据库
+#   sockets  workerman
+#   zip      openspout 读写 xlsx/ods（composer 也强制要求 ext-zip）
+#   redis    webman/redis-queue 的 RedisConnection extends \Redis，没有它连投递都致命错误
+RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS linux-headers libzip-dev \
+    && apk add --no-cache libzip \
+    && docker-php-ext-install -j"$(nproc)" pcntl pdo_mysql sockets zip \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del .build-deps \
+    && rm -rf /tmp/pear /var/cache/apk/*
+
+# ---------------------------------------------------------------- vendor：装依赖
+FROM base AS vendor
+
+RUN apk add --no-cache git unzip
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+ARG COMPOSER_MIRROR=""
+RUN if [ -n "$COMPOSER_MIRROR" ]; then \
+      composer config -g repos.packagist composer "$COMPOSER_MIRROR"; \
+    fi
+
+WORKDIR /app
+
+# 先只拷 composer.json/lock 装包，再拷代码：改业务代码不会让依赖层失效，
+# 重建从「几分钟装包」变成「几秒拷文件」
+COPY server/composer.json server/composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction --prefer-dist
+
+COPY server/ ./
+
+# 生成优化过的 classmap。
+# 刻意**不用** --classmap-authoritative：那会关掉 psr-4 回退，
+# 而 webman 的 autoload 配了空命名空间前缀（"": "./"），
+# 依赖运行期按路径解析 support/ 下的类，一旦关掉回退就是 Class not found。
+RUN composer dump-autoload --no-dev --optimize --no-interaction
+
+# ---------------------------------------------------------------- runtime：最终镜像
+FROM base AS runtime
+
+WORKDIR /app
+COPY --from=vendor /app /app
+
+# 容器以 read_only 跑（见 docker-compose.prod.yml），这两个目录挂卷：
+#   runtime/        日志、导入导出临时文件、pid
+#   public/uploads/ 用户上传的头像等，**是业务数据**，丢了就找不回来
+# 这里先建出来并放开权限，卷首次挂载时会继承目录的属主与权限
+RUN mkdir -p runtime/logs runtime/cache runtime/views runtime/exports runtime/imports public/uploads \
+    && chmod -R 777 runtime public/uploads
+
+COPY docker/php/entrypoint.prod.sh /usr/local/bin/entrypoint.sh
+COPY docker/php/init.sh            /usr/local/bin/init.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/init.sh
+
+EXPOSE 8787
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -14,6 +14,7 @@
 
 use support\Log;
 use support\Request;
+use app\common\support\Env;
 use app\process\Http;
 
 global $argv;
@@ -77,7 +78,21 @@ return [
                 'php', 'html', 'htm', 'env'
             ],
             'options' => [
-                'enable_file_monitor' => !in_array('-d', $argv) && DIRECTORY_SEPARATOR === '/',
+                /*
+                 * 文件监听：**生产必须关**
+                 *
+                 * 上游默认只按 `-d`（守护进程）判断，而容器里不能用 -d——
+                 * 主进程一 daemon 化，容器就退出了。于是生产实际跑的是前台模式，
+                 * 上游的判断放行，文件监听就一直开着：每 2 秒扫一遍 app/ config/ support/，
+                 * 并且**任何文件改动都会自动 reload 线上进程**。
+                 * 代码是 bind mount 进去的，`git pull` 到一半就可能触发一次半新半旧的 reload。
+                 *
+                 * 所以这里额外用 APP_ENV 兜一道。内存监听保留：
+                 * 它负责把超过 memory_limit 的 worker 重启掉，生产比开发更需要。
+                 */
+                'enable_file_monitor' => !in_array('-d', $argv)
+                    && DIRECTORY_SEPARATOR === '/'
+                    && !Env::isProd(),
                 'enable_memory_monitor' => DIRECTORY_SEPARATOR === '/',
             ]
         ]

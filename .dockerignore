@@ -1,0 +1,57 @@
+# 构建上下文过滤（前后端两个 Dockerfile 的上下文都是仓库根目录）
+#
+# ⚠️ 这个文件不是「优化构建速度」的，它是**正确性**的一部分：
+# 后端生产镜像里 `COPY server/ ./` 发生在 `composer install` 之后，
+# 没有这份排除清单，宿主机的 server/vendor 会把构建阶段装好的那份**整个覆盖掉**，
+# 镜像里跑的就成了某台开发机上那棵依赖树 —— 不可复现性又绕回来了。
+# 同理 server/.env 会把生产密钥烤进镜像层，任何拿到镜像的人都能读出来。
+
+# ---- 版本控制与本机配置 ----
+.git
+.gitignore
+.github
+CLAUDE.md
+DESIGN-apple.md
+*.md
+!server/**/*.md
+!web/**/*.md
+
+# ---- 密钥与环境 ----
+.env
+.env.*
+!.env.example
+**/.env
+*.pem
+*.key
+
+# ---- 后端 ----
+# vendor 由构建阶段自己装；runtime 是运行产物（日志、导出文件、pid）
+server/vendor
+server/runtime
+server/public/uploads
+server/.phpunit.result.cache
+server/.php-cs-fixer.cache
+
+# ---- 前端 ----
+# node_modules 由 npm ci 自己装；dist 由构建阶段自己产
+web/node_modules
+web/dist
+web/dist-ssr
+web/.vite
+web/coverage
+web/stats.html
+web/*.tsbuildinfo
+
+# ---- 编辑器与系统 ----
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# ---- 本地数据与临时产物 ----
+docker/data
+docker/logs
+*.log
+*.pid
+tmp
+temp

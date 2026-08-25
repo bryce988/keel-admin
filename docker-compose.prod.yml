@@ -1,10 +1,58 @@
 # Keel 生产/预览编排
-#   docker compose -f docker-compose.prod.yml up -d --build
+#   ./scripts/deploy.sh                                     # 常规发布
+#   docker compose -f docker-compose.prod.yml up -d --build  # 手动
 #
 # 与开发编排的区别：
+# - 后端代码与依赖**烤进镜像**，不 bind mount，容器以只读根文件系统运行
+# - 建表与播种由一次性的 `migrate` 服务负责，server 等它成功后才启动
 # - 前端构建成静态文件由 nginx 托管，不跑 vite dev server
 # - MySQL / Redis 不对宿主机暴露端口，只在容器网络内可达
 # - 只开放一个 HTTP 端口（默认 8080），避免与服务器上已有的 nginx 冲突
+
+# server 与 migrate 跑的是同一个镜像、同一套环境变量，用锚点共享，
+# 避免两处各写一份、改了一处忘了另一处
+x-server-build: &server-build
+  context: .
+  dockerfile: docker/php/Dockerfile.prod
+  args:
+    # 网络受限时在 .env 里设置，默认走官方源
+    APK_MIRROR: ${APK_MIRROR:-}
+    COMPOSER_MIRROR: ${COMPOSER_MIRROR:-}
+
+x-server-env: &server-env
+  APP_NAME: ${APP_NAME:-Keel}
+  APP_ENV: prod
+  APP_DEBUG: "false"
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_DATABASE: ${DB_DATABASE:-keel}
+  DB_USERNAME: ${DB_USERNAME:-keel}
+  DB_PASSWORD: ${DB_PASSWORD}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_DB: ${REDIS_DB:-0}
+  JWT_SECRET: ${JWT_SECRET:?必须在 .env 中设置}
+  JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-7200}
+  JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-604800}
+  LOGIN_FAIL_LIMIT: ${LOGIN_FAIL_LIMIT:-5}
+  LOGIN_IP_FAIL_LIMIT: ${LOGIN_IP_FAIL_LIMIT:-20}
+  LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-30}
+  CAPTCHA_TTL: ${CAPTCHA_TTL:-120}
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须在 .env 中设置}
+  SEED_DEMO: ${SEED_DEMO:-}           # 生产默认不播演示账号，预览站在 .env 里显式打开
+  # 多端：生产不给默认值，未配置即该端不可用（PROJECT.md §8）
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+  CLIENT_RATE_LIMIT: ${CLIENT_RATE_LIMIT:-120}
+  CLIENT_IP_RATE_LIMIT: ${CLIENT_IP_RATE_LIMIT:-}
+  CLIENT_RATE_WINDOW: ${CLIENT_RATE_WINDOW:-60}
+  OPEN_APP_KEY: ${OPEN_APP_KEY:-}
+  OPEN_APP_SECRET: ${OPEN_APP_SECRET:-}
+  OPEN_IP_WHITELIST: ${OPEN_IP_WHITELIST:-}
+  INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
+  SLOW_QUERY_MS: ${SLOW_QUERY_MS:-500}
+  TZ: Asia/Shanghai
 
 services:
   mysql:
@@ -25,6 +73,7 @@ services:
       - --innodb-buffer-pool-size=256M
     volumes:
       - mysql-data:/var/lib/mysql
+      # 只对空数据卷生效（MySQL 的 initdb 只跑一次），存量库靠 migrate 服务补齐
       - ./server/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD}"]
@@ -45,59 +94,54 @@ services:
       timeout: 3s
       retries: 10
 
-  server:
-    build:
-      context: ./docker/php
-      args:
-        # 网络受限时在 .env 里设置，默认走官方源
-        APK_MIRROR: ${APK_MIRROR:-}
-        COMPOSER_MIRROR: ${COMPOSER_MIRROR:-}
-    container_name: keel-server
-    restart: always
+  # 一次性初始化：migrate → install → seed，跑完即退出
+  #
+  # 单独成一个服务而不是塞进 server 的 entrypoint，为的是让「改表结构」这件事
+  # 与「跑服务」分开、并且失败能拦住发布。server 用 service_completed_successfully
+  # 等它，所以哪怕直接 `up -d`（不走 deploy.sh）顺序也是对的。
+  #
+  # 每次 `up -d` 都会重跑（compose 会把已退出的一次性容器重新拉起），三步都幂等，
+  # 约 1 秒。多副本时也只有这一个容器在改表，不会并发迁移。
+  migrate:
+    build: *server-build
+    image: keel-server:latest
+    container_name: keel-migrate
+    restart: "no"
     working_dir: /app
-    environment:
-      APP_NAME: ${APP_NAME:-Keel}
-      APP_ENV: prod
-      APP_DEBUG: "false"
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE:-keel}
-      DB_USERNAME: ${DB_USERNAME:-keel}
-      DB_PASSWORD: ${DB_PASSWORD}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_DB: ${REDIS_DB:-0}
-      JWT_SECRET: ${JWT_SECRET:?必须在 .env 中设置}
-      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-7200}
-      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-604800}
-      LOGIN_FAIL_LIMIT: ${LOGIN_FAIL_LIMIT:-5}
-      LOGIN_IP_FAIL_LIMIT: ${LOGIN_IP_FAIL_LIMIT:-20}
-      LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-30}
-      CAPTCHA_TTL: ${CAPTCHA_TTL:-120}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?必须在 .env 中设置}
-      SEED_DEMO: ${SEED_DEMO:-}           # 生产默认不播演示账号，预览站在 .env 里显式打开
-      # 多端：生产不给默认值，未配置即该端不可用（PROJECT.md §8）
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
-      CLIENT_RATE_LIMIT: ${CLIENT_RATE_LIMIT:-120}
-      CLIENT_IP_RATE_LIMIT: ${CLIENT_IP_RATE_LIMIT:-}
-      CLIENT_RATE_WINDOW: ${CLIENT_RATE_WINDOW:-60}
-      OPEN_APP_KEY: ${OPEN_APP_KEY:-}
-      OPEN_APP_SECRET: ${OPEN_APP_SECRET:-}
-      OPEN_IP_WHITELIST: ${OPEN_IP_WHITELIST:-}
-      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
-      SLOW_QUERY_MS: ${SLOW_QUERY_MS:-500}
-      TZ: Asia/Shanghai
-      COMPOSER_ALLOW_SUPERUSER: 1
+    entrypoint: ["/usr/local/bin/init.sh"]
+    environment: *server-env
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
-      - ./server:/app
-      - composer-cache:/root/.composer
+      - server-runtime:/app/runtime
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  server:
+    build: *server-build
+    image: keel-server:latest
+    container_name: keel-server
+    restart: always
+    working_dir: /app
+    environment: *server-env
+    # 代码与依赖都在镜像里，运行期不该有任何写入根文件系统的需求。
+    # 真有组件想写（临时文件、缓存），这里会立刻报错而不是悄悄写进容器层——
+    # 写进容器层的东西下次发版就没了，属于「测试环境好好的，线上偶发丢数据」那一类。
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      # 日志、导入导出临时文件、pid
+      - server-runtime:/app/runtime
+      # ⚠️ 用户上传的头像等，**是业务数据**。不挂卷的话每次发版重建镜像就全没了
+      - server-uploads:/app/public/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   web:
     build:
@@ -113,4 +157,5 @@ services:
 volumes:
   mysql-data:
   redis-data:
-  composer-cache:
+  server-runtime:
+  server-uploads:
