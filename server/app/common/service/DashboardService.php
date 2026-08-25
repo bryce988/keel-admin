@@ -69,28 +69,102 @@ class DashboardService
     }
 
     /**
+     * 概览页用到的全部计数，一次请求只算一次
+     *
+     * 拆成独立方法是为了掐掉两处浪费，它们在 23 条 SQL 的首页里占了一半：
+     *
+     * 1. **重复计数**：`stats()` 与 `moduleSummary()` 各自查了一遍用户、部门、岗位、角色，
+     *    同一个数在一次请求里查两次
+     * 2. **同表多查**：「总数」与「其中多少条满足某条件」是同一张表的两个聚合，
+     *    原先拆成两条 `count()`。合成一条 `SUM(条件)` 不只是省一次往返——
+     *    两次查询之间刚好有人登录，「今日登录 7 次、失败 8 次」这种对不上的数就出来了
+     *
+     * 记在 `Ctx` 而不是 static 属性：static 存请求态是 webman 常驻内存的红线，
+     * 第二个请求会读到第一个请求的数（PROJECT.md §14）。
+     *
+     * 用 `toBase()` 而不是模型查询：它会先 `applyScopes()` 再退回查询构造器，
+     * 数据权限与软删除条件一条不少，但不必为了取两个聚合值去 hydrate 一个模型。
+     *
+     * @return array<string, int>
+     */
+    private static function counts(): array
+    {
+        $cached = Ctx::get('dashboard.counts');
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $today = date('Y-m-d') . ' 00:00:00';
+
+        $user = SysUserModel::query()->toBase()
+            ->selectRaw(
+                'COUNT(*) AS total, SUM(status <> ?) AS active',
+                [SysUserModel::STATUS_DISABLED]
+            )->first();
+
+        $perm = SysPermissionModel::query()->toBase()
+            ->selectRaw(
+                'COUNT(*) AS total, SUM(status = ?) AS enabled',
+                [SysPermissionModel::STATUS_ENABLED]
+            )->first();
+
+        $login = SysLoginLogModel::query()->toBase()
+            ->where('created_at', '>=', $today)
+            ->selectRaw(
+                'COUNT(*) AS total, SUM(status = ?) AS failed',
+                [SysLoginLogModel::STATUS_FAIL]
+            )->first();
+
+        // 操作日志要三个数：全量总数、今日总数、今日失败数。
+        // 全量那个没有时间条件，所以不能像上面登录日志那样先 where 再聚合，
+        // 只能把时间条件放进 SUM 里
+        $op = SysOperationLogModel::query()->toBase()
+            ->selectRaw(
+                'COUNT(*) AS total,
+                 SUM(created_at >= ?) AS today,
+                 SUM(created_at >= ? AND status = ?) AS today_failed',
+                [$today, $today, SysOperationLogModel::STATUS_FAIL]
+            )->first();
+
+        // SUM() 在空结果集上返回 NULL，(int) 之后才是 0
+        $out = [
+            'user_total'   => (int) ($user->total ?? 0),
+            'user_active'  => (int) ($user->active ?? 0),
+            'dept'         => SysDeptModel::query()->count(),
+            'post'         => SysPostModel::query()->count(),
+            'role'         => SysRoleModel::query()->count(),
+            'perm_total'   => (int) ($perm->total ?? 0),
+            'perm_enabled' => (int) ($perm->enabled ?? 0),
+            'dict'         => SysDictTypeModel::query()->count(),
+            'param'        => SysParamModel::query()->count(),
+            'login_today'  => (int) ($login->total ?? 0),
+            'login_failed' => (int) ($login->failed ?? 0),
+            'op_total'     => (int) ($op->total ?? 0),
+            'op_today'     => (int) ($op->today ?? 0),
+            'op_failed'    => (int) ($op->today_failed ?? 0),
+        ];
+
+        Ctx::set('dashboard.counts', $out);
+
+        return $out;
+    }
+
+    /**
      * 四张指标卡
      *
      * 用户与今日登录受数据权限影响，部门/岗位/角色/权限点是全局配置，对谁都一样。
      */
     private static function stats(): array
     {
-        $today = date('Y-m-d') . ' 00:00:00';
-
-        $userTotal    = SysUserModel::query()->count();
-        $userActive   = SysUserModel::query()->where('status', '<>', SysUserModel::STATUS_DISABLED)->count();
-        $loginToday   = SysLoginLogModel::query()->where('created_at', '>=', $today)->count();
-        $loginFailed  = SysLoginLogModel::query()->where('created_at', '>=', $today)->where('status', SysLoginLogModel::STATUS_FAIL)->count();
-        $opToday      = SysOperationLogModel::query()->where('created_at', '>=', $today)->count();
-        $opFailed     = SysOperationLogModel::query()->where('created_at', '>=', $today)->where('status', SysOperationLogModel::STATUS_FAIL)->count();
+        $c = self::counts();
 
         return [
             [
                 'key'    => 'user',
                 'label'  => '用户',
-                'value'  => $userTotal,
+                'value'  => $c['user_total'],
                 'unit'   => '人',
-                'hint'   => "在职 {$userActive} · 停用 " . ($userTotal - $userActive),
+                'hint'   => "在职 {$c['user_active']} · 停用 " . ($c['user_total'] - $c['user_active']),
                 'tone'   => 'primary',
                 'to'     => '/system/user',
                 'perm'   => 'sys:user:list',
@@ -98,9 +172,9 @@ class DashboardService
             [
                 'key'    => 'org',
                 'label'  => '组织',
-                'value'  => SysDeptModel::query()->count(),
+                'value'  => $c['dept'],
                 'unit'   => '个部门',
-                'hint'   => '岗位 ' . SysPostModel::query()->count() . ' 个',
+                'hint'   => "岗位 {$c['post']} 个",
                 'tone'   => 'success',
                 'to'     => '/system/dept',
                 'perm'   => 'sys:dept:list',
@@ -108,9 +182,9 @@ class DashboardService
             [
                 'key'    => 'auth',
                 'label'  => '角色',
-                'value'  => SysRoleModel::query()->count(),
+                'value'  => $c['role'],
                 'unit'   => '个',
-                'hint'   => '权限点 ' . SysPermissionModel::query()->enabled()->count() . ' 条',
+                'hint'   => "权限点 {$c['perm_enabled']} 条",
                 'tone'   => 'warning',
                 'to'     => '/system/role',
                 'perm'   => 'sys:role:list',
@@ -118,14 +192,14 @@ class DashboardService
             [
                 'key'    => 'today',
                 'label'  => '今日登录',
-                'value'  => $loginToday,
+                'value'  => $c['login_today'],
                 'unit'   => '次',
                 // 失败次数单独点出来：它是这张卡里唯一需要人去看一眼的信号
-                'hint'   => $loginFailed > 0 ? "失败 {$loginFailed} 次" : '无失败',
-                'tone'   => $loginFailed > 0 ? 'danger' : 'info',
+                'hint'   => $c['login_failed'] > 0 ? "失败 {$c['login_failed']} 次" : '无失败',
+                'tone'   => $c['login_failed'] > 0 ? 'danger' : 'info',
                 'to'     => '/log/login',
                 'perm'   => 'sys:log:login:list',
-                'extra'  => ['op_today' => $opToday, 'op_failed' => $opFailed],
+                'extra'  => ['op_today' => $c['op_today'], 'op_failed' => $c['op_failed']],
             ],
         ];
     }
@@ -198,15 +272,19 @@ class DashboardService
      */
     private static function moduleSummary(): array
     {
+        $c = self::counts();
+
+        // 这里的数与上面指标卡共用同一次查询：以前两处各查一遍，
+        // 除了白花四条 SQL，还可能因为两次查询之间有写入而对不上
         return [
-            ['name' => '用户',     'count' => SysUserModel::query()->count(),                       'to' => '/system/user',  'perm' => 'sys:user:list'],
-            ['name' => '部门',     'count' => SysDeptModel::query()->count(),                       'to' => '/system/dept',  'perm' => 'sys:dept:list'],
-            ['name' => '岗位',     'count' => SysPostModel::query()->count(),                       'to' => '/system/post',  'perm' => 'sys:post:list'],
-            ['name' => '角色',     'count' => SysRoleModel::query()->count(),                       'to' => '/system/role',  'perm' => 'sys:role:list'],
-            ['name' => '权限点',   'count' => SysPermissionModel::query()->count(),                 'to' => '/system/menu',  'perm' => 'sys:menu:list'],
-            ['name' => '字典',     'count' => SysDictTypeModel::query()->count(),                   'to' => '/system/dict',  'perm' => 'sys:dict:list'],
-            ['name' => '参数',     'count' => SysParamModel::query()->count(),                      'to' => '/system/param', 'perm' => 'sys:param:list'],
-            ['name' => '操作日志', 'count' => SysOperationLogModel::query()->count(),               'to' => '/log/operation', 'perm' => 'sys:log:operation:list'],
+            ['name' => '用户',     'count' => $c['user_total'],   'to' => '/system/user',   'perm' => 'sys:user:list'],
+            ['name' => '部门',     'count' => $c['dept'],         'to' => '/system/dept',   'perm' => 'sys:dept:list'],
+            ['name' => '岗位',     'count' => $c['post'],         'to' => '/system/post',   'perm' => 'sys:post:list'],
+            ['name' => '角色',     'count' => $c['role'],         'to' => '/system/role',   'perm' => 'sys:role:list'],
+            ['name' => '权限点',   'count' => $c['perm_total'],   'to' => '/system/menu',   'perm' => 'sys:menu:list'],
+            ['name' => '字典',     'count' => $c['dict'],         'to' => '/system/dict',   'perm' => 'sys:dict:list'],
+            ['name' => '参数',     'count' => $c['param'],        'to' => '/system/param',  'perm' => 'sys:param:list'],
+            ['name' => '操作日志', 'count' => $c['op_total'],     'to' => '/log/operation', 'perm' => 'sys:log:operation:list'],
         ];
     }
 
