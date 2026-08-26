@@ -56,6 +56,19 @@
   --el-color-info-light-8: #dfdee2;
   --el-color-info-light-9: #efeff1;
   --el-color-info-dark-2: #4a4958;
+
+  /* 字体栈：跟随系统 UI 字体（macOS/iOS 走 -apple-system，Windows 走 Segoe UI，
+   * Android 走 Roboto），比 EP 默认那套写死 Helvetica Neue 的更贴近各平台原生观感。
+   *
+   * 覆盖 --el-font-family 而不只是给 body 设 font-family——EP 组件内部
+   * （表格、下拉、消息框等）引用的是这个变量，只改 body 会盖不全。
+   *
+   * 中文字体排在西文之后、且必须显式写出：浏览器是**逐字符**回退的，
+   * 拉丁字形由前面的西文字体命中，轮不到中文字体；而汉字在西文字体里没有字形，
+   * 才会继续往后找。不写 PingFang SC / Microsoft YaHei 的话，
+   * Windows 下汉字落到浏览器的默认回退字体（各机器设置不同，观感不可控）。 */
+  --el-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans', 'Noto Sans SC', sans-serif;
 }
 
 html.dark {
@@ -153,8 +166,7 @@ body,
 }
 
 body {
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-    Arial, sans-serif;
+  font-family: var(--el-font-family);
   font-size: 14px;
   color: var(--el-text-color-regular);
   background: var(--el-bg-color-page);
