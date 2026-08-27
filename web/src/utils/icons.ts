@@ -16,16 +16,25 @@ import type { Component } from 'vue'
  * ## 关于打包体积：这里**没有**做懒加载，原因如下
  *
  * `@element-plus/icons-vue` 发布的是**一个** `dist/index.js`，293 个图标全在里面，
- * 没有单图标入口。而布局外壳（layout、ProTable、SearchForm）静态 import 了
- * Search / Refresh / Fold 等约 25 个图标——只要有一处静态 import，这个模块就落在
- * 主 chunk 里；此时再写 `import('@element-plus/icons-vue')` 拿全量，
- * Rollup 只会把它**并回**主 chunk（实测：加上动态 import 后主 chunk 从 674KB 涨到 818KB，
- * 而不是多出一个异步 chunk）。写成异步只会平添一个永远瞬时完成的 loading 态。
+ * 没有单图标入口。而布局外壳（layout、TagsView、MenuSearch）静态 import 了
+ * Fold / Search / Moon 等十来个图标——只要有一处静态 import，这个模块就落在
+ * 首屏 chunk 里；此时再写 `import('@element-plus/icons-vue')` 拿全量，
+ * Rollup 只会把它**并回**首屏（实测：加上动态 import 后主 chunk 从 674KB 涨到 818KB，
+ * 而不是多出一个异步 chunk）。Rollup 是按模块分包的，而这个包只有一个模块：
+ * 静态可达就整个进首屏，动态那侧要用到全部导出，两边取并集就是 293 个。
  *
- * 要真正把这 144KB（gzip 38KB）拆出去，唯一的办法是**外壳里一个图标都不从这个包静态引**，
- * 也就是把那 25 个图标的 SVG 抄成本地组件。代价是与 EP 版本漂移、且违背「不写死资源」的取向，
- * 收益是首屏 JS 从 gzip 270KB 降到 232KB。目前判断不值，如果哪天首屏预算收紧，
- * 这就是下一个可动的地方。
+ * 它现在被 `vite.config.ts` 的 manualChunks 单独切成 `icons` chunk：
+ * 171KB / gzip 44KB，占首屏 JS（gzip 135KB）的三分之一。切出来不为省字节
+ * ——照样首屏加载——是因为它内容固定，值得单独长期缓存。
+ *
+ * 要真正让它变成按需加载，唯一的办法是**首屏一个图标都不从这个包静态引**，
+ * 把那十来个外壳图标的 SVG 抄成本地组件。但真正的拦路虎不是抄图标，是**侧边栏**：
+ * 菜单图标名由后端下发，可以是 293 个里的任意一个。改成异步之后，用户给菜单选了
+ * `Football`，侧边栏就会先显示兜底的 `Menu` 再跳成 `Football`——
+ * 而这是脚手架的常规用法，不是边角情况。省 44KB 换全站侧边栏图标闪一下，不值。
+ *
+ * 换句话说：这 44KB 不是「还没来得及优化」，是 DB 驱动图标名的固有代价。
+ * 真要动，得先改设计（比如把可选图标收敛成一个白名单），而不是改打包配置。
  */
 
 /**

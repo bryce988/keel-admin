@@ -40,6 +40,33 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        /**
+         * 手动分包：只切「整体都在首屏、且没有懒加载专属消费者」的第三方包
+         *
+         * 目的**不是**减少首屏字节数——这几个包本来就要在首屏下完，切开总量不变。
+         * 目的是缓存粒度：它们只在升级依赖时才变，而业务代码每次发版都变。
+         * 混在一个文件里，改一行业务就得让用户重下整包。
+         *
+         * ⚠️ 只能放**首屏本来就要加载**的包。像 `element-plus` 这种按需导入的，
+         * 千万别整包切一个 chunk：`el-table` / `el-date-picker` 现在是跟着
+         * ProTable / SearchForm 落在异步 chunk 里的，一旦点名进 manualChunks
+         * 就会被提到首屏，等于把上面「去掉全局注册」省下的 300KB 又还回去。
+         * 同理 `lodash-es`、`dayjs`、`@vueuse` 都有只被懒加载组件用到的部分，也不切。
+         * EP 自己的分包交给 Rollup 按引用关系自动做，它做得对。
+         */
+        manualChunks: {
+          // 框架与 HTTP 客户端：全站每个页面都要用
+          vendor: ['vue', 'vue-router', 'pinia', 'axios'],
+          // 293 个图标一个扁平文件，内容固定，最适合长期缓存
+          // （为什么整包进首屏而不是懒加载，见 src/utils/icons.ts 的注释）
+          icons: ['@element-plus/icons-vue']
+        }
+      }
+    }
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,

@@ -1,25 +1,27 @@
-import type { App } from 'vue'
-import ProTable from './ProTable.vue'
-import SearchForm from './SearchForm.vue'
-import FormDrawer from './FormDrawer.vue'
-import FormDialog from './FormDialog.vue'
-import DictSelect from './DictSelect.vue'
-import DictTag from './DictTag.vue'
-import EmptyState from './EmptyState.vue'
-import PageSkeleton from './PageSkeleton.vue'
-import BrandLogo from './BrandLogo.vue'
-
-export {
-  BrandLogo,
-  ProTable,
-  SearchForm,
-  FormDrawer,
-  FormDialog,
-  DictSelect,
-  DictTag,
-  EmptyState,
-  PageSkeleton
-}
+/**
+ * 通用组件的**类型**出口
+ *
+ * 这里只导出类型。组件本体不从这里走，也不再提供 `app.use()` 的全局注册。
+ *
+ * ## 为什么去掉全局注册
+ *
+ * `src/components/` 是 unplugin-vue-components 的默认扫描目录，用到 `<ProTable>`
+ * 的页面**早就**被插件按页注入了 import——`src/types/components.d.ts` 里列着。
+ * 也就是说原先 `main.ts` 里的 `app.use(components)` 一个组件都没多注册，
+ * 纯粹是历史遗留的第二条路径。
+ *
+ * 但它不是无害的。这个文件为了注册要静态 import 全部九个组件，而 `main.ts` 又静态
+ * import 了这个文件，于是整条链被钉进**首屏** chunk：`ProTable` 带着 `el-table`，
+ * `SearchForm` 带着 `el-date-picker` 与 `el-time-picker`——三个加起来 320KB（未压缩），
+ * 连只有一个输入框的登录页都得先下完。
+ *
+ * 删掉之后这些组件只被懒加载的页面引用，自然落进异步 chunk。
+ *
+ * ⚠️ 别把组件本体重新 `export` 回来：只要有一处在首屏路径上按值 import 这个 barrel，
+ * 上面那条链就原样回来了。页面要用直接写 `<ProTable>`（插件注入），
+ * 或显式 `import ProTable from '@/components/ProTable.vue'`。
+ * `src/layout/` 与 `src/views/` 不在扫描目录里，那边本来就是显式 import。
+ */
 export type { ProColumn, PageResult, TableQuery } from './ProTable.vue'
 export type { SearchField } from './SearchForm.vue'
 /*
@@ -38,23 +40,4 @@ export type {
 export interface ProTableInstance {
   reload: () => void
   refresh: () => void
-}
-
-/**
- * 全局注册
- *
- * 这几个组件在每个列表页都会用到，逐页 import 只是噪音。
- * 业务组件不要往这里加——全局注册的东西进不了 tree-shaking。
- */
-export default {
-  install(app: App) {
-    app.component('ProTable', ProTable)
-    app.component('SearchForm', SearchForm)
-    app.component('FormDrawer', FormDrawer)
-    app.component('FormDialog', FormDialog)
-    app.component('DictSelect', DictSelect)
-    app.component('DictTag', DictTag)
-    app.component('EmptyState', EmptyState)
-    app.component('PageSkeleton', PageSkeleton)
-  }
 }

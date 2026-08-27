@@ -25,14 +25,19 @@ import App from './App.vue'
 import router from './router'
 import { useAppStore } from './stores/app'
 import directives from './directives/permission'
-import components from './components'
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
 app.use(directives) // v-permission / v-role
-app.use(components) // ProTable / SearchForm / DictSelect / DictTag
+
+/*
+ * 这里原来还有一行 `app.use(components)` 注册 ProTable / SearchForm 等通用组件。
+ * 它是**多余的**：`src/components/` 本就在 unplugin-vue-components 的扫描目录里，
+ * 用到的页面早已被按页注入 import。而多这一层的代价是首屏——
+ * 详见 `components/index.ts` 的注释。
+ */
 
 /*
  * 这里原来把 293 个图标全部 app.component() 注册了一遍，理由是「菜单的 icon
