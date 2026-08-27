@@ -2,8 +2,25 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 
 const SIDEBAR_KEY = 'keel_sidebar_collapsed'
 const THEME_KEY = 'keel_theme'
+const LAYOUT_KEY = 'keel_layout'
 
 export type ThemeMode = 'light' | 'dark'
+
+/**
+ * 导航版式
+ *
+ * - `side` 经典：一级、二级都在左侧栏，二级嵌套展开
+ * - `mix`  混合：一级在顶栏横排，左侧栏只显示当前一级项的子菜单
+ *
+ * 两者用的是**同一棵**后端菜单树（`userStore.menus`），只是分层渲染的位置不同，
+ * 所以切换版式不涉及路由重注册，也不需要后端配合。
+ */
+export type LayoutMode = 'side' | 'mix'
+
+/** 读版式：localStorage 里可能是历史遗留的脏值，只认已知的两个 */
+function readLayout(): LayoutMode {
+  return localStorage.getItem(LAYOUT_KEY) === 'mix' ? 'mix' : 'side'
+}
 
 /**
  * 降级路径用的定时器（见 `toggleTheme`）
@@ -19,17 +36,33 @@ type ViewTransitionDocument = Document & {
   startViewTransition?: (cb: () => void) => { finished: Promise<void> }
 }
 
-/** 全局界面状态：侧栏折叠、主题，均持久化到 localStorage */
+/** 全局界面状态：侧栏折叠、主题、导航版式，均持久化到 localStorage */
 export const useAppStore = defineStore('app', {
   state: () => ({
     sidebarCollapsed: localStorage.getItem(SIDEBAR_KEY) === '1',
-    theme: (localStorage.getItem(THEME_KEY) as ThemeMode) || 'light'
+    theme: (localStorage.getItem(THEME_KEY) as ThemeMode) || 'light',
+    layout: readLayout()
   }),
 
   actions: {
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
       localStorage.setItem(SIDEBAR_KEY, this.sidebarCollapsed ? '1' : '0')
+    },
+
+    /**
+     * 切换导航版式
+     *
+     * 顺手把折叠态复位：混合版式下侧栏只剩当前模块的几个二级项，
+     * 带着上一个版式的折叠状态过来，用户会看到一条只有图标的窄条，
+     * 而这时候他刚点完「混合布局」，最需要看清的恰恰是侧栏变成了什么。
+     */
+    setLayout(mode: LayoutMode) {
+      if (this.layout === mode) return
+      this.layout = mode
+      localStorage.setItem(LAYOUT_KEY, mode)
+      this.sidebarCollapsed = false
+      localStorage.setItem(SIDEBAR_KEY, '0')
     },
 
     /**

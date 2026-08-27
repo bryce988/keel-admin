@@ -1,25 +1,27 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { resolveMenuIcon } from '@/utils/icons'
 import { useAppStore } from '@/stores/app'
-import { useUserStore } from '@/stores/user'
+import { useMenuNav } from '@/composables/useMenuNav'
 import type { MenuNode } from '@/stores/user'
 
-const route = useRoute()
+/**
+ * 要渲染的节点
+ *
+ * 不传 = 整棵菜单树（经典版式）。混合版式由 layout 传入当前一级模块的子菜单，
+ * 一级项已经在顶栏了，侧栏不再重复显示它。
+ */
+const props = defineProps<{ nodes?: MenuNode[] }>()
+
 const appStore = useAppStore()
-const userStore = useUserStore()
+const { topMenus, activeMenuPath } = useMenuNav()
 
 /** 后端返回的 icon 是 Element Plus 图标名，这里动态解析（见 utils/icons.ts） */
 const resolveIcon = resolveMenuIcon
 
-const menus = computed(() => userStore.menus.filter((m) => m.visible))
+const menus = computed(() => props.nodes ?? topMenus.value)
 
-/**
- * 当前高亮项：详情页等不在菜单里的路由，
- * 通过 meta.activeMenu 指回它的列表页（PROJECT.md §4）
- */
-const activeMenu = computed(() => (route.meta.activeMenu as string) || route.path)
+const activeMenu = activeMenuPath
 
 function hasChildren(node: MenuNode) {
   return !!node.children?.some((c) => c.visible)
