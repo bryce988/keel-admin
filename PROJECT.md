@@ -840,7 +840,9 @@ php start.php status       # 查看进程与连接状态
 **发布流程**：拉取代码 → `composer install --no-dev -o` → 执行数据库迁移 → `php start.php reload`。
 只有修改了 `config/`、`process/` 或启动文件时才需要 `restart`，其余情况一律 `reload`，避免请求中断。
 
-**进程与端口**：`config/server.php` 中 `count` 建议设为 CPU 核数 × 2~4，压测后定值；webman 监听 8787，不直接对外，由 Nginx 反向代理。
+**进程与端口**：`config/process.php` 中 `count` 为 `max(8, 核数 × 2)`，可用 `WORKER_COUNT` 覆盖；
+倍数由压测定值（拐点在 ×2，×4 多一倍内存而吞吐持平），依据与复现脚本见该文件注释与 `scripts/bench-workers.sh`。
+webman 监听 8787，不直接对外，由 Nginx 反向代理。
 
 ```nginx
 upstream webman {
@@ -1003,15 +1005,19 @@ worker 回收时内核不再往它派新连接。压测中曾用 `false` 复现�
 | M4 联调加固 | 权限矩阵验证、异常场景、性能优化 | 压测与进程数定值、内存泄漏观察、部署脚本与守护配置、client/open 空壳链路联通验证 |
 | | ↳ 可重复执行：`sh scripts/acceptance.sh`（26 项断言） | |
 
-**M4 里两项没有真正完成，如实记在这里而不是从上表里划掉：**
+**M4 曾遗留两项，均已补做（2026-08-27）：**
 
-- **进程数定值**：只记录了依据（每 worker 稳态 26MB，见 `config/process.php` 注释），
-  没有定出具体数字。压测跑的是 4 并发，远没打满 40 个 worker，那种数据推不出最优值。
-  真要定值得先有目标 QPS 与 P99 延迟，再从 `count=核数` 逐档压到延迟拐点——
-  那是接了真实业务、有了真实流量画像之后的事，现在定等于拍脑袋。
-- **前端性能优化**：没做。目前唯一已知的点是生产包主 chunk 1.27MB（gzip 412KB），
-  构建时一直有 chunk 过大的告警。按路由拆包是明确可行的，但脚手架阶段没有真实页面数量，
-  拆了也验证不出收益。
+- **进程数定值** ✅ 由 `max(8, 核数 × 2)` 取代原先的 `核数 × 4`，可用 `WORKER_COUNT` 覆盖。
+  逐档压测（并发 100，三次取中位）显示吞吐拐点在 ×2：×4 内存翻倍而吞吐持平，×8 开始倒退。
+  复现脚本 `scripts/bench-workers.sh`，完整数据与两条硬约束（内存、MySQL 连接数）
+  记在 `config/process.php` 的 count 注释里。
+  保底 8 个是**推理不是实测**——防的是导出这类长阻塞接口把小池子占满，
+  演示库数据量太小压不出来，接真实业务后应复测。
+- **前端拆包** ✅ 首屏 JS 从 816KB 降到 404KB（gzip 269 → 135KB）。
+  根因不是没分包，而是通用组件被注册了两遍：`main.ts` 的 `app.use(components)` 与
+  unplugin-vue-components 的按页注入重复，前者把 `ProTable` / `SearchForm` 连同
+  `el-table`、`el-date-picker` 钉进首屏依赖图，登录页也得下载。
+  另按缓存粒度切出 `vendor` 与 `icons` 两个 chunk，业务代码单独 72KB（gzip 29KB）。
 
 **验收清单**（勾选 = 已实测，非「应该没问题」）
 

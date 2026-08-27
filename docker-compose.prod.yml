@@ -52,6 +52,8 @@ x-server-env: &server-env
   OPEN_IP_WHITELIST: ${OPEN_IP_WHITELIST:-}
   INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
   SLOW_QUERY_MS: ${SLOW_QUERY_MS:-500}
+  # HTTP worker 进程数；留空按 CPU 核数 × 4，依据见 server/config/process.php
+  WORKER_COUNT: ${WORKER_COUNT:-}
   TZ: Asia/Shanghai
 
 services:
