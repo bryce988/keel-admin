@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { Download, Key, Plus, Upload } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, Download, EditPen, Key, Open, Plus, TurnOff, Upload, View } from '@element-plus/icons-vue'
 import {
   createUser,
   deleteUser,
@@ -63,7 +63,7 @@ const columns: ProColumn<UserRow>[] = [
   { prop: 'email', label: '邮箱', minWidth: 200, align: 'center', hidden: true },
   { prop: 'status', label: '状态', width: 100, align: 'center', dict: 'user_status' },
   { prop: 'last_login_at', label: '最后登录', minWidth: 190, align: 'center', sortable: true },
-  { prop: 'actions', label: '操作', width: 230, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 // ---------------------------------------------------------------- 部门树与选项
@@ -91,15 +91,15 @@ function onDeptClick(node: DeptNode) {
   tableRef.value?.reload()
 }
 
-/** 部门树压平成下拉项，全角空格做层级缩进 */
+/** 部门树压平成下拉项，depth 只用于下拉项的缩进渲染，不进 label（否则选中后输入框里带缩进） */
 const deptOptions = computed(() => {
-  const flatten = (nodes: DeptNode[], depth = 0): Array<{ id: number; name: string }> =>
+  const flatten = (nodes: DeptNode[], depth = 0): Array<{ id: number; name: string; depth: number }> =>
     nodes.flatMap((n) => [
-      { id: n.id, name: '　'.repeat(depth) + n.name },
+      { id: n.id, name: n.name, depth },
       ...(n.children?.length ? flatten(n.children, depth + 1) : [])
     ])
 
-  return [{ id: 0, name: '未分配' }, ...flatten(deptTree.value)]
+  return [{ id: 0, name: '未分配', depth: 0 }, ...flatten(deptTree.value)]
 })
 
 // ---------------------------------------------------------------- 增改删
@@ -349,10 +349,10 @@ onMounted(() => {
 
         <template #actions="{ row }">
           <div class="table-actions">
-            <el-button link type="primary" @click="onView(row)">详情</el-button>
+            <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
 
             <template v-if="!row.is_super">
-              <el-button v-permission="'sys:user:update'" link type="primary" @click="onEdit(row)">
+              <el-button :icon="EditPen" v-permission="'sys:user:update'" link type="primary" @click="onEdit(row)">
                 编辑
               </el-button>
               <!--
@@ -362,7 +362,15 @@ onMounted(() => {
                 定位片段的锚点文本节点，删掉它等于破坏 Vue 的 DOM 记账。
               -->
               <el-dropdown v-if="canMore">
-                <el-button link type="primary">更多</el-button>
+                <!--
+                  「更多」的箭头放在文字**右边**（`el-icon--right`），与其余按钮的
+                  左置图标不同：左边的图标说「这个动作是什么」，而这里的向下箭头说的是
+                  「点了会展开一层」，是方向提示，跟着文字走才读得通。
+                -->
+                <el-button link type="primary">
+                  更多
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item
@@ -372,10 +380,15 @@ onMounted(() => {
                     >
                       重置密码
                     </el-dropdown-item>
-                    <el-dropdown-item v-if="can.update" @click="onToggleStatus(row)">
+                    <!-- 图标跟着当前会执行的动作走，不是跟着当前状态走 -->
+                    <el-dropdown-item
+                      v-if="can.update"
+                      :icon="row.status === 0 ? Open : TurnOff"
+                      @click="onToggleStatus(row)"
+                    >
                       {{ row.status === 0 ? '启用' : '停用' }}
                     </el-dropdown-item>
-                    <el-dropdown-item v-if="can.remove" divided @click="onDelete(row)">
+                    <el-dropdown-item v-if="can.remove" :icon="Delete" divided @click="onDelete(row)">
                       删除
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -431,7 +444,9 @@ onMounted(() => {
           </el-form-item>
           <el-form-item label="部门" prop="dept_id" :error="errors.dept_id">
             <el-select v-model="form.dept_id" style="width: 100%">
-              <el-option v-for="d in deptOptions" :key="d.id" :label="d.name" :value="d.id" />
+              <el-option v-for="d in deptOptions" :key="d.id" :label="d.name" :value="d.id">
+                <span :style="{ paddingLeft: d.depth * 16 + 'px' }">{{ d.name }}</span>
+              </el-option>
             </el-select>
           </el-form-item>
           <el-form-item label="岗位" prop="post_id">

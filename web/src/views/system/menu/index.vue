@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
 import { resolveIconOrNone } from '@/utils/icons'
-import { Plus } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, EditPen, Plus, View } from '@element-plus/icons-vue'
 import IconPicker from '@/components/IconPicker.vue'
 import {
   createMenu,
@@ -15,6 +15,7 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { useUserStore } from '@/stores/user'
 import { BizCode } from '@/constants/bizCode'
 
 /**
@@ -25,6 +26,24 @@ import { BizCode } from '@/constants/bizCode'
  * 反过来说填错了会让整个页面打不开，所以表单按类型收紧了可填字段。
  */
 const dictStore = useDictStore()
+
+/**
+ * 操作列：可见槽位固定三个（约定见 views/system/role/index.vue 的同名注释）
+ *
+ * 详情 / 编辑 / 更多。「新增下级」与「删除」收进下拉：前者只在扩展树时用，
+ * 后者是破坏性动作，都不该常驻在最显眼的位置；而「编辑」是每一行都支持、
+ * 每个页面都在同一个位置的动作，留在外面。
+ */
+const userStore = useUserStore()
+
+/** 「更多」里两项各自的权限 */
+const can = computed(() => ({
+  create: userStore.can('sys:menu:create'),
+  remove: userStore.can('sys:menu:delete')
+}))
+
+/** 逐行判断：叶子节点加不了下级，只剩「删除」一项时仍然渲染，全空才隐藏 */
+const canMore = (row: MenuNodeRow) => (can.value.create && row.type <= 2) || can.value.remove
 
 const tableRef = ref<ProTableInstance | null>(null)
 const drawerRef = ref<FormDrawerInstance<MenuPayload> | null>(null)
@@ -227,22 +246,35 @@ onMounted(() => {
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button link type="primary" @click="onView(row)">详情</el-button>
-          <el-button
-            v-if="row.type <= 2"
-            v-permission="'sys:menu:create'"
-            link
-            type="primary"
-            @click="onCreate(row.id, row.type === 1 ? 2 : 3)"
-          >
-            新增下级
-          </el-button>
-          <el-button v-permission="'sys:menu:update'" link type="primary" @click="onEdit(row)">
+          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <el-button :icon="EditPen" v-permission="'sys:menu:update'" link type="primary" @click="onEdit(row)">
             编辑
           </el-button>
-          <el-button v-permission="'sys:menu:delete'" link type="danger" @click="onDelete(row)">
-            删除
-          </el-button>
+          <!--
+            「新增下级」只有目录与菜单能加（type <= 2），按钮/接口/数据是叶子。
+            这一条本来就在，收进下拉后仍然要判——否则叶子节点的下拉里会出现
+            一个点了报错的项
+          -->
+          <el-dropdown v-if="canMore(row)">
+            <el-button link type="primary">
+              更多
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-if="can.create && row.type <= 2"
+                  :icon="Plus"
+                  @click="onCreate(row.id, row.type === 1 ? 2 : 3)"
+                >
+                  新增下级
+                </el-dropdown-item>
+                <el-dropdown-item v-if="can.remove" :icon="Delete" divided @click="onDelete(row)">
+                  删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </template>
     </ProTable>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { Delete, Plus } from '@element-plus/icons-vue'
+import { Delete, EditPen, Plus, View } from '@element-plus/icons-vue'
 import {
   batchDeletePosts,
   createPost,
@@ -46,18 +46,18 @@ const columns: ProColumn<PostRow>[] = [
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'remark', label: '备注', minWidth: 180, hidden: true },
   { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', sortable: true, hidden: true },
-  { prop: 'actions', label: '操作', width: 180, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 const selected = ref<PostRow[]>([])
 const deptTree = ref<DeptNode[]>([])
 
 /** 岗位可以是「全公司通用」，所以选择器要有 dept_id = 0 这一项 */
-const deptOptions = ref<Array<{ id: number; name: string }>>([])
+const deptOptions = ref<Array<{ id: number; name: string; depth: number }>>([])
 
 async function loadDepts() {
   deptTree.value = await fetchDeptTree()
-  deptOptions.value = [{ id: 0, name: '全公司通用' }, ...flatten(deptTree.value)]
+  deptOptions.value = [{ id: 0, name: '全公司通用', depth: 0 }, ...flatten(deptTree.value)]
 }
 
 /**
@@ -84,9 +84,10 @@ function roleName(id?: number): string {
 }
 
 /** 树压平成下拉选项，用全角空格做层级缩进——比再塞一个树选择器轻 */
-function flatten(nodes: DeptNode[], depth = 0): Array<{ id: number; name: string }> {
+/** depth 只用于下拉项的缩进渲染，不进 name（否则选中后输入框里带缩进） */
+function flatten(nodes: DeptNode[], depth = 0): Array<{ id: number; name: string; depth: number }> {
   return nodes.flatMap((n) => [
-    { id: n.id, name: '　'.repeat(depth) + n.name },
+    { id: n.id, name: n.name, depth },
     ...(n.children?.length ? flatten(n.children, depth + 1) : [])
   ])
 }
@@ -221,11 +222,11 @@ onMounted(() => {
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button link type="primary" @click="onView(row)">详情</el-button>
-          <el-button v-permission="'sys:post:update'" link type="primary" @click="onEdit(row)">
+          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <el-button :icon="EditPen" v-permission="'sys:post:update'" link type="primary" @click="onEdit(row)">
             编辑
           </el-button>
-          <el-button v-permission="'sys:post:delete'" link type="danger" @click="onDelete(row)">
+          <el-button :icon="Delete" v-permission="'sys:post:delete'" link type="danger" @click="onDelete(row)">
             删除
           </el-button>
         </div>
@@ -269,7 +270,9 @@ onMounted(() => {
               :key="opt.id"
               :label="opt.name"
               :value="opt.id"
-            />
+            >
+              <span :style="{ paddingLeft: opt.depth * 16 + 'px' }">{{ opt.name }}</span>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="默认角色" prop="default_role_id">

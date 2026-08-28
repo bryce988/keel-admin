@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Delete, EditPen, Plus } from '@element-plus/icons-vue'
 import type { ProColumn, ProTableInstance, SearchField } from '@/components'
 // ⛔ 复制后把这一行换成你自己的 api/xxx.ts
 import { deleteDemo, demoTree, fetchDemoList, type DemoRow } from '../_demo'
@@ -45,7 +45,7 @@ const columns: ProColumn<DemoRow>[] = [
   { prop: 'owner', label: '负责人', minWidth: 100, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', sortable: true },
-  { prop: 'actions', label: '操作', width: 120, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 150, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 /**
@@ -121,8 +121,8 @@ async function onDelete(row: DemoRow) {
 
         <template #actions="{ row }">
           <div class="table-actions">
-            <el-button link type="primary">编辑</el-button>
-            <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            <el-button link type="primary" :icon="EditPen">编辑</el-button>
+            <el-button link type="danger" :icon="Delete" @click="onDelete(row)">删除</el-button>
           </div>
         </template>
       </ProTable>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Delete, EditPen, Plus } from '@element-plus/icons-vue'
 import type { FormDrawerInstance, ProColumn, ProTableInstance } from '@/components'
 // ⛔ 复制后把这一行换成你自己的 api/xxx.ts
 import {
@@ -43,7 +43,7 @@ const childColumns: ProColumn<DemoChild>[] = [
   { prop: 'value', label: '值', minWidth: 120, align: 'center' },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
-  { prop: 'actions', label: '操作', width: 120, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 150, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 async function loadMasters() {
@@ -198,8 +198,8 @@ onMounted(loadMasters)
 
         <template #actions="{ row }">
           <div class="table-actions">
-            <el-button link type="primary" @click="onEditChild(row)">编辑</el-button>
-            <el-button link type="danger" @click="onDeleteChild(row)">删除</el-button>
+            <el-button :icon="EditPen" link type="primary" @click="onEditChild(row)">编辑</el-button>
+            <el-button :icon="Delete" link type="danger" @click="onDeleteChild(row)">删除</el-button>
           </div>
         </template>
       </ProTable>

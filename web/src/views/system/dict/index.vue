@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { Delete, Edit, Plus, Search } from '@element-plus/icons-vue'
+import { Delete, Edit, EditPen, Plus, Search } from '@element-plus/icons-vue'
 import {
   batchDeleteDictItems,
   createDictItem,
@@ -97,7 +97,7 @@ const columns: ProColumn<DictItemRow>[] = [
   { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'remark', label: '备注', minWidth: 160, hidden: true },
-  { prop: 'actions', label: '操作', width: 180, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 150, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 const selected = ref<DictItemRow[]>([])
@@ -410,10 +410,11 @@ onMounted(async () => {
 
         <template #actions="{ row }">
           <div class="table-actions">
-            <el-button v-permission="'sys:dict:update'" link type="primary" @click="onEditItem(row)">
+            <el-button :icon="EditPen" v-permission="'sys:dict:update'" link type="primary" @click="onEditItem(row)">
               编辑
             </el-button>
             <el-button
+              :icon="Delete"
               v-permission="'sys:dict:delete'"
               link
               type="danger"

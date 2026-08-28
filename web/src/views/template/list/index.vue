@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Delete, EditPen, Plus, View } from '@element-plus/icons-vue'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 // ⛔ 复制后把这一行换成你自己的 api/xxx.ts
 import { createDemo, deleteDemo, fetchDemoList, updateDemo, type DemoRow } from '../_demo'
@@ -52,7 +52,7 @@ const columns: ProColumn<DemoRow>[] = [
   // 默认列不超过 8 列，多出来的用 hidden 收进列设置里（§9.1）
   { prop: 'remark', label: '备注', minWidth: 160, hidden: true },
   { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', sortable: true },
-  { prop: 'actions', label: '操作', width: 160, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 // ---------------------------------------------------------------- 增改删
@@ -139,9 +139,9 @@ async function onDelete(row: DemoRow) {
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button link type="primary" @click="onView(row)">详情</el-button>
-          <el-button link type="primary" @click="onEdit(row)">编辑</el-button>
-          <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <el-button :icon="EditPen" link type="primary" @click="onEdit(row)">编辑</el-button>
+          <el-button :icon="Delete" link type="danger" @click="onDelete(row)">删除</el-button>
         </div>
       </template>
     </ProTable>

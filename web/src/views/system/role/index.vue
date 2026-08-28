@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { Key, Plus, User } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, EditPen, Key, Plus, User, View } from '@element-plus/icons-vue'
 import {
   createRole,
   deleteRole,
@@ -13,6 +13,7 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { useUserStore } from '@/stores/user'
 import GrantDrawer from './GrantDrawer.vue'
 import MemberDrawer from './MemberDrawer.vue'
 import { BizCode } from '@/constants/bizCode'
@@ -25,6 +26,29 @@ import { BizCode } from '@/constants/bizCode'
  * 成员 tab 是同一件事的反向入口，走的是同一套校验。
  */
 const dictStore = useDictStore()
+
+/**
+ * 操作列：可见槽位固定三个
+ *
+ * 动作超过三个就把次要的收进「更多」，而不是一路平铺——五个「图标 + 文字」
+ * 要 287px，比这张表任何一个数据列都宽，操作入口反倒成了整屏最重的东西。
+ *
+ * 三个槽位的分配是固定的：**详情** 永远在第一个（它是唯一不需要权限的动作，
+ * 任何能看到这张表的人都点得到，位置固定下来眼睛就不用每页重新找）、
+ * 中间放这一页最常用的那个、第三个是「更多」。
+ *
+ * ⚠️ 下拉项的权限用 `v-if` 而不是 `v-permission`：`el-dropdown-item` 的根节点是
+ * Fragment，运行时指令挂不上去（控制台会报 "Runtime directive used on component
+ * with non-element root node"），指令拿到的 el 是 Vue 用来定位片段的锚点文本节点，
+ * 删掉它等于破坏 Vue 的 DOM 记账。
+ */
+const userStore = useUserStore()
+
+/** 「更多」里两项各自的权限。「成员」不需要权限，所以这个下拉不会是空的 */
+const can = computed(() => ({
+  update: userStore.can('sys:role:update'),
+  remove: userStore.can('sys:role:delete')
+}))
 
 const tableRef = ref<ProTableInstance | null>(null)
 const drawerRef = ref<FormDrawerInstance<RolePayload> | null>(null)
@@ -55,7 +79,7 @@ const columns: ProColumn<RoleRow>[] = [
   { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'remark', label: '备注', minWidth: 200, hidden: true },
-  { prop: 'actions', label: '操作', width: 250, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 // ---------------------------------------------------------------- 增改删
@@ -159,35 +183,45 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button link type="primary" @click="onView(row)">详情</el-button>
+          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <!-- 角色页最常用的是授权：改名排序偶尔为之，配权限是天天要做的 -->
           <el-button
             v-permission.any="['sys:role:grantPerm', 'sys:role:grantData']"
+            :icon="Key"
             link
             type="primary"
-            :icon="Key"
             @click="grantRef?.open(row)"
           >
             授权
           </el-button>
-          <el-button link type="primary" :icon="User" @click="memberRef?.open(row)">成员</el-button>
-          <el-button
-            v-permission="'sys:role:update'"
-            link
-            type="primary"
-            :disabled="row.is_builtin"
-            @click="onEdit(row)"
-          >
-            编辑
-          </el-button>
-          <el-button
-            v-permission="'sys:role:delete'"
-            link
-            type="danger"
-            :disabled="row.is_builtin"
-            @click="onDelete(row)"
-          >
-            删除
-          </el-button>
+          <el-dropdown>
+            <el-button link type="primary">
+              更多
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item :icon="User" @click="memberRef?.open(row)">成员</el-dropdown-item>
+                <el-dropdown-item
+                  v-if="can.update"
+                  :icon="EditPen"
+                  :disabled="row.is_builtin"
+                  @click="onEdit(row)"
+                >
+                  编辑
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-if="can.remove"
+                  :icon="Delete"
+                  divided
+                  :disabled="row.is_builtin"
+                  @click="onDelete(row)"
+                >
+                  删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </template>
     </ProTable>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
+import { Download, View } from '@element-plus/icons-vue'
 import {
   exportOperationLogs,
   fetchOperationLog,
@@ -63,7 +63,7 @@ const columns: ProColumn<OperationLogRow>[] = [
   { prop: 'ip', label: 'IP', minWidth: 150, align: 'center', hidden: true },
   { prop: 'api_path', label: '接口', minWidth: 200, hidden: true, slot: 'api' },
   { prop: 'trace_id', label: 'TraceID', minWidth: 170, align: 'center', hidden: true },
-  { prop: 'actions', label: '操作', width: 90, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 120, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 function requestLogs(params: TableQuery) {
@@ -166,7 +166,7 @@ onMounted(() => dictStore.preload(['log_action', 'log_status']))
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button link type="primary" @click="onView(row)">
+          <el-button :icon="View" link type="primary" @click="onView(row)">
             详情
             <el-badge v-if="row.change_count" :value="row.change_count" class="chg" />
           </el-button>

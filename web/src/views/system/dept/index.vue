@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, EditPen, Plus, View } from '@element-plus/icons-vue'
 import {
   createDept,
   deleteDept,
@@ -12,6 +12,7 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
+import { useUserStore } from '@/stores/user'
 import { BizCode } from '@/constants/bizCode'
 
 /**
@@ -21,6 +22,22 @@ import { BizCode } from '@/constants/bizCode'
  * 能看到哪些数据，所以移动部门是个重操作，后端会同步刷新整棵子树的祖级路径。
  */
 const dictStore = useDictStore()
+
+/**
+ * 操作列：可见槽位固定三个（约定见 views/system/role/index.vue 的同名注释）
+ *
+ * 详情 / 编辑 / 更多。「新增下级」与「删除」收进下拉：前者只在扩展树时用，
+ * 后者是破坏性动作，都不该常驻在最显眼的位置；而「编辑」是每一行都支持、
+ * 每个页面都在同一个位置的动作，留在外面。
+ */
+const userStore = useUserStore()
+
+/** 「更多」里两项各自的权限；一项都没有时整个下拉不渲染，免得点开是空的 */
+const can = computed(() => ({
+  create: userStore.can('sys:dept:create'),
+  remove: userStore.can('sys:dept:delete')
+}))
+const canMore = computed(() => Object.values(can.value).some(Boolean))
 
 const tableRef = ref<ProTableInstance | null>(null)
 const drawerRef = ref<FormDrawerInstance<DeptPayload> | null>(null)
@@ -41,7 +58,7 @@ const columns: ProColumn<DeptNode>[] = [
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', hidden: true },
-  { prop: 'actions', label: '操作', width: 230, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 // ---------------------------------------------------------------- 上级部门选择
@@ -183,16 +200,26 @@ onMounted(() => {
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button link type="primary" @click="onView(row)">详情</el-button>
-          <el-button v-permission="'sys:dept:create'" link type="primary" @click="onCreate(row.id)">
-            新增下级
-          </el-button>
-          <el-button v-permission="'sys:dept:update'" link type="primary" @click="onEdit(row)">
+          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <el-button :icon="EditPen" v-permission="'sys:dept:update'" link type="primary" @click="onEdit(row)">
             编辑
           </el-button>
-          <el-button v-permission="'sys:dept:delete'" link type="danger" @click="onDelete(row)">
-            删除
-          </el-button>
+          <el-dropdown v-if="canMore">
+            <el-button link type="primary">
+              更多
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-if="can.create" :icon="Plus" @click="onCreate(row.id)">
+                  新增下级
+                </el-dropdown-item>
+                <el-dropdown-item v-if="can.remove" :icon="Delete" divided @click="onDelete(row)">
+                  删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </template>
     </ProTable>
