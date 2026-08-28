@@ -74,8 +74,9 @@ foreach ($statements as $statement) {
  * MySQL 8 没有 `ADD COLUMN IF NOT EXISTS`（那是 MariaDB 的扩展），
  * 所以先查 information_schema 再决定加不加。
  *
- * ⚠️ 这仍然是脚手架阶段的权宜之计：只处理「加列」，不处理改类型、删列、
- * 数据迁移与回滚。表结构一旦开始频繁演进，就该换成 phinx 这类正式迁移工具。
+ * ⚠️ 这仍然是脚手架阶段的权宜之计：这一段只处理「加列」，改类型与删列没有。
+ * 下面另有索引补丁和数据补丁两段，同样是点名式的、不带回滚。
+ * 表结构一旦开始频繁演进，就该换成 phinx 这类正式迁移工具。
  *
  * 每项：[表, 列, 列定义, 加完之后跑一次的回填 SQL（可为 null）]
  */
@@ -187,8 +188,64 @@ foreach ($indexPatches as [$table, $index, $columns]) {
     }
 }
 
+/**
+ * 存量数据的补丁
+ *
+ * 与补列、补索引同源的问题，但更隐蔽：枚举的**取值范围**变窄时，`CREATE TABLE`
+ * 和 `ALTER TABLE` 都管不着已经写进去的行。开发机 `down -v` 重来永远看不到，
+ * 线上则是「有几个人的状态列渲染成空白」——前端拿 value 去字典里查不到 label。
+ *
+ * 每项：[说明, 检测 SQL（有结果才执行）, 检测参数, 要执行的语句数组]
+ * 检测条件必须写成「打完补丁后就不再成立」，重复执行才是安全的。
+ */
+$dataPatches = [
+    [
+        'sys_users.status 归并为两档',
+        // 判据是「列注释还不等于目标那句」，不是「注释里含试用期」。
+        //
+        // 两个理由。其一，一行 status=2 都没有的库，注释同样要更新，
+        // 否则 schema.sql 与线上表的字段注释会长期对不上（database.md 要求枚举列注释列全取值）。
+        // 其二是开发时现踩的：按**旧值**匹配的判据，只要目标那句本身再改一次，
+        // 已经打过补丁的库就再也追不上——旧值不在了，判据永远不成立。
+        // 能自愈的判据必须认「要到哪去」，不是「从哪来」。
+        "SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'sys_users'
+            AND COLUMN_NAME = 'status' AND COLUMN_COMMENT <> '0停用 1启用' LIMIT 1",
+        null,
+        [
+            // 试用期在鉴权上一直等同于在职（AuthService 只判 status === 0），
+            // 所以并到 1 不改变任何人的登录与权限，只是把标记去掉
+            'UPDATE `sys_users` SET `status` = 1 WHERE `status` NOT IN (0, 1)',
+            "ALTER TABLE `sys_users`
+                MODIFY COLUMN `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0停用 1启用'",
+        ],
+    ],
+];
+
+$dataPatched = 0;
+
+foreach ($dataPatches as [$label, $detect, $detectParams, $statements]) {
+    $hit = Db::conn()->selectOne($detect, $detectParams ?? [$database]);
+
+    if (!$hit) {
+        continue;
+    }
+
+    try {
+        foreach ($statements as $statement) {
+            Db::conn()->unprepared($statement);
+        }
+        $dataPatched++;
+        echo "  ✓ 数据补丁 {$label}\n";
+    } catch (Throwable $e) {
+        fwrite(STDERR, "✗ 数据补丁失败 {$label}：{$e->getMessage()}\n");
+        exit(1);
+    }
+}
+
 $tables = count(Db::conn()->select('SHOW TABLES'));
 echo "  ✓ 表结构已对齐（{$created} 条建表语句"
     . ($patched > 0 ? "，{$patched} 处补列" : '')
     . ($indexed > 0 ? "，{$indexed} 处索引调整" : '')
+    . ($dataPatched > 0 ? "，{$dataPatched} 处数据补丁" : '')
     . "，当前 {$tables} 张表）\n";

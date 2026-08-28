@@ -317,7 +317,7 @@ class UserService
                         $item['email'],
                         $item['dept_name'],
                         $item['post_name'],
-                        ['0' => '停用', '1' => '在职', '2' => '试用期'][(string) $item['status']] ?? '',
+                        (int) $item['status'] === SysUserModel::STATUS_ENABLED ? '启用' : '停用',
                         $item['last_login_at'] ?? '',
                         $item['created_at'] ?? '',
                     ]);

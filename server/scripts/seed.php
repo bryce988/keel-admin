@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use app\common\service\DictService;
 use app\common\support\Db;
 
 $withDemo = in_array('--demo', $argv, true);
@@ -267,7 +268,7 @@ $dicts = [
         ['进行中', '4', 'primary'], ['已归档', '5', 'info'],
     ]],
     'enable_status' => ['启用状态', [['启用', '1', 'success'], ['停用', '0', 'info']]],
-    'user_status'   => ['用户状态', [['在职', '1', 'success'], ['试用期', '2', 'warning'], ['停用', '0', 'info']]],
+    'user_status'   => ['用户状态', [['启用', '1', 'success'], ['停用', '0', 'info']]],
     'data_scope'    => ['数据范围', [
         ['全部', '1', 'danger'], ['本部门及下属', '2', 'warning'], ['本部门', '3', 'primary'],
         ['仅本人', '4', 'info'], ['自定义', '5', 'success'],
@@ -306,6 +307,46 @@ foreach ($dicts as $code => [$name, $items]) {
     }
 }
 echo '  ✓ 字典 ' . count($dicts) . " 类\n";
+
+/*
+ * 退役的字典项
+ *
+ * 上面那个循环只 upsert，从来不删——所以枚举「少了一个值」时，旧项会一直留在库里：
+ * 筛选下拉里还看得见「试用期」，选中之后永远筛不出任何数据。
+ *
+ * 不做「把 seed 之外的项全删掉」，那会连用户自己在字典管理里加的项一起清掉。
+ * 要退役哪一项就在这里点名，按 (type_code, value) 精确删，重复执行不出错。
+ */
+$retired = [
+    // 用户状态归并为两档：试用期是人事状态，登录与鉴权从来没看过它（见 HasStatus）
+    ['user_status', '2'],
+];
+
+$dropped = 0;
+foreach ($retired as [$code, $value]) {
+    $dropped += Db::table('sys_dict_items')->where('type_code', $code)->where('value', $value)->delete();
+}
+if ($dropped > 0) {
+    echo "  ✓ 清理退役字典项 {$dropped} 条\n";
+}
+
+/*
+ * 清掉字典缓存
+ *
+ * DictService 把每类字典缓存在 Redis 里（TTL = sys.cache.ttl，默认 300 秒），
+ * 而上面是直接写库的，缓存不会自己失效。不清的话，改完标签重新播种，
+ * 前端最长还要拿五分钟旧值——「部署完了但界面没变」最容易被当成改动没生效。
+ *
+ * Redis 连不上不算致命：缓存过期后自愈，不该把整个播种拖挂。
+ */
+try {
+    foreach (array_keys($dicts) as $code) {
+        DictService::forget((string) $code);
+    }
+    echo "  ✓ 字典缓存已清\n";
+} catch (Throwable $e) {
+    echo "  · 字典缓存未清（{$e->getMessage()}），最长 sys.cache.ttl 秒后自动过期\n";
+}
 
 // ─────────────────────────────────────────── 系统参数
 // 第 6 位是 is_secret：密钥类参数只写不读，接口返回掩码（docs/api.md §9）

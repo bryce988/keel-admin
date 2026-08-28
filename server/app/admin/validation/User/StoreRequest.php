@@ -24,7 +24,7 @@ class StoreRequest extends FormRequest
             'email'     => ['email|max:128',                '邮箱'],
             'dept_id'   => ['integer|min:0',                '部门'],
             'post_id'   => ['integer|min:0',                '岗位'],
-            'status'    => ['integer|in:0,1,2',             '状态'],
+            'status'    => ['integer|in:0,1',               '状态'],
             'remark'    => ['string|max:255',               '备注'],
             'password'  => ['string|max:64',                '密码'],
         ];

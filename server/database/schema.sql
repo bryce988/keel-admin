@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `sys_users` (
   `email`          VARCHAR(128)    NOT NULL DEFAULT ''     COMMENT '邮箱',
   `dept_id`        BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '所属部门，0=未分配',
   `post_id`        BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '岗位',
-  `status`         TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1在职 2试用期',
+  `status`         TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1启用',
   `is_super`       TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '超级管理员，跳过权限校验',
   `perm_version`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '权限版本号，授权变更时递增使缓存失效',
   `token_version`  INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '会话版本号，改密/重置密码时递增使该用户全部令牌失效',

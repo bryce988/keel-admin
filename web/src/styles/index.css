@@ -390,6 +390,23 @@ html.theme-switching *::after {
   background: var(--el-border-color-darker);
 }
 
+/* ---------------------------------------------------------------- 开关的行内文字
+ * `inline-prompt` 把状态词印在轨道里，EP 给这两个字定死了白色
+ * （`.el-switch__inner-wrapper { color: var(--el-color-white) }`）。
+ * 开态压在主色上还算能读，关态的轨道是 `--el-border-color`（浅色主题 #dcdfe6），
+ * **白字压浅灰实测 1.33:1** —— 不是"偏淡"，是根本看不见那两个字。
+ *
+ * 只改关态：开态的白字压主色与全站主色按钮是同一套观感，单独改这一处反而不一致。
+ * 关态换成正文色，#303133 压 #dcdfe6 是 9.3:1；深色模式下这两个令牌一起翻个面
+ * （轨道变深、正文色变浅），仍然是深底浅字，不用为暗色再写一条。
+ *
+ * 选择器多挂一层 `.el-switch__inner` 是为了压过 EP 的 (0,4,0)——
+ * 按需导入下 el-switch 的样式 chunk 排在入口 CSS 后面，打平就是它赢（见本目录的护栏脚本）。
+ */
+:root .el-switch:not(.is-checked) .el-switch__inner .el-switch__inner-wrapper {
+  color: var(--el-text-color-primary);
+}
+
 /* ---------------------------------------------------------------- 表格操作列
  * el-button 与 el-dropdown 的默认 vertical-align 不同，直接并排会错开半行。
  * 统一用 flex 排，顺便把按钮间距也统一了（EP 的 link 按钮之间默认没有间距）。

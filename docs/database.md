@@ -21,7 +21,7 @@
 | 逻辑删除 | `deleted_at DATETIME NULL`，为空表示未删除 |
 | 审计字段 | `creator_id` `updater_id` `created_at` `updated_at`，由框架自动填充 |
 | 索引命名 | 唯一索引 `uk_*`，普通索引 `idx_*`，外键不建物理约束（由应用层保证） |
-| **注释** | **每张表、每个字段都必须写 `COMMENT`**，枚举字段要在注释中列全取值（如 `0停用 1在职 2试用期`） |
+| **注释** | **每张表、每个字段都必须写 `COMMENT`**，枚举字段要在注释中列全取值（如 `0停用 1启用`） |
 
 **数据权限的硬性要求**
 
@@ -69,7 +69,7 @@ CREATE TABLE `sys_users` (
   `email`          VARCHAR(128)    NOT NULL DEFAULT ''     COMMENT '邮箱',
   `dept_id`        BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '所属部门，0=未分配',
   `post_id`        BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '岗位',
-  `status`         TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1在职 2试用期',
+  `status`         TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1启用',
   `is_super`       TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '超级管理员，跳过权限校验',
   `perm_version`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '权限版本号，授权变更时递增使缓存失效',
   `token_version`  INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '会话版本号，改密/重置密码时递增使该用户全部令牌失效',
@@ -482,7 +482,7 @@ VALUES
 |---|---|---|
 | `common_status` | 通用状态 | 正常(success) / 待处理(warning) / 异常(danger) / 进行中(primary) / 已归档(info) |
 | `enable_status` | 启用状态 | 启用(success) / 停用(info) |
-| `user_status` | 用户状态 | 在职(success) / 试用期(warning) / 停用(info) |
+| `user_status` | 用户状态 | 启用(success) / 停用(info) |
 | `data_scope` | 数据范围 | 全部 / 本部门及下属 / 本部门 / 仅本人 / 自定义 |
 | `perm_type` | 权限类型 | 目录 / 菜单 / 按钮 / 接口 / 数据 |
 | `log_action` | 操作类型 | 新增 / 修改 / 删除 / 导出 / 授权 / 其他 |

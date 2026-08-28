@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { ArrowDown, Delete, Download, EditPen, Key, Open, Plus, TurnOff, Upload, View } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, Download, EditPen, Key, Plus, Upload, View } from '@element-plus/icons-vue'
 import {
   createUser,
   deleteUser,
@@ -35,13 +35,17 @@ import { BizCode } from '@/constants/bizCode'
 const dictStore = useDictStore()
 const userStore = useUserStore()
 
-/** 「更多」下拉里三项各自的权限；一项都没有时整个下拉不渲染，免得点开是空的 */
+/**
+ * 三个写权限。`update` 同时管着「编辑」按钮和状态列那个开关，
+ * `resetPwd` / `remove` 是「更多」里的两项——两项都没有时整个下拉不渲染，
+ * 免得点开是空的。
+ */
 const can = computed(() => ({
   resetPwd: userStore.can('sys:user:resetPwd'),
   update: userStore.can('sys:user:update'),
   remove: userStore.can('sys:user:delete')
 }))
-const canMore = computed(() => Object.values(can.value).some(Boolean))
+const canMore = computed(() => can.value.resetPwd || can.value.remove)
 
 const tableRef = ref<ProTableInstance | null>(null)
 const drawerRef = ref<FormDrawerInstance<UserPayload> | null>(null)
@@ -61,7 +65,7 @@ const columns: ProColumn<UserRow>[] = [
   { prop: 'post_name', label: '岗位', minWidth: 140, align: 'center' },
   { prop: 'phone', label: '手机号', minWidth: 140, align: 'center' },
   { prop: 'email', label: '邮箱', minWidth: 200, align: 'center', hidden: true },
-  { prop: 'status', label: '状态', width: 100, align: 'center', dict: 'user_status' },
+  { prop: 'status', label: '状态', width: 110, align: 'center', slot: 'status' },
   { prop: 'last_login_at', label: '最后登录', minWidth: 190, align: 'center', sortable: true },
   { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
@@ -226,21 +230,53 @@ async function onDelete(row: UserRow) {
   tableRef.value?.refresh()
 }
 
-async function onToggleStatus(row: UserRow) {
-  const next = row.status === 0 ? 1 : 0
+/** 正在提交状态变更的那一行；开关的 loading 只点亮这一个，不锁整张表 */
+const togglingId = ref(0)
+
+/**
+ * 切换启用 / 停用
+ *
+ * 挂在 el-switch 的 `before-change` 上，返回 `Promise<boolean>`：
+ * **resolve(true) 开关才会翻**，resolve(false) 或 reject 都保持原样。
+ * 开关是单击即生效的控件，误触成本比按钮高得多，所以确认框放在翻转之前——
+ * 先翻再问「要撤销吗」的话，用户看到的已经是错误的状态。
+ *
+ * 成功后直接改 `row.status` 而不是 `refresh()` 整张表：翻一个开关就重拉一页，
+ * 会把分页、滚动位置和多选一起重置，代价远大于同步一个字段。
+ *
+ * 两处 catch 都得吞掉再返回 false：取消确认框和接口报错都会 reject，
+ * 而 EP 对 reject 的处理是 `debugWarn` 打一条控制台警告——那不是错误，
+ * 「点了取消」是正常操作。接口失败的原因（不能停用自己、名下还有待交接的数据）
+ * 由请求拦截器统一弹出，这里只负责别让开关翻过去。
+ */
+async function onToggleStatus(row: UserRow): Promise<boolean> {
+  const next = row.status === 1 ? 0 : 1
   const word = next === 0 ? '停用' : '启用'
 
-  await ElMessageBox.confirm(
-    next === 0
-      ? `停用后「${row.username}」将立即无法登录。若他名下还有未交接的数据，系统会拦下这次操作。`
-      : `确定启用「${row.username}」吗？`,
-    `${word}确认`,
-    { type: 'warning' }
-  )
+  try {
+    await ElMessageBox.confirm(
+      next === 0
+        ? `停用后「${row.username}」将立即无法登录。若他名下还有未交接的数据，系统会拦下这次操作。`
+        : `确定启用「${row.username}」吗？`,
+      `${word}确认`,
+      { type: 'warning', confirmButtonText: word }
+    )
+  } catch {
+    return false
+  }
 
-  await setUserStatus(row.id, next)
+  togglingId.value = row.id
+  try {
+    await setUserStatus(row.id, next)
+  } catch {
+    return false
+  } finally {
+    togglingId.value = 0
+  }
+
+  row.status = next
   ElMessage.success(`已${word}`)
-  tableRef.value?.refresh()
+  return true
 }
 
 async function onResetPassword(row: UserRow) {
@@ -347,6 +383,25 @@ onMounted(() => {
           </el-button>
         </template>
 
+        <!--
+          状态列是开关不是标签：这一列上唯一会做的事就是启用/停用，
+          「看状态」和「改状态」用同一个控件，比标签旁边再放一个按钮少一次跳转。
+          超管与无 sys:user:update 权限的人看到的是**灰掉的**开关——
+          仍然读得出状态，只是按不动（真正的拦截在后端路由的 perm 声明上）。
+        -->
+        <template #status="{ row }">
+          <el-switch
+            class="status-switch"
+            :model-value="row.status === 1"
+            :loading="togglingId === row.id"
+            :disabled="row.is_super || !can.update"
+            inline-prompt
+            active-text="启用"
+            inactive-text="停用"
+            :before-change="() => onToggleStatus(row)"
+          />
+        </template>
+
         <template #actions="{ row }">
           <div class="table-actions">
             <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
@@ -379,14 +434,6 @@ onMounted(() => {
                       @click="onResetPassword(row)"
                     >
                       重置密码
-                    </el-dropdown-item>
-                    <!-- 图标跟着当前会执行的动作走，不是跟着当前状态走 -->
-                    <el-dropdown-item
-                      v-if="can.update"
-                      :icon="row.status === 0 ? Open : TurnOff"
-                      @click="onToggleStatus(row)"
-                    >
-                      {{ row.status === 0 ? '启用' : '停用' }}
                     </el-dropdown-item>
                     <el-dropdown-item v-if="can.remove" :icon="Delete" divided @click="onDelete(row)">
                       删除
@@ -463,11 +510,15 @@ onMounted(() => {
             <div class="tip">多角色时功能权限取并集，数据范围取最大的那个</div>
           </el-form-item>
           <el-form-item label="状态" prop="status">
-            <el-radio-group v-model="form.status">
-              <el-radio :value="1">在职</el-radio>
-              <el-radio :value="2">试用期</el-radio>
-              <el-radio :value="0">停用</el-radio>
-            </el-radio-group>
+            <el-switch
+              v-model="form.status"
+              :active-value="1"
+              :inactive-value="0"
+              inline-prompt
+              active-text="启用"
+              inactive-text="停用"
+            />
+            <div class="tip">停用后该账号立即无法登录，已签发的令牌下次请求即失效</div>
           </el-form-item>
           <el-form-item label="备注" prop="remark">
             <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="255" />
@@ -519,10 +570,26 @@ onMounted(() => {
   min-width: 0;
 }
 
+/*
+ * `width: 100%` 不能省：el-form-item 的内容区是 flex 容器，
+ * 而状态那一项的控件是个 48px 宽的开关，右边剩的空间足够把说明拽到同一行去，
+ * 于是这条说明的位置跟别处（控件本来就占满整行）对不上。占满一行才统一。
+ */
 .tip {
+  width: 100%;
   margin-top: 4px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+/*
+ * el-switch 的**外框**默认 32px 高（轨道本身只有 20px，其余是上下留白），
+ * 直接放进表格会把行高从 40px 顶到 48px，只为一列多出 8px。
+ * 压到 24px 与操作列的 link 按钮同高，轨道仍然放得下，
+ * 点击区（整个 .el-switch）也还够 WCAG 2.5.8 要求的 24px。
+ */
+.status-switch {
+  height: 24px;
 }
 
 @media (max-width: 900px) {

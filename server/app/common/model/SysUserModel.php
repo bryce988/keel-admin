@@ -20,7 +20,7 @@
  * @property string      $email          邮箱，同样受字段级权限控制
  * @property int         $dept_id        所属部门，0 = 未分配
  * @property int         $post_id        岗位，0 = 未设置
- * @property int         $status         状态：0 停用 · 1 在职 · 2 试用期（见 STATUS_*）
+ * @property int         $status         状态：0 停用 · 1 启用（见 HasStatus）
  * @property bool        $is_super       超级管理员，跳过一切权限与数据范围校验
  * @property int         $perm_version   权限版本号，授权变更时递增使令牌里的 pv 失效
  * @property int         $token_version  会话版本号，改密/重置密码时递增使该用户全部令牌失效
@@ -44,6 +44,7 @@ declare(strict_types=1);
 namespace app\common\model;
 
 use app\common\model\concern\HasDataScope;
+use app\common\model\concern\HasStatus;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -53,16 +54,7 @@ class SysUserModel extends BaseModel
 {
     use SoftDeletes;
     use HasDataScope;
-
-    /**
-     * 账号状态，三档所以不用 HasStatus（那个是两档的开关）
-     *
-     * 判能不能登录只认 STATUS_DISABLED，别写 === STATUS_ACTIVE——
-     * 试用期是人事状态不是权限状态，那样写会把试用期员工挡在门外。
-     */
-    public const STATUS_DISABLED  = 0;   // 停用，不能登录，已签发的令牌下次请求即失效
-    public const STATUS_ACTIVE    = 1;   // 在职
-    public const STATUS_PROBATION = 2;   // 试用期，登录与权限跟在职一样，只是个标记
+    use HasStatus;
 
     protected $table = 'sys_users';
 

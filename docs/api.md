@@ -382,7 +382,7 @@ POST /admin/auth/login
 | POST | `/admin/users` | `sys:user:create` | 新建 |
 | PUT | `/admin/users/{id}` | `sys:user:update` | 编辑 |
 | DELETE | `/admin/users/{id}` | `sys:user:delete` | 删除（软删） |
-| PUT | `/admin/users/{id}/status` | `sys:user:update` | 启用 / 停用 |
+| PUT | `/admin/users/{id}/status` | `sys:user:update` | 启用 / 停用（`status` 只收 0/1） |
 | PUT | `/admin/users/{id}/roles` | `sys:user:grantRole` | 分配角色 |
 | PUT | `/admin/users/{id}/password/reset` | `sys:user:resetPwd` | 重置密码 |
 | POST | `/admin/users/import` | `sys:user:import` | 批量导入 |
@@ -524,7 +524,7 @@ GET /admin/dicts/common_status/items → 200 OK
 维护界面的 `items/all` 每行多一个 `ref_count`：这个字典值被业务表引用的行数。
 
 ```json
-{ "id": 8, "type_code": "user_status", "label": "在职", "value": "1",
+{ "id": 8, "type_code": "user_status", "label": "启用", "value": "1",
   "tag_type": "success", "sort": 1, "status": 1, "ref_count": 5 }
 ```
 

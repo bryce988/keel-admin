@@ -18,7 +18,7 @@ final class ListRequest extends FormRequest
     {
         return [
             'keyword' => ['string|max:64', '关键词'],
-            'status'  => ['in:0,1,2',      '状态'],
+            'status'  => ['in:0,1',        '状态'],
             'dept_id' => ['integer|min:1', '部门'],
         ];
     }

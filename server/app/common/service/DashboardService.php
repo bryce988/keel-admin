@@ -164,7 +164,7 @@ class DashboardService
                 'label'  => '用户',
                 'value'  => $c['user_total'],
                 'unit'   => '人',
-                'hint'   => "在职 {$c['user_active']} · 停用 " . ($c['user_total'] - $c['user_active']),
+                'hint'   => "启用 {$c['user_active']} · 停用 " . ($c['user_total'] - $c['user_active']),
                 'tone'   => 'primary',
                 'to'     => '/system/user',
                 'perm'   => 'sys:user:list',
