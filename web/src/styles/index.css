@@ -434,9 +434,51 @@ html.theme-switching *::after {
  * 独立按钮定的。这一列的字号已经降到 13px，两个汉字宽 26px，
  * 6px 的间隙占到标签宽度的四分之一，图标看着像是浮在旁边、没跟文字成一体。
  *
+ * 最终收到 2px（中间在 4px 停过一版，还是偏松）。实测图标盒与它内部的 svg
+ * 等宽（13px），但字形在 viewBox 里自带留白、笔画不顶边，所以 CSS 上的 2px
+ * 落到眼睛里仍有几个像素的呼吸感，不会糊成一团。想再紧就得动 svg 本身了。
+ *
  * 「更多」右侧那个箭头不在此列（EP 的 `.el-icon--right` 是 5px）：
  * 它是方向提示不是动作图标，离得开一点反而更像「后面还有」。
  */
 .table-actions .el-button [class*='el-icon'] + span {
-  margin-left: 4px;
+  margin-left: 2px;
+}
+
+/*
+ * 焦点环画在按钮内侧，否则会被单元格裁成左右两根竖线
+ *
+ * 现象：鼠标移到「更多」上，两侧各出现一条淡蓝色竖线，上下没有横边——
+ * 看着像渲染坏了。
+ *
+ * 成因是两件事撞在一起：
+ * 1. `el-dropdown` 展开时会**主动 focus 触发元素**，于是 Chrome 给它画上
+ *    `:focus-visible` 的焦点环。EP 的规则是
+ *    `outline: 2px solid var(--el-button-outline-color); outline-offset: 1px`，
+ *    颜色正是 `--el-color-primary-light-5`（#a0cfff），与看到的淡蓝一致
+ * 2. 这个环比按钮盒大 3px（1px 偏移 + 2px 线宽），而 EP 的 `.el-table .cell`
+ *    带 `overflow: hidden`，单元格高度就等于 `.table-actions` 的 24px——
+ *    环的上下两条边正好落在盒子外面被裁掉，只剩左右两条竖线
+ *
+ * 把偏移改成 -2px：环的外沿与按钮盒对齐，整圈都在可见区域内，不再被裁。
+ * 不用 `outline: none` 一关了事——那是键盘用户唯一的位置指示，去掉等于让
+ * Tab 到这一列的人不知道焦点在哪。
+ */
+.table-actions .el-button:focus-visible {
+  outline-offset: -2px;
+}
+
+/*
+ * 鼠标悬停时不画焦点环
+ *
+ * 环本身是给键盘用的：Tab 到哪儿了，只有它能告诉你。而这里是**鼠标**移上去
+ * 也会出现——因为 `el-dropdown` 展开时主动 focus 了触发元素，
+ * 于是一个纯鼠标动作触发了一个纯键盘的视觉反馈。
+ *
+ * 只在指针悬停在这个下拉上时压掉。键盘用户 Tab 过来时鼠标通常不在这儿，
+ * 环照常出现；唯一被误伤的是「鼠标正停在这个控件上、同时用键盘 Tab 到它」，
+ * 这时菜单本来就已经展开了，位置一望而知。
+ */
+.table-actions .el-dropdown:hover .el-button:focus-visible {
+  outline: none;
 }
