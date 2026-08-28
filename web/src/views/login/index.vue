@@ -1,14 +1,81 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { Lock, Picture, User } from '@element-plus/icons-vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import request, { BizError } from '@/utils/request'
+import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+
+/*
+ * 站点标识由后端参数下发（sys.name / sys.logo / sys.footer）。
+ * main.ts 已经在启动时拉过一次，这里只读——登录页是未登录场景，
+ * 用的正是那个免登录的 /admin/params/public。
+ */
+const appStore = useAppStore()
+
+/*
+ * Logo 加载失败就退回内置矢量标记
+ *
+ * `sys.logo` 是运维在后台手填的 URL，填错、图挂了、跨域被拦都可能——
+ * 而 `<img>` 加载失败的默认表现是一个碎图标加 alt 文字，比没有 Logo 难看得多。
+ *
+ * 除了 `error`，`load` 也要判一次 `naturalWidth === 0`：
+ * **只有 viewBox、没有 width/height 的 SVG 会「加载成功但没有固有尺寸」**，
+ * 配上 `width: auto` 得到的是一个画不出来的盒子——浏览器照样显示碎图。
+ * 本仓库自己的 `public/favicon.svg` 就是这种（验证时正是拿它试出来的）。
+ * 与其猜一个宽高比硬撑，不如退回内置标记：结果可预期，且永远不会是碎的。
+ */
+const logoBroken = ref(false)
+
+watch(
+  () => appStore.site.logo,
+  () => (logoBroken.value = false)
+)
+
+const showLogoImage = computed(() => Boolean(appStore.site.logo) && !logoBroken.value)
+
+function onLogoLoad(e: Event) {
+  const img = e.target as HTMLImageElement
+  if (img.naturalWidth === 0) logoBroken.value = true
+}
+
+/**
+ * 品牌侧的背景motif：一组同心的船体肋骨
+ *
+ * 用的就是 `BrandLogo` 里那条船体横剖弧，按比例套着画若干层，
+ * 像顺着船身往里看的一排肋骨。
+ *
+ * ## 走过两次弯路
+ *
+ * 1. 第一版画的是「一排竖线，高度按抛物线走」。形状上没错（那确实是横剖轮廓），
+ *    但等宽竖线立在一条基线上**就是柱状图的长相**——登录页上冒出一张图表，
+ *    会让人以为那是数据。同心弧没有这个歧义
+ * 2. 第二版还带着 `BrandLogo` 里那根贯穿的龙骨主梁（一条竖线）。图形整体被放大到
+ *    栏宽的一倍半，1.4 的线宽跟着放大成二十几像素的**竖条**，落在离两栏分隔线
+ *    不远的地方，看着像渲染出了问题。去掉之后弧线自己就成立了——
+ *    龙骨的意象由上方的 `BrandLogo` 承担，装饰不必再说一遍
+ *
+ * ## 为什么不是插画
+ *
+ * 插画要么外链（CSP 与离线部署都过不去）、要么内联一大坨 base64。
+ * 而且这个脚手架是给人 fork 的：插画一旦有具体形象，改名换色之后就格格不入；
+ * 一组线是结构性的，`currentColor` 跟着主色走。
+ */
+const HULL_PATH = 'M4 5.2 C 4.6 17.1, 9.7 25, 16 25.8 C 22.3 25, 27.4 17.1, 28 5.2'
+
+/** 由内向外套 6 层，越外圈越淡——近处清晰、远处退开，才有纵深 */
+const hullRings = computed(() =>
+  Array.from({ length: 6 }, (_, i) => ({
+    scale: 1 + i * 0.42,
+    opacity: 0.9 - i * 0.13
+  }))
+)
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
@@ -74,43 +141,98 @@ onMounted(loadCaptcha)
 <template>
   <div class="login-wrap">
     <div class="login-card">
-      <div class="login-head">
-        <BrandLogo :size="40" />
-        <p>多端后台系统的底座</p>
-      </div>
+      <!--
+        左右两栏：左品牌、右表单。
+        窄屏（< 860px）下左栏收成一条横带（见媒体查询）——
+        品牌栏原样堆在表单上方会把输入框推到首屏之外，
+        而登录页唯一要紧的事就是那三个输入框。
+      -->
+      <aside class="brand">
+        <!--
+          背景 motif，纯装饰，读屏器跳过。
+          放在内容之前 + 绝对定位，让下面的文字自然压在它上面
+        -->
+        <svg class="hull" viewBox="0 0 32 32" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+            <g v-for="ring in hullRings" :key="ring.scale" :opacity="ring.opacity">
+              <path :d="HULL_PATH" :transform="`translate(16 16) scale(${ring.scale}) translate(-16 -16)`" />
+            </g>
+          </g>
+        </svg>
 
-      <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="onSubmit">
-        <el-form-item prop="username">
-          <el-input v-model="form.username" placeholder="账号" clearable />
-        </el-form-item>
+        <div class="brand-lockup">
+          <!--
+            配了 sys.logo 就用那张图，加载不出来（或没有固有尺寸）时回到内置矢量标记。
+            图片高度锁死 44px，宽度自适应——上传的 Logo 长宽比不可控，
+            锁宽会把窄标压扁、把宽标撑破卡片。
+          -->
+          <img
+            v-if="showLogoImage"
+            :src="appStore.site.logo"
+            class="brand-image"
+            :alt="appStore.site.name"
+            @load="onLogoLoad"
+            @error="logoBroken = true"
+          />
+          <BrandLogo v-else :size="40" />
+        </div>
 
-        <el-form-item prop="password">
-          <el-input v-model="form.password" type="password" placeholder="密码" show-password />
-        </el-form-item>
+        <p class="brand-tagline">多端后台系统的底座</p>
 
-        <el-form-item prop="captcha_code">
-          <div class="captcha-row">
-            <el-input v-model="form.captcha_code" placeholder="验证码" maxlength="4" />
-            <img
-              v-if="captchaImage"
-              :src="captchaImage"
-              class="captcha-img"
-              title="点击刷新"
-              alt="验证码"
-              @click="loadCaptcha"
+        <!-- 页脚文案走 sys.footer；没配就整条不出，别留一行空白 -->
+        <p v-if="appStore.site.footer" class="brand-foot">{{ appStore.site.footer }}</p>
+      </aside>
+
+      <section class="form">
+        <h1 class="form-title">登录</h1>
+
+        <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="onSubmit">
+          <el-form-item prop="username">
+            <el-input v-model="form.username" :prefix-icon="User" placeholder="账号" clearable />
+          </el-form-item>
+
+          <el-form-item prop="password">
+            <el-input
+              v-model="form.password"
+              type="password"
+              :prefix-icon="Lock"
+              placeholder="密码"
+              show-password
             />
-          </div>
-        </el-form-item>
+          </el-form-item>
 
-        <el-button type="primary" class="login-btn" :loading="loading" @click="onSubmit">
-          登 录
-        </el-button>
-      </el-form>
+          <el-form-item prop="captcha_code">
+            <div class="captcha-row">
+              <!--
+                验证码这一格用 Picture 而不是 Key：Key 和上一行的 Lock 是一对近义图形，
+                挨着放会让人分不清哪行才是密码。而「图形验证码」本来就是照着旁边那张图填，
+                Picture 既说得通、形状上也与锁区分得开。
+              -->
+              <el-input
+                v-model="form.captcha_code"
+                :prefix-icon="Picture"
+                placeholder="验证码"
+                maxlength="4"
+              />
+              <img
+                v-if="captchaImage"
+                :src="captchaImage"
+                class="captcha-img"
+                title="点击刷新"
+                alt="验证码"
+                @click="loadCaptcha"
+              />
+            </div>
+          </el-form-item>
 
-      <p class="login-tip">演示环境默认账号 admin / admin123</p>
+          <el-button type="primary" class="login-btn" :loading="loading" @click="onSubmit">
+            登 录
+          </el-button>
+        </el-form>
+
+        <p class="login-tip">演示环境默认账号 admin / admin123</p>
+      </section>
     </div>
-
-    <div class="login-foot">Keel v1.0.0 · MIT License</div>
   </div>
 </template>
 
@@ -119,42 +241,114 @@ onMounted(loadCaptcha)
   position: fixed;
   inset: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  padding: 24px;
   background:
     radial-gradient(1000px 500px at 50% -10%, var(--el-color-primary-light-9), transparent 70%),
-    var(--el-bg-color-page, #f2f3f5);
+    var(--el-bg-color-page);
 }
+
+/*
+ * 卡片本身不设内边距：两栏各有各的留白，而且左栏的底色要铺满到卡片边缘。
+ * overflow: hidden 让底色被圆角裁掉——否则左栏的直角会从圆角处露出来。
+ */
 .login-card {
-  width: min(400px, 92vw);
-  padding: 32px 36px 28px;
-  background: var(--el-bg-color, #fff);
-  border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  /* 容器档：登录卡与全站的面板、卡片是同一类东西，圆角必须跟着走，
-     否则登录页会是全站唯一一张直角感更强的卡 */
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  width: min(800px, 100%);
+  overflow: hidden;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  /* 容器档：登录卡与全站的面板、卡片是同一类东西，圆角必须跟着走 */
   border-radius: var(--keel-radius-lg);
   box-shadow: var(--el-box-shadow-light);
 }
-/* 竖排 flex 而不是 text-align：标记是 inline-flex，按行内元素排会带上
-   基线下方的空隙，副标题跟它的间距就不是这里写的 6px 了 */
-.login-head {
+
+/* ---------------------------------------------------------------- 左：品牌 */
+.brand {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  margin-bottom: 24px;
+  padding: 40px 32px 32px;
+  overflow: hidden;
+  background: var(--el-color-primary-light-9);
+  border-right: 1px solid var(--el-border-color-lighter);
 }
-.login-head p {
-  margin: 6px 0 0;
-  font-size: 13px;
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+}
+
+.brand-image {
+  height: 40px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.brand-tagline {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--el-text-color-secondary);
 }
+
+/*
+ * 背景 motif
+ *
+ * 绝对定位并往外溢出：只露出弧线的一段，看着像船身还在画面之外继续延伸。
+ * 卡片那层 `overflow: hidden` 负责裁掉多出去的部分。
+ *
+ * 不用参与布局的方案（比如 margin-top: auto 把它顶到底部）——
+ * 品牌栏的高度由**右侧表单**决定，让装饰参与布局就会出现
+ * 「表单多一行错误提示、装饰跟着跳一下」。
+ */
+.hull {
+  position: absolute;
+  right: -52%;
+  bottom: -30%;
+  width: 152%;
+  height: auto;
+  color: var(--el-color-primary);
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+/* 文字压在装饰之上：装饰在 DOM 里排在前面，给内容加个定位上下文就够了 */
+.brand-lockup,
+.brand-tagline,
+.brand-foot {
+  position: relative;
+}
+
+/* margin-top: auto 把页脚推到品牌栏底部，中间那段空白就是留白本身 */
+.brand-foot {
+  margin: auto 0 0;
+  padding-top: 24px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+/* ---------------------------------------------------------------- 右：表单 */
+.form {
+  padding: 40px 40px 32px;
+}
+
+.form-title {
+  margin: 0 0 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .captcha-row {
   display: flex;
   gap: 10px;
   width: 100%;
 }
+
 .captcha-img {
   width: 104px;
   height: 40px;
@@ -164,19 +358,47 @@ onMounted(loadCaptcha)
   cursor: pointer;
   user-select: none;
 }
+
 .login-btn {
   width: 100%;
   height: 40px;
   letter-spacing: 0.24em;
 }
+
 .login-tip {
   margin: 16px 0 0;
   font-size: 12px;
   text-align: center;
   color: var(--el-text-color-secondary);
 }
-.login-foot {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+
+/* ----------------------------------------------------------------
+ * 窄屏：左栏收成一条横带
+ *
+ * 不是隐藏——品牌标识在登录页是有用的（这是哪个系统）。但竖着的品牌栏
+ * 堆在表单上方会把输入框推到首屏之外，所以只留标识那一行，
+ * 标语、肋骨、页脚三样装饰性的收掉。
+ */
+@media (max-width: 860px) {
+  .login-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .brand {
+    align-items: center;
+    padding: 24px;
+    border-right: none;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+
+  .brand-tagline,
+  .hull,
+  .brand-foot {
+    display: none;
+  }
+
+  .form {
+    padding: 28px 24px 24px;
+  }
 }
 </style>
