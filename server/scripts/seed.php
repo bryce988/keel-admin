@@ -312,7 +312,7 @@ echo '  ✓ 字典 ' . count($dicts) . " 类\n";
 $params = [
     ['sys.name',             'Keel Admin', 'basic',    'string', '系统名称'],
     ['sys.logo',             '',           'basic',    'string', '登录页 Logo 地址'],
-    ['sys.footer',           'Powered by Keel', 'basic', 'string', '页脚文案'],
+    ['sys.footer',           'Keel v1.0.0 · MIT License', 'basic', 'string', '登录页页脚文案'],
     ['sys.page.size',        '20',         'basic',    'int',    '默认分页条数'],
     ['sys.upload.maxSize',   '20971520',   'advanced', 'int',    '单文件上传上限（字节）'],
     // 头像单开一档：全局的 20MB 对一张头像太宽松，而收进来就要长期占盘

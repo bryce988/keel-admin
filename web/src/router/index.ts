@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { setUnauthorizedHandler } from '@/utils/request'
 import { buildRoutes, firstMenuPath } from './dynamic'
@@ -181,10 +182,22 @@ router.beforeEach(async (to) => {
   return true
 })
 
-router.afterEach((to) => {
-  const title = (to.meta.title as string) || ''
-  document.title = title ? `${title} · Keel` : 'Keel'
-})
+/**
+ * 写标题：`页面名 · 站点名`
+ *
+ * 读的是当前路由而不是入参，因为它有两个调用时机：路由跳转之后，
+ * 以及 `sys.name` 从后端到达之后（`main.ts` 里）。后者没有「to」可传。
+ *
+ * 站点名每次现读 store，不缓存到模块变量——参数是异步到的，
+ * 缓存下来就成了「首屏之后改不了」。
+ */
+export function applyDocumentTitle(): void {
+  const site = useAppStore().site.name
+  const title = (router.currentRoute.value.meta.title as string) || ''
+  document.title = title ? `${title} · ${site}` : site
+}
+
+router.afterEach(() => applyDocumentTitle())
 
 // 拦截器里收到 401 时统一由这里处理跳转
 setUnauthorizedHandler(() => {

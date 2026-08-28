@@ -1,4 +1,5 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
+import { fetchPublicParams } from '@/api/system'
 
 const SIDEBAR_KEY = 'keel_sidebar_collapsed'
 const THEME_KEY = 'keel_theme'
@@ -41,10 +42,51 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     sidebarCollapsed: localStorage.getItem(SIDEBAR_KEY) === '1',
     theme: (localStorage.getItem(THEME_KEY) as ThemeMode) || 'light',
-    layout: readLayout()
+    layout: readLayout(),
+
+    /**
+     * 站点标识，由后端参数下发（`sys.name` / `sys.logo` / `sys.footer`）
+     *
+     * 这里的初值是**兜底**不是默认值：接口没回来、或者部署时后端没起来时用它，
+     * 保证 logo 位置不是一片空白。真正的默认值在 `server/scripts/seed.php` 里。
+     *
+     * 放在 app store 而不是各页面自己取：登录页要用（未登录）、侧栏要用（已登录）、
+     * 路由标题也要用，三个地方各请求一次不如存一份。
+     */
+    site: {
+      name: 'Keel',
+      /** 登录页 Logo 图片地址；空串表示用内置的矢量标记 */
+      logo: '',
+      footer: ''
+    }
   }),
 
   actions: {
+    /**
+     * 拉站点标识
+     *
+     * 免登录接口，在 `main.ts` 里 **不 await** 地发出去：
+     * 站点名这种东西不值得让整个应用等一个网络往返，
+     * 而后端不可用时 await 会把首屏卡成白屏——兜底值本来就是为这一刻准备的。
+     *
+     * 代价是首屏可能先画兜底名再换成真名。默认部署下两者一致（seed 里
+     * `sys.name` 就是这个值），只有改过参数的站点会看到一次替换。
+     *
+     * 失败静默：这是装饰性数据，弹一个「加载站点信息失败」既没法处理也没意义。
+     */
+    async loadSite() {
+      try {
+        const data = await fetchPublicParams()
+        this.site = {
+          name: data['sys.name'] || this.site.name,
+          logo: data['sys.logo'] || '',
+          footer: data['sys.footer'] || ''
+        }
+      } catch {
+        // 保持兜底值
+      }
+    },
+
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
       localStorage.setItem(SIDEBAR_KEY, this.sidebarCollapsed ? '1' : '0')

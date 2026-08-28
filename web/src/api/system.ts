@@ -396,6 +396,22 @@ export interface ParamRow {
 /** 密钥掩码，与后端 ParamService::MASK 一致 */
 export const PARAM_MASK = '******'
 
+/**
+ * 登录页要用的少量参数（系统名、Logo、页脚）
+ *
+ * 免登录接口，白名单在后端 `ParamService::PUBLIC_KEYS` 里，加键要改那一处。
+ * 键名带点，是数据库里的 `param_key` 原样下发，不做驼峰转换（全链路 snake/原样）。
+ */
+export interface PublicParams {
+  'sys.name'?: string
+  'sys.logo'?: string
+  'sys.footer'?: string
+}
+
+export function fetchPublicParams() {
+  return request.get<unknown, PublicParams>('/admin/params/public')
+}
+
 export function fetchParamGroups() {
   return request.get<unknown, Array<{ code: string; name: string }>>('/admin/params/groups')
 }

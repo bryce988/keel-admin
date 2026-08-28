@@ -22,7 +22,7 @@ import 'element-plus/theme-chalk/el-message-box.css'
 import './styles/index.css'
 
 import App from './App.vue'
-import router from './router'
+import router, { applyDocumentTitle } from './router'
 import { useAppStore } from './stores/app'
 import directives from './directives/permission'
 
@@ -55,5 +55,21 @@ app.use(directives) // v-permission / v-role
  * 跑到这一行时首帧早画完了，指望这里"挂载前应用"是防不住的。
  */
 useAppStore().initTheme()
+
+/*
+ * 站点标识（系统名、Logo、页脚）从后端参数拉一次
+ *
+ * 刻意不 await：这是装饰性数据，让整个应用等一个网络往返不划算，
+ * 后端不可用时更会把首屏卡成白屏。store 里的兜底值就是为这一刻准备的。
+ * 免登录接口，所以放在挂载前、登录页也能用。
+ */
+void useAppStore()
+  .loadSite()
+  /*
+   * 站点名多半比首次路由跳转晚到，那时 afterEach 已经用兜底名写过标题了，
+   * 所以拿到之后要补写一次。不补的话首屏标题一直是兜底名，
+   * 直到用户点第二个菜单才对——而这恰恰是最不容易被发现的那类不一致。
+   */
+  .then(applyDocumentTitle)
 
 app.mount('#app')
