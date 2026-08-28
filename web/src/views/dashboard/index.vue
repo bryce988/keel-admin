@@ -274,7 +274,7 @@ onMounted(() => {
 }
 
 .stat-card .value {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   line-height: 1.2;
   color: var(--el-text-color-primary);
@@ -476,7 +476,7 @@ onMounted(() => {
 }
 
 .modules .count {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 

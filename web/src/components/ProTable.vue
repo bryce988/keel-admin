@@ -42,11 +42,80 @@ import DictTag from './DictTag.vue'
  * 而 `interface Foo { a: string }` 在 TS 里并不满足 `Record<string, unknown>`
  * （接口不会隐式获得索引签名），约束写严了反而让调用方全都传不进来。
  */
+/**
+ * 列定义
+ *
+ * ## 宽度：优先 `minWidth`，不要用 `width`
+ *
+ * `width` 是死值，`minWidth` 是下限——列宽不够时两者一样，有富余时只有 `minWidth`
+ * 会把剩下的空间摊进来。写死 `width` 的列在宽屏上会让表格右边空一块。
+ * 只有真正不该变宽的（图标、单个开关）才用 `width`。
+ *
+ * ⚠️ **先加 32px，不是 24px**。EP 默认 `.el-table .cell { padding: 0 12px }`，
+ * 但 `styles/index.css` 把它改成了 `0 16px`（行高留白那一版调的）。
+ * 照 EP 文档按 24px 算，每列都会差 8px——差得不多，正好卡在
+ * 「大部分值能显示、偏长的那个截断」，最难发现。第一轮修列宽就是这么返的工。
+ *
+ * 定长内容的常用值（**实测**，不是估的，新列照抄即可）：
+ *
+ * | 内容 | 文字宽 | +32 | 建议 |
+ * |---|---|---|---|
+ * | `2026-08-28 09:47:23` | 144 | 176 | `minWidth: 190` |
+ * | 归属地 `中国广东省深圳市【电信】` | 157 | 189 | `minWidth: 200` |
+ * | 权限标识 `sys:role:member:remove` | 159 | 191 | `minWidth: 210` |
+ * | 角色编码 `ROLE_DEPT_MANAGER` | 154 | 186 | `minWidth: 200` |
+ * | `TRC-` + 12 位十六进制 | 128 | 160 | `minWidth: 170` |
+ * | `255.255.255.255` | 111 | 143 | `minWidth: 150` |
+ * | 模块 `系统管理/菜单权限` | 119 | 151 | `minWidth: 160` |
+ * | 姓名 5 字 `系统管理员` | 70 | 101 | `minWidth: 120` |
+ * | 手机号 11 位 | 89 | 121 | `minWidth: 140` |
+ *
+ * 单字宽：汉字 13.9px、数字 8.05px、`- : 空格` 各 6.3px。
+ * 另外要加的：`<DictTag>` 等标签 +20px（标签自身内边距与边框）、
+ * **可排序的表头 +24px**（排序箭头），表头字重是 600 比正文宽一点。
+ * 最终取「表头所需」与「正文最坏值所需」的较大者，再往上取整到十位留点余量。
+ *
+ * 重新量不必开浏览器，正文与表头两种字重都能量：
+ *
+ *   swift -e 'import AppKit
+ *             let f = NSFont.systemFont(ofSize: 14)              // 表头用 weight: .semibold
+ *             print(("2026-08-28 09:47:23" as NSString).size(withAttributes: [.font: f]).width)'
+ *
+ * 这张表是补出来的。原先日期列写的 160 / 165 只差几个像素，
+ * 表现是秒被吃掉一半、显示成 `2026-08-28 09:4…`；而 `show-overflow-tooltip`
+ * 默认开着，鼠标移上去看得到完整值，于是很久没人当成 bug。
+ * 同类的还有「姓名」（100 装不下 `系统管理员`）、操作日志的「模块」与「操作人」、
+ * 「IP」（装不下三位段的 IPv4）、个人中心的「登录地址」（120，直接砍一半）。
+ *
+ * 注意这些是**常见值的下限**，不是保证。姓名、部门这类用户自己填的字段没有上界，
+ * 真填了十个字仍然会走 tooltip——那是可接受的降级，但产品自带的种子数据
+ * （`系统管理员`、`技术负责人`）必须一个不截。
+ *
+ * ## 对齐：默认居中，左对齐是例外
+ *
+ * 表头已经在模板里写死居中。**正文也一律 `align: 'center'`**——
+ * 后台列表的字段绝大多数是短的（账号、姓名、部门、编码、时间、状态），
+ * 表头居中而正文靠左时，两者错开半个格子，一屏扫下来是歪的。
+ *
+ * 只有两类列**保持左对齐**，加列时对着这两条判断，别的一律居中：
+ *
+ * 1. **树形表格的名称列**（部门、菜单的「名称」）。这是硬约束不是审美：
+ *    展开箭头和层级缩进都画在这一列上，居中之后缩进量被两侧的空白吃掉，
+ *    父子层级就看不出来了。这两处的 `align: 'left'` 是显式写的，别当成漏改删掉
+ * 2. **会被 tooltip 截断的自由文本**：备注、登录地址（`United StatesCalifornia
+ *    【Google LLC】` 35 字符 vs `回环地址` 4 字符）、操作对象、接口路径、组件路径、
+ *    失败说明。这类列每行长度差好几倍，居中会让首尾都参差，比靠左更难扫
+ *
+ * 数字列也不单独右对齐：全表就一两列数字时右对齐反而像漏改了。
+ */
 export interface ProColumn<Row = Record<string, unknown>> {
   prop: string
   label: string
+  /** 死宽度。除非这一列不该随窗口变宽，否则用 minWidth */
   width?: number | string
+  /** 宽度下限，有富余时按比例摊开——绝大多数列该用这个 */
   minWidth?: number | string
+  /** 不写即左对齐。定长内容用 'center'，见上面的对齐约定 */
   align?: 'left' | 'center' | 'right'
   fixed?: boolean | 'left' | 'right'
   sortable?: boolean
@@ -459,9 +528,24 @@ onMounted(() => {
   if (props.immediate) nextTick(fetch)
   scheduleMeasure()
   window.addEventListener('resize', measure)
+  /*
+   * 进出全屏也要重算
+   *
+   * 全屏改变的是视口高度，按说 resize 会跟着发，不必单独监听。
+   * 这里仍然显式挂上，是因为「按说会发」一旦不成立，症状是表格高度停在
+   * 上一次的值——表体要么滚不到底、要么下面空一截，而且只在用过全屏后出现，
+   * 极难联想到根因。多一个监听器的成本远低于这个。
+   * 全屏事件先于 resize 到达时 nextTick 会等到布局稳定再量。
+   */
+  document.addEventListener('fullscreenchange', scheduleMeasure)
+  document.addEventListener('webkitfullscreenchange', scheduleMeasure)
 })
 
-onBeforeUnmount(() => window.removeEventListener('resize', measure))
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measure)
+  document.removeEventListener('fullscreenchange', scheduleMeasure)
+  document.removeEventListener('webkitfullscreenchange', scheduleMeasure)
+})
 onActivated(scheduleMeasure)
 
 defineExpose({ reload, refresh, selected, loading })

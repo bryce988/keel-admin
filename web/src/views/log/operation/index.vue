@@ -52,17 +52,17 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<OperationLogRow>[] = [
-  { prop: 'created_at', label: '时间', width: 165, sortable: true },
-  { prop: 'username', label: '操作人', width: 100 },
-  { prop: 'module', label: '模块', minWidth: 130 },
+  { prop: 'created_at', label: '时间', minWidth: 190, align: 'center', sortable: true },
+  { prop: 'username', label: '操作人', minWidth: 130, align: 'center' },
+  { prop: 'module', label: '模块', minWidth: 160, align: 'center' },
   { prop: 'action', label: '类型', width: 90, align: 'center', dict: 'log_action' },
-  { prop: 'title', label: '描述', minWidth: 130 },
+  { prop: 'title', label: '描述', minWidth: 140, align: 'center' },
   { prop: 'target', label: '操作对象', minWidth: 180, showOverflowTooltip: true },
   { prop: 'status', label: '结果', width: 90, align: 'center', slot: 'status' },
-  { prop: 'duration', label: '耗时', width: 90, align: 'right', sortable: true, slot: 'duration' },
-  { prop: 'ip', label: 'IP', width: 130, hidden: true },
+  { prop: 'duration', label: '耗时', minWidth: 100, align: 'center', sortable: true, slot: 'duration' },
+  { prop: 'ip', label: 'IP', minWidth: 150, align: 'center', hidden: true },
   { prop: 'api_path', label: '接口', minWidth: 200, hidden: true, slot: 'api' },
-  { prop: 'trace_id', label: 'TraceID', width: 170, hidden: true },
+  { prop: 'trace_id', label: 'TraceID', minWidth: 170, align: 'center', hidden: true },
   { prop: 'actions', label: '操作', width: 90, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -251,7 +251,7 @@ onMounted(() => dictStore.preload(['log_action', 'log_status']))
 h4 {
   margin: 20px 0 8px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 

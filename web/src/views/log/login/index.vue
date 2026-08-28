@@ -37,12 +37,12 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<LoginLogRow>[] = [
-  { prop: 'created_at', label: '时间', width: 180, sortable: true , align: 'center'},
-  { prop: 'username', label: '账号', minWidth: 120 },
-  { prop: 'ip', label: 'IP', width: 140 },
-  { prop: 'location', label: '登录地址', minWidth: 170, showOverflowTooltip: true },
-  { prop: 'browser', label: '浏览器', width: 110 },
-  { prop: 'os', label: '操作系统', width: 110 },
+  { prop: 'created_at', label: '时间', minWidth: 190, align: 'center', sortable: true },
+  { prop: 'username', label: '账号', minWidth: 130, align: 'center' },
+  { prop: 'ip', label: 'IP', minWidth: 150, align: 'center' },
+  { prop: 'location', label: '登录地址', minWidth: 200, showOverflowTooltip: true },
+  { prop: 'browser', label: '浏览器', minWidth: 110, align: 'center' },
+  { prop: 'os', label: '操作系统', minWidth: 110, align: 'center' },
   { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'login_type' },
   { prop: 'status', label: '结果', width: 90, align: 'center', dict: 'log_status' },
   { prop: 'msg', label: '说明', minWidth: 160, slot: 'msg' }

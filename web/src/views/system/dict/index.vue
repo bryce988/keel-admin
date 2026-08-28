@@ -91,8 +91,8 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<DictItemRow>[] = [
-  { prop: 'label', label: '显示文案', minWidth: 140 },
-  { prop: 'value', label: '存储值', minWidth: 120, slot: 'value' },
+  { prop: 'label', label: '显示文案', minWidth: 140, align: 'center' },
+  { prop: 'value', label: '存储值', minWidth: 180, align: 'center', slot: 'value' },
   { prop: 'tag_type', label: '标签预览', width: 120, align: 'center', slot: 'preview' },
   { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },

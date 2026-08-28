@@ -110,11 +110,11 @@ const phoneDialog = ref<InstanceType<typeof PhoneDialog> | null>(null)
 const loginQuery = ref<Record<string, unknown>>({})
 
 const loginColumns: ProColumn<MyLoginRow>[] = [
-  { prop: 'created_at', label: '时间', width: 165 },
-  { prop: 'ip', label: 'IP', width: 130 },
-  { prop: 'location', label: '登录地址', minWidth: 120 },
-  { prop: 'browser', label: '浏览器', width: 110 },
-  { prop: 'os', label: '操作系统', width: 110 },
+  { prop: 'created_at', label: '时间', minWidth: 190, align: 'center' },
+  { prop: 'ip', label: 'IP', minWidth: 150, align: 'center' },
+  { prop: 'location', label: '登录地址', minWidth: 200, showOverflowTooltip: true },
+  { prop: 'browser', label: '浏览器', minWidth: 110, align: 'center' },
+  { prop: 'os', label: '操作系统', minWidth: 110, align: 'center' },
   { prop: 'type', label: '类型', width: 80, align: 'center', dict: 'login_type' },
   { prop: 'status', label: '结果', width: 80, align: 'center', dict: 'log_status' }
 ]

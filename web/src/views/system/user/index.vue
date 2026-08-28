@@ -55,14 +55,14 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<UserRow>[] = [
-  { prop: 'username', label: '账号', minWidth: 120, sortable: true, fixed: 'left' },
-  { prop: 'real_name', label: '姓名', minWidth: 100 },
-  { prop: 'dept_name', label: '部门', minWidth: 110 },
-  { prop: 'post_name', label: '岗位', minWidth: 120 },
-  { prop: 'phone', label: '手机号', minWidth: 130 },
-  { prop: 'email', label: '邮箱', minWidth: 180, hidden: true },
+  { prop: 'username', label: '账号', minWidth: 130, align: 'center', sortable: true, fixed: 'left' },
+  { prop: 'real_name', label: '姓名', minWidth: 120, align: 'center' },
+  { prop: 'dept_name', label: '部门', minWidth: 130, align: 'center' },
+  { prop: 'post_name', label: '岗位', minWidth: 140, align: 'center' },
+  { prop: 'phone', label: '手机号', minWidth: 140, align: 'center' },
+  { prop: 'email', label: '邮箱', minWidth: 200, align: 'center', hidden: true },
   { prop: 'status', label: '状态', width: 100, align: 'center', dict: 'user_status' },
-  { prop: 'last_login_at', label: '最后登录', minWidth: 160, sortable: true },
+  { prop: 'last_login_at', label: '最后登录', minWidth: 190, align: 'center', sortable: true },
   { prop: 'actions', label: '操作', width: 230, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -490,7 +490,7 @@ onMounted(() => {
 .panel-title {
   margin-bottom: var(--keel-gap);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 

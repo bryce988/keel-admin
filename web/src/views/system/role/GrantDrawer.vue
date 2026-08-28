@@ -269,7 +269,7 @@ defineExpose({ open })
 .sub-title {
   margin: 12px 0 8px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 

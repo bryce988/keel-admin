@@ -39,12 +39,13 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<MenuNodeRow>[] = [
+  // 树的名称列必须左对齐：展开箭头与层级缩进画在这一列上，居中会把缩进吃掉
   { prop: 'name', label: '名称', minWidth: 200, align: 'left' },
   // 放在名称之后：树形表格的展开箭头在第一列，图标列插到最前会把层级压没
   { prop: 'icon', label: '图标', width: 70, align: 'center', slot: 'icon' },
   { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'perm_type' },
-  { prop: 'perm_code', label: '权限标识', minWidth: 190 },
-  { prop: 'path', label: '路由路径', minWidth: 160, slot: 'path' },
+  { prop: 'perm_code', label: '权限标识', minWidth: 210, align: 'center' },
+  { prop: 'path', label: '路由路径', minWidth: 160, align: 'center', slot: 'path' },
   { prop: 'component', label: '组件', minWidth: 200, hidden: true },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },

@@ -34,12 +34,13 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<DeptNode>[] = [
+  // 树的名称列必须左对齐：展开箭头与层级缩进画在这一列上，居中会把缩进吃掉
   { prop: 'name', label: '部门名称', minWidth: 200, align: 'left' },
-  { prop: 'code', label: '部门编码', minWidth: 140 },
+  { prop: 'code', label: '部门编码', minWidth: 140, align: 'center' },
   { prop: 'user_count', label: '用户数', width: 90, align: 'center' },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
-  { prop: 'created_at', label: '创建时间', minWidth: 160, hidden: true },
+  { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', hidden: true },
   { prop: 'actions', label: '操作', width: 230, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 

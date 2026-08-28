@@ -40,11 +40,11 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<DemoRow>[] = [
-  { prop: 'name', label: '名称', minWidth: 160 },
-  { prop: 'code', label: '编码', minWidth: 140 },
-  { prop: 'owner', label: '负责人', width: 100 },
+  { prop: 'name', label: '名称', minWidth: 160, align: 'center' },
+  { prop: 'code', label: '编码', minWidth: 140, align: 'center' },
+  { prop: 'owner', label: '负责人', minWidth: 100, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
-  { prop: 'created_at', label: '创建时间', width: 165, sortable: true },
+  { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', sortable: true },
   { prop: 'actions', label: '操作', width: 120, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -144,7 +144,7 @@ async function onDelete(row: DemoRow) {
 .panel-title {
   margin-bottom: 12px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 

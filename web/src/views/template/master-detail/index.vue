@@ -39,8 +39,8 @@ const drawerRef = ref<FormDrawerInstance | null>(null)
 const childQuery = ref<Record<string, unknown>>({ master_id: 0 })
 
 const childColumns: ProColumn<DemoChild>[] = [
-  { prop: 'label', label: '标签', minWidth: 140 },
-  { prop: 'value', label: '值', minWidth: 120 },
+  { prop: 'label', label: '标签', minWidth: 140, align: 'center' },
+  { prop: 'value', label: '值', minWidth: 120, align: 'center' },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'actions', label: '操作', width: 120, align: 'center', fixed: 'right', slot: 'actions' }
@@ -250,7 +250,7 @@ onMounted(loadMasters)
 
 .panel-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 
