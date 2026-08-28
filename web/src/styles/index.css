@@ -5,58 +5,20 @@
    ============================================================ */
 
 /* ---------------------------------------------------------------- 主题色
- * 覆盖 Element Plus 的五个品牌色。EP 默认那套偏灰偏软，在白底上对比度
- * 全部不到 3:1；这套饱和度更高，五个颜色的对比度都往上走了一档，
- * success / warning / danger 直接取 Tailwind 的 green-600 / orange-500 / red-600。
+ * 品牌色**不覆盖**，整套用 Element Plus 自己的。
  *
- * light-3/5/7/8/9 与 dark-2 是 EP 的派生阶梯，必须一起写死。只改
- * --el-color-primary 的话，标签底色、hover 态、禁用态仍是旧蓝，一个页面上两种蓝。
- * 算法与 EP 官方主题一致：浅色阶梯是原色向 #fff 混 N×10%，深色阶梯向 #141414 混，
- * dark-2 反向（浅色向黑 20%、深色向白 20%）。改主色时整块重算，别手改单个值。
+ * 曾经这里写死过一套饱和度更高的（Tailwind 的 green-600 / orange-500 / red-600 等），
+ * 出发点是 EP 原色在白底上对比度偏低。撤销的理由不是那个判断错了，而是代价不划算：
+ * 一旦改主色，light-3/5/7/8/9 与 dark-2 六档派生值都得手算一遍，浅色深色各一套，
+ * 共 70 个色值——写错一个就是"同一个页面上两种蓝"，而这种错只有肉眼能发现。
+ * EP 的两份 css-vars（`el-var.css` / `dark/css-vars.css`）本来就把这 70 个值算好了。
  *
- * 本文件在 main.ts 里排在 EP 的两份 css 之后，所以这里能盖住它们。
+ * 现在全站唯一的颜色来源是 EP 的调色板，这个文件里一个品牌色都不出现。
+ * 真要换主色，改 EP 的 SCSS 变量重编主题，别在这里逐个贴十六进制。
+ *
+ * 对比度的问题没有被忽略，是换了个地方解决的——见文件下方「纯文字用 dark-2 档」。
  */
 :root {
-  --el-color-primary: #3986ff;
-  --el-color-primary-light-3: #74aaff;
-  --el-color-primary-light-5: #9cc3ff;
-  --el-color-primary-light-7: #c4dbff;
-  --el-color-primary-light-8: #d7e7ff;
-  --el-color-primary-light-9: #ebf3ff;
-  --el-color-primary-dark-2: #2e6bcc;
-
-  --el-color-success: #16a34a;
-  --el-color-success-light-3: #5cbf80;
-  --el-color-success-light-5: #8bd1a5;
-  --el-color-success-light-7: #b9e3c9;
-  --el-color-success-light-8: #d0eddb;
-  --el-color-success-light-9: #e8f6ed;
-  --el-color-success-dark-2: #12823b;
-
-  --el-color-warning: #f97316;
-  --el-color-warning-light-3: #fb9d5c;
-  --el-color-warning-light-5: #fcb98b;
-  --el-color-warning-light-7: #fdd5b9;
-  --el-color-warning-light-8: #fee3d0;
-  --el-color-warning-light-9: #fef1e8;
-  --el-color-warning-dark-2: #c75c12;
-
-  --el-color-danger: #dc2626;
-  --el-color-danger-light-3: #e76767;
-  --el-color-danger-light-5: #ee9393;
-  --el-color-danger-light-7: #f5bebe;
-  --el-color-danger-light-8: #f8d4d4;
-  --el-color-danger-light-9: #fce9e9;
-  --el-color-danger-dark-2: #b01e1e;
-
-  --el-color-info: #5d5b6e;
-  --el-color-info-light-3: #8e8c9a;
-  --el-color-info-light-5: #aeadb7;
-  --el-color-info-light-7: #ceced4;
-  --el-color-info-light-8: #dfdee2;
-  --el-color-info-light-9: #efeff1;
-  --el-color-info-dark-2: #4a4958;
-
   /* 字体栈：跟随系统 UI 字体（macOS/iOS 走 -apple-system，Windows 走 Segoe UI，
    * Android 走 Roboto），比 EP 默认那套写死 Helvetica Neue 的更贴近各平台原生观感。
    *
@@ -71,11 +33,15 @@
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans', 'Noto Sans SC', sans-serif;
 
   /* ---------------------------------------------------------------- 阴影
-   * 用带蓝调的深色（#0f172a，Tailwind slate-900）而不是纯黑。
+   * 用 #303133（rgb 48 49 51）而不是纯黑。这是 EP 中性色里最深的一档，
+   * 也就是 --el-text-color-primary 的值。取它是为了让整个文件不出现 EP 之外的
+   * 颜色——阴影也是颜色。（曾经用的是 Tailwind 的 slate-900 #0f172a。）
    *
-   * 纯黑阴影会把底下的颜色往灰里拉，浅色界面上尤其明显——白底卡片周围
-   * 会出现一圈发脏的灰。同样不透明度换成偏冷的深色，边缘看着是"暗"而不是"脏"，
-   * 与页面底色 #f2f3f5（本身也是偏冷的灰）也更搭。
+   * 纯黑阴影会把底下的颜色往灰里拉，白底卡片周围会出现一圈发脏的灰；
+   * 抬一点点明度，边缘看着是暗而不是脏。
+   *
+   * 这里写 rgb 三元组而不是 var(--el-text-color-primary)：rgb() 的透明度语法
+   * 要的是三个通道值，塞不进一个十六进制变量。这四行是全文件仅有的写死颜色。
    *
    * 顺带修掉 EP `--el-box-shadow-light` 的一个问题：它是 `0 0 12px`，
    * 没有垂直偏移，等于一圈均匀光晕而不是阴影——登录卡用的就是它，
@@ -86,59 +52,17 @@
    *
    * ⚠️ 深色模式必须换成纯黑，不能沿用这套，原因见 html.dark 里的注释。
    */
-  --el-box-shadow-lighter: 0 1px 2px rgb(15 23 42 / 6%);
-  --el-box-shadow-light: 0 2px 8px rgb(15 23 42 / 8%), 0 1px 2px rgb(15 23 42 / 4%);
-  --el-box-shadow: 0 8px 24px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 5%);
-  --el-box-shadow-dark: 0 16px 40px rgb(15 23 42 / 14%), 0 4px 12px rgb(15 23 42 / 8%);
+  --el-box-shadow-lighter: 0 1px 2px rgb(48 49 51 / 6%);
+  --el-box-shadow-light: 0 2px 8px rgb(48 49 51 / 8%), 0 1px 2px rgb(48 49 51 / 4%);
+  --el-box-shadow: 0 8px 24px rgb(48 49 51 / 10%), 0 2px 6px rgb(48 49 51 / 5%);
+  --el-box-shadow-dark: 0 16px 40px rgb(48 49 51 / 14%), 0 4px 12px rgb(48 49 51 / 8%);
 }
 
 html.dark {
-  --el-color-primary: #3986ff;
-  --el-color-primary-light-3: #2e64b9;
-  --el-color-primary-light-5: #274d8a;
-  --el-color-primary-light-7: #1f365b;
-  --el-color-primary-light-8: #1b2b43;
-  --el-color-primary-light-9: #181f2c;
-  --el-color-primary-dark-2: #619eff;
-
-  --el-color-success: #16a34a;
-  --el-color-success-light-3: #15783a;
-  --el-color-success-light-5: #155c2f;
-  --el-color-success-light-7: #153f24;
-  --el-color-success-light-8: #14311f;
-  --el-color-success-light-9: #142219;
-  --el-color-success-dark-2: #45b56e;
-
-  --el-color-warning: #f97316;
-  --el-color-warning-light-3: #b45715;
-  --el-color-warning-light-5: #874415;
-  --el-color-warning-light-7: #593115;
-  --el-color-warning-light-8: #422714;
-  --el-color-warning-light-9: #2b1e14;
-  --el-color-warning-dark-2: #fa8f45;
-
-  --el-color-danger: #dc2626;
-  --el-color-danger-light-3: #a02121;
-  --el-color-danger-light-5: #781d1d;
-  --el-color-danger-light-7: #501919;
-  --el-color-danger-light-8: #3c1818;
-  --el-color-danger-light-9: #281616;
-  --el-color-danger-dark-2: #e35151;
-
-  /* info 深色下单独提亮：原色 #5d5b6e 在深底标签上对比度只有 2.61，
-     五个颜色里唯一不及格的一个。混 30% 白后 4.94，与 EP 默认的 5.24 相当 */
-  --el-color-info: #8e8c9a;
-  --el-color-info-light-3: #696872;
-  --el-color-info-light-5: #515057;
-  --el-color-info-light-7: #39383c;
-  --el-color-info-light-8: #2c2c2f;
-  --el-color-info-light-9: #202021;
-  --el-color-info-dark-2: #a5a3ae;
-
   /* 阴影：深色模式退回纯黑，并大幅提高不透明度
    *
-   * 浅色那套的 #0f172a 在这里等于隐形——页面底色是 #0a0a0a，
-   * 用一个亮度接近的深蓝去投影，什么都看不出来。深色界面的"浮起"
+   * 浅色那套的 #303133 在这里等于隐形——页面底色是 #0a0a0a，
+   * 用一个亮度接近的深灰去投影，什么都看不出来。深色界面的"浮起"
    * 靠的是浮层本身（#141414）比页面底更亮，阴影的作用是把周围压得更暗，
    * 所以要用纯黑、且不透明度得比浅色高一个数量级（6~14% → 32~56%）。
    *
@@ -329,9 +253,69 @@ html.theme-switching *::after {
   --el-dialog-border-radius: var(--keel-radius-lg);
 }
 
-.el-card.is-never-shadow {
+:root .el-card.is-never-shadow {
   box-shadow: none;
 }
+
+/* ---------------- 字号与字重 ----------------
+ * ## 字号：正文档只有 12 / 13 / 14
+ *
+ *   14px  正文、表格、表单、菜单、按钮 —— 绝大多数东西（= EP 的 --el-font-size-base）
+ *   13px  页签
+ *   12px  辅助说明、表单提示、标签内文字
+ *   16px  区块标题（个人中心的姓名、详情页的段标题）
+ *   20px  品牌字
+ *   24/40px  仪表盘大数字、错误页状态码 —— 独立表面，不参与正文阶梯
+ *
+ * **图标的 font-size 是另一根轴**，不受这套约束：图标按钮 18、菜单搜索命中项 16、
+ * 页签图钉 11、导入拖拽区 36。它们量的是图形尺寸不是字号，混在一起数会得出
+ * 「全站十种字号」的错误结论。
+ *
+ * ## 字重：14px 及以下只有 400 / 500
+ *
+ * 这是补出来的规则。此前同一屏的 14px 上同时存在四种字重：
+ *
+ *   400 正文(59 处)   500 按钮与链接(18)   600 面板标题与表头(10)   700 面包屑分隔符、分页当前页(2)
+ *
+ * 字号一样、字重四档，等于让字重同时干四件事，看下来就是"哪儿都在强调、
+ * 又说不清在强调什么"——这正是"字体不协调"的实际来源，而不是字号。
+ * 对照 SaiAdmin（Arco 那套）：整个工作区 14px 一个字号，字重只有 400 / 500 两档。
+ *
+ * 现在的规则：
+ *   - 14px 及以下：400 正文，500 强调（表头、面板标题、按钮、链接）
+ *   - 16px 及以上：允许 600 —— 字号已经跨了一档，字重再跨一档才不会打架
+ *
+ * 下面两条是把 EP 自带的 700 拉回来。它们不是设计决定，是没人注意到的默认值：
+ * 面包屑那个「/」是**文本**不是图标，EP 给它 font-weight:700，
+ * 于是一个分隔符比它两边的文字都重。
+ */
+:root .el-breadcrumb__separator {
+  font-weight: 400;
+}
+
+:root .el-pager li.is-active {
+  font-weight: 500;
+}
+
+/* ---------------- 关于品牌色：这里刻意什么都不写 ----------------
+ * 标签、链接按钮、实心按钮的颜色**全部走 EP 默认**，本文件不做任何调整。
+ *
+ * 试过给「纯文字」形态降一档用 `dark-2`（EP 自己的深一档色，不引入新色值），
+ * 出发点是 EP 原色偏亮，压在浅底上的文字对比度只有 2.0~2.8：
+ *
+ *   标签文字压自家 light-9：primary 2.53 success 2.08 warning 2.04 danger 2.61 info 2.80
+ *   链接按钮压白底：        primary 2.78 success 2.24 warning 2.19 danger 2.90 info 3.08
+ *
+ * 两次都撤了，原因是同一个：**一屏之内出现两种同名色**。
+ * 链接按钮 `#337ECC` 挨着实心主按钮 `#409EFF`，看着像链接被禁用了；
+ * 标签降档之后同样偏离了页面上其他地方的品牌色，观感是"发暗、发脏"。
+ *
+ * 结论：对比度这件事，在"只用 EP 调色板"的前提下没有免费的解。
+ * 真要提对比度，正确做法是**换一套主色**（改 EP 的 SCSS 变量重编主题），
+ * 让 base 档本身就够深——而不是在个别组件上打补丁，那必然造成一屏两种色。
+ *
+ * 所以本文件对品牌色零覆盖。改主色请从 EP 主题走，别在这里贴十六进制。
+ */
 
 /* ---------------- 表格：表头浅灰底，行悬停浅蓝灰 ----------------
  * 表头底色改**令牌**而不是写 `.el-table th { background: ... }`。
@@ -344,14 +328,26 @@ html.theme-switching *::after {
  * 于是那两列走的是令牌的默认值（白），跟我们改的 background 无关。
  *
  * 改令牌，两条 EP 规则拿到的就是同一个值，不用去跟它抢权重。
+ *
+ * ⚠️ `:root` 前缀不能删，删了表头就变回白的。EP 自己也在
+ * **`.el-table` 这个一模一样的选择器**上声明了这一串令牌
+ * （`--el-table-header-bg-color: var(--el-fill-color-blank)`，也就是白），
+ * 特异性完全相同，只能比谁写在后面。而按需导入之后 EP 的表格样式在
+ * `el-table-column-*.css` 这个**懒加载 chunk** 里，进列表页时才插进 <head>，
+ * 永远排在 index.css 之后 —— 于是它赢，我们这条静默失效。
+ * 加 `:root` 把特异性抬到 (0,2,0)，不用跟加载顺序赌。
+ * 同一个坑之前已经吃过分页箭头圆角和卡片圆角两次，见文件末尾的护栏说明。
+ *
+ * 底色用 `--el-fill-color-light`（浅色 #f5f7fa / 深色 #262727）而不是
+ * `-lighter`（#fafafa）：后者与表体白底只差 2%，就算规则生效了看着也像没底色。
  */
-.el-table {
-  --el-table-header-bg-color: var(--el-fill-color-lighter);
+:root .el-table {
+  --el-table-header-bg-color: var(--el-fill-color-light);
 }
 
-.el-table th.el-table__cell {
+:root .el-table th.el-table__cell {
   color: var(--el-text-color-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /*
@@ -364,11 +360,11 @@ html.theme-switching *::after {
  *
  * 用不带档位的选择器，密度下拉切到 large/small 时由 EP 自己的规则接管。
  */
-.el-table .el-table__cell {
+:root .el-table .el-table__cell {
   padding: 9px 0;
 }
 
-.el-table .cell {
+:root .el-table .cell {
   padding: 0 16px;
 }
 

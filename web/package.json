@@ -8,7 +8,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "check": "vue-tsc --noEmit && vite build"
+    "check": "npm run check-css && vue-tsc --noEmit && vite build",
+    "check-css": "node scripts/check-el-overrides.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
