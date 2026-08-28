@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
+import { resolveMenuIcon } from '@/utils/icons'
 import { useUserStore } from '@/stores/user'
 import type { MenuNode } from '@/stores/user'
 
@@ -10,7 +11,17 @@ interface MenuHit {
   name: string
   path: string
   group: string
+  /** 菜单图标名，由后端下发（可能为空，渲染时兜底） */
+  icon: string
 }
+
+/*
+ * 用 resolveMenuIcon 而不是 resolveIconOrNone
+ *
+ * 前者解析不到会兜底成 Menu，后者返回 undefined。这里必须每行都有图标：
+ * 少一个图标那行的文字就会往左顶，一列名字参差不齐，比图标本身画错更难看。
+ */
+const resolveIcon = resolveMenuIcon
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -44,7 +55,7 @@ const entries = computed<MenuHit[]>(() => {
       if (children.length) {
         walk(children, group || node.name)
       } else if (node.path) {
-        out.push({ name: node.name, path: node.path, group })
+        out.push({ name: node.name, path: node.path, group, icon: node.icon })
       }
     }
   }
@@ -170,6 +181,7 @@ defineExpose({ open })
         @click="choose(item)"
         @mouseenter="active = i"
       >
+        <el-icon class="hit-icon"><component :is="resolveIcon(item.icon)" /></el-icon>
         <span class="hit-name">{{ item.name }}</span>
         <span v-if="item.group" class="hit-group">{{ item.group }}</span>
       </li>
@@ -225,11 +237,18 @@ defineExpose({ open })
   list-style: none;
 }
 
+/*
+ * 不用 justify-content: space-between
+ *
+ * 加上图标之后这一行有三个子元素，space-between 会把它们均匀撑开——
+ * 图标贴左、分组贴右、**名字浮在中间**，与图标之间裂开一大条空隙。
+ * 改成让 .hit-name 吃掉剩余空间（flex: 1），图标与名字自然靠在一起，
+ * 分组被顶到最右。
+ */
 .hits li {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   height: 40px;
   padding: 0 12px;
   border-radius: 4px;
@@ -246,9 +265,23 @@ defineExpose({ open })
   background: var(--el-fill-color-light);
 }
 
+/* 图标与侧边栏保持同一套解析（utils/icons.ts），颜色压一档，
+   让它是名字的辅助标识而不是抢视线的色块 */
+.hit-icon {
+  flex: none;
+  font-size: 16px;
+  color: var(--el-text-color-secondary);
+}
+
+/* 高亮行的图标跟着提亮，整行是一个整体 */
+.hits li.is-active .hit-icon {
+  color: var(--el-color-primary);
+}
+
 /* min-width:0 是必需的：flex 子项默认 min-width:auto，
    不置 0 的话它宁可把分组名挤出容器也不肯截断自己 */
 .hit-name {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -264,6 +297,7 @@ defineExpose({ open })
 
 .tips {
   display: flex;
+  justify-content: center;
   gap: 16px;
   margin-top: 12px;
   padding-top: 10px;
