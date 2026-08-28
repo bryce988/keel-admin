@@ -37,7 +37,7 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<LoginLogRow>[] = [
-  { prop: 'created_at', label: '时间', width: 165, sortable: true },
+  { prop: 'created_at', label: '时间', width: 180, sortable: true , align: 'center'},
   { prop: 'username', label: '账号', minWidth: 120 },
   { prop: 'ip', label: 'IP', width: 140 },
   { prop: 'location', label: '登录地址', minWidth: 170, showOverflowTooltip: true },
@@ -82,7 +82,7 @@ onMounted(() => dictStore.preload(['login_type', 'log_status']))
       :request="requestLogs"
       :param-parsers="paramParsers"
       :columns="columns"
-      index
+      id-column
     >
       <template #toolbar>
         <el-button

@@ -3,9 +3,11 @@
  * keel admin
  * 岗位
  *
- * 岗位是 HR 概念，不是角色：它只在新建用户时带出 `default_role_id`
- * 作为初始值，之后改岗位不会动已有账号的授权（docs/database.md §3.3）。
+ * 岗位是 HR 概念，不是角色：`default_role_id` 只在**新建**用户时被前端读走、
+ * 用作角色框的初始值；编辑用户改岗位一律不动角色（docs/database.md §3.3）。
  * 这个边界一旦被打破，「改一下岗位结果一批人权限变了」就会变成线上事故。
+ *
+ * 本服务只负责把这个字段存好、并通过 options() 下发，不参与授权。
  *
  * @author 火火
  */
@@ -70,6 +72,33 @@ class PostService
         $post = Guard::found(SysPostModel::find($id));
 
         return $post->toArray();
+    }
+
+    /**
+     * 下拉选项：给用户表单选岗位用
+     *
+     * 带上 `default_role_id`，前端新建用户选中岗位时据此预填角色——
+     * 不带的话前端只能再逐个查岗位详情，或者把整个分页列表拉下来筛。
+     *
+     * 只给启用的：停用岗位不该出现在「给新人选岗位」的下拉里。
+     * 但已经挂在停用岗位上的存量用户不受影响，那是历史数据，
+     * 编辑他时下拉里选不到当前值，界面会显示成空——这是有意的，
+     * 提醒操作者这个人的岗位已经废弃了，该重新选一个。
+     */
+    public static function options(): array
+    {
+        return SysPostModel::query()
+            ->enabled()
+            ->orderBy('sort')
+            ->get(['id', 'name', 'code', 'dept_id', 'default_role_id'])
+            ->map(fn (SysPostModel $p) => [
+                'id'              => $p->id,
+                'name'            => $p->name,
+                'code'            => $p->code,
+                'dept_id'         => $p->dept_id,
+                'default_role_id' => $p->default_role_id,
+            ])
+            ->all();
     }
 
     public static function create(array $data): SysPostModel

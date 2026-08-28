@@ -421,10 +421,17 @@ PUT /admin/users/12/roles
 | PUT | `/admin/depts/{id}` | `sys:dept:update` | 编辑（移动时同步更新子孙 `ancestors`） |
 | DELETE | `/admin/depts/{id}` | `sys:dept:delete` | 删除（有用户或子部门时 409 + `20203`） |
 | GET | `/admin/posts` | `sys:post:list` | 岗位列表 |
+| GET | `/admin/posts/options` | `sys:post:list` 或 `sys:user:list` | 岗位下拉选项，含 `default_role_id` |
+| GET | `/admin/posts/{id}` | `sys:post:list` | 岗位详情 |
 | POST/PUT/DELETE | `/admin/posts/{id}` | `sys:post:create` / `update` / `delete` | 岗位增改删 |
 
-部门树是用户列表筛选面板的数据源，因此**任一权限满足即可**读取——
-只有用户管理权限、没有部门管理权限的账号也要能按部门筛人。
+部门树与岗位选项都是用户表单的数据源，因此**任一权限满足即可**读取——
+只有用户管理权限、没有部门/岗位管理权限的账号，也要能按部门筛人、给人选岗位。
+
+`/admin/posts/options` 只返回**启用**的岗位，并带上 `default_role_id`：
+前端新建用户时选中岗位，据此预填角色（见 §6 末尾的说明）。
+已挂在停用岗位上的存量用户不受影响，但编辑他时下拉里选不到当前值、显示为空——
+这是有意的，提示操作者该岗位已废弃、需要重新选一个。
 
 ---
 

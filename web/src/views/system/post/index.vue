@@ -8,6 +8,7 @@ import {
   deletePost,
   fetchDeptTree,
   fetchPosts,
+  fetchRoleOptions,
   updatePost,
   type DeptNode,
   type PostRow,
@@ -57,6 +58,29 @@ const deptOptions = ref<Array<{ id: number; name: string }>>([])
 async function loadDepts() {
   deptTree.value = await fetchDeptTree()
   deptOptions.value = [{ id: 0, name: '全公司通用' }, ...flatten(deptTree.value)]
+}
+
+/**
+ * 默认角色的候选
+ *
+ * 只是「新人入职时的初始值」，不是这个岗位的权限——所以允许留空（0 = 不带角色）。
+ * 表单里那句说明必须留着：不写的话很容易被理解成「这个岗位就有这些权限」。
+ */
+const roleOptions = ref<Array<{ id: number; name: string }>>([])
+
+async function loadRoles() {
+  roleOptions.value = await fetchRoleOptions()
+}
+
+/**
+ * 详情里把角色 id 显示成名字
+ *
+ * 0 是「不带角色」，是合法取值不是缺失，所以给明确文案而不是「—」。
+ * 查不到则说明角色被删了——直接显示这句，比显示一个孤零零的 id 有用。
+ */
+function roleName(id?: number): string {
+  if (!id) return '不带角色'
+  return roleOptions.value.find((r) => r.id === id)?.name ?? `角色已删除（#${id}）`
 }
 
 /** 树压平成下拉选项，用全角空格做层级缩进——比再塞一个树选择器轻 */
@@ -156,6 +180,7 @@ async function onBatchDelete() {
 onMounted(() => {
   dictStore.preload(['enable_status'])
   loadDepts()
+  loadRoles()
 })
 </script>
 
@@ -175,7 +200,7 @@ onMounted(() => {
       :param-parsers="paramParsers"
       :columns="columns"
       selection
-      index
+      id-column
       @selection-change="selected = $event as PostRow[]"
     >
       <template #toolbar>
@@ -221,6 +246,7 @@ onMounted(() => {
           <el-descriptions-item label="岗位名称">{{ form.name }}</el-descriptions-item>
           <el-descriptions-item label="岗位编码">{{ form.code }}</el-descriptions-item>
           <el-descriptions-item label="所属部门">{{ form.dept_name }}</el-descriptions-item>
+          <el-descriptions-item label="默认角色">{{ roleName(form.default_role_id) }}</el-descriptions-item>
           <el-descriptions-item label="排序">{{ form.sort }}</el-descriptions-item>
           <el-descriptions-item label="状态">
             <DictTag code="enable_status" :value="form.status" />
@@ -245,6 +271,15 @@ onMounted(() => {
               :value="opt.id"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item label="默认角色" prop="default_role_id">
+          <el-select v-model="form.default_role_id" clearable style="width: 100%" placeholder="不带角色">
+            <el-option v-for="r in roleOptions" :key="r.id" :label="r.name" :value="r.id" />
+          </el-select>
+          <div class="tip">
+            仅在<strong>新建用户</strong>选中此岗位时带出，作为角色的初始值。
+            之后改岗位不会改动已有账号的角色——岗位不是权限。
+          </div>
         </el-form-item>
         <el-form-item label="排序" prop="sort">
           <el-input-number v-model="form.sort" :min="0" :max="9999" controls-position="right" />

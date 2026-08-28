@@ -368,7 +368,7 @@ onMounted(async () => {
         :columns="columns"
         :immediate="false"
         selection
-        index
+        id-column
         @selection-change="selected = $event as DictItemRow[]"
       >
         <template #toolbar>

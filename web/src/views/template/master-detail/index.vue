@@ -190,7 +190,7 @@ onMounted(loadMasters)
         :request="fetchDemoChildren"
         :columns="childColumns"
         :sync-url="false"
-        index
+        id-column
       >
         <template #toolbar>
           <el-button type="primary" :icon="Plus" @click="onCreateChild">新增明细</el-button>

@@ -51,6 +51,21 @@ class PostController
     }
 
     /**
+     * 岗位下拉选项
+     *
+     * 用户表单要选岗位，所以 `sys:user:list` 也放行——与角色的
+     * `/roles/options` 同一套口径。不这么做的话，有权管用户但无权管岗位的人
+     * 打开新增用户抽屉，岗位下拉会是空的且控制台一个 403。
+     *
+     * @url GET /admin/posts/options
+     * @perm sys:post:list | sys:user:list
+     */
+    public function options(Request $request): Response
+    {
+        return Result::ok(PostService::options());
+    }
+
+    /**
      * 岗位详情
      * @url GET /admin/posts/{id}
      * @perm sys:post:list

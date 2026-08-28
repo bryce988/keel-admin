@@ -154,8 +154,21 @@ export function deleteDept(id: number) {
 }
 
 // ---------------------------------------------------------------- 岗位
+/** 岗位下拉选项，带 default_role_id 供用户表单预填角色 */
+export interface PostOption {
+  id: number
+  name: string
+  code: string
+  dept_id: number
+  default_role_id: number
+}
+
 export function fetchPosts(params: TableQuery) {
   return request.get<unknown, PageResult<PostRow>>('/admin/posts', { params })
+}
+
+export function fetchPostOptions() {
+  return request.get<unknown, PostOption[]>('/admin/posts/options')
 }
 
 export function createPost(data: PostPayload) {

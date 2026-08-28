@@ -113,7 +113,7 @@ async function onDelete(row: DemoRow) {
         :request="fetchDemoList"
         :param-parsers="paramParsers"
         :columns="columns"
-        index
+        id-column
       >
         <template #toolbar>
           <el-button type="primary" :icon="Plus">新增</el-button>

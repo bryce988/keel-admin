@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox, type FormRules, type UploadRequestOptions } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
 import { Download, Key, Plus, Upload } from '@element-plus/icons-vue'
 import {
   createUser,
   deleteUser,
   fetchDeptTree,
+  fetchPostOptions,
   fetchRoleOptions,
   fetchUser,
   fetchUsers,
@@ -14,10 +15,12 @@ import {
   setUserStatus,
   updateUser,
   type DeptNode,
+  type PostOption,
   type UserRow,
   type UserPayload
 } from '@/api/system'
 import { download } from '@/utils/request'
+import ImportDialog from '@/components/ImportDialog.vue'
 import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
 import { useDictStore } from '@/stores/dict'
 import { useUserStore } from '@/stores/user'
@@ -67,6 +70,11 @@ const columns: ProColumn<UserRow>[] = [
 const deptTree = ref<DeptNode[]>([])
 const deptLoading = ref(false)
 const roleOptions = ref<Array<{ id: number; name: string }>>([])
+const postOptions = ref<PostOption[]>([])
+
+async function loadPosts() {
+  postOptions.value = await fetchPostOptions()
+}
 
 async function loadDeptTree() {
   deptLoading.value = true
@@ -113,8 +121,41 @@ const errorFields = {
   [BizCode.DATA_SCOPE_DENIED]: 'dept_id'
 }
 
+/**
+ * 岗位带出默认角色
+ *
+ * 只在**新增**时生效。编辑时绝不能动角色——那等于「改岗位就改权限」，
+ * 正好撞上岗位与角色解耦这条设计红线（database.md §3.3）：
+ * 调个岗结果一批人权限变了，是会上生产事故的。
+ *
+ * 换岗位时是否覆盖已选角色，取「用户没动过才跟着变」：
+ *   - 角色为空 → 填上新岗位的默认值
+ *   - 角色正好等于上一个岗位带出来的那份（说明用户没改过）→ 换成新的
+ *   - 用户手动增删过 → 一律不动，他的选择优先
+ * 直接覆盖会毁掉手动选的角色；完全不覆盖又会在换岗位后留着上一个岗位的默认值。
+ */
+const autoFilledRoles = ref<number[]>([])
+
+function sameRoles(a: number[], b: number[]) {
+  return a.length === b.length && a.every((v) => b.includes(v))
+}
+
+function onPostChange(form: UserPayload) {
+  if (editingId.value) return
+
+  const current = form.role_ids ?? []
+  const touched = current.length > 0 && !sameRoles(current, autoFilledRoles.value)
+  if (touched) return
+
+  const post = postOptions.value.find((p) => p.id === form.post_id)
+  const next = post?.default_role_id ? [post.default_role_id] : []
+  form.role_ids = next
+  autoFilledRoles.value = next
+}
+
 function onCreate() {
   editingId.value = 0
+  autoFilledRoles.value = []
   drawerRef.value?.open({
     title: '新增用户',
     data: {
@@ -219,43 +260,27 @@ async function onResetPassword(row: UserRow) {
 }
 
 // ---------------------------------------------------------------- 导入导出
-const importing = ref(false)
+const importRef = ref<InstanceType<typeof ImportDialog> | null>(null)
+const exporting = ref(false)
 
 /** 把当前筛选一并带上：导出的应该是「我现在看到的这批」，不是全表 */
-function onExport() {
-  return download('/admin/users/export', { ...query.value }, '用户列表.xlsx')
+async function onExport() {
+  exporting.value = true
+  try {
+    await download('/admin/users/export', { ...query.value }, '用户列表.xlsx')
+  } finally {
+    exporting.value = false
+  }
 }
 
 function onDownloadTemplate() {
   return download('/admin/users/import-template', undefined, '用户导入模板.xlsx')
 }
 
-/** 接管 el-upload 的请求，走统一封装（带 token、共用错误处理） */
-async function onImport(options: UploadRequestOptions) {
-  importing.value = true
-  try {
-    const result = await importUsers(options.file)
-
-    if (result.fail_count === 0) {
-      ElMessage.success(`导入成功 ${result.success_count} 条`)
-    } else {
-      // 失败明细带行号，用户手上只有那个 Excel，得知道回去改哪一行
-      await ElMessageBox.alert(
-        result.failed.map((f) => f.reason).join('<br>'),
-        `成功 ${result.success_count} 条，失败 ${result.fail_count} 条`,
-        { dangerouslyUseHTMLString: true, type: 'warning' }
-      )
-    }
-
-    tableRef.value?.refresh()
-  } finally {
-    importing.value = false
-  }
-}
-
 onMounted(() => {
   dictStore.preload(['user_status'])
   loadDeptTree()
+  loadPosts()
   fetchRoleOptions().then((roles) => (roleOptions.value = roles))
 })
 </script>
@@ -296,27 +321,28 @@ onMounted(() => {
         :request="fetchUsers"
         :param-parsers="paramParsers"
         :columns="columns"
-        index
+        id-column
       >
         <template #toolbar>
           <el-button v-permission="'sys:user:create'" type="primary" :icon="Plus" @click="onCreate">
             新增
           </el-button>
 
-          <el-upload
+          <!-- 模板下载收进了导入弹窗，工具栏不再为它占一个位置 -->
+          <el-button
             v-permission="'sys:user:import'"
-            :show-file-list="false"
-            :http-request="onImport"
-            accept=".xlsx,.csv"
+            :icon="Upload"
+            @click="importRef?.open()"
           >
-            <el-button :icon="Upload" :loading="importing">导入</el-button>
-          </el-upload>
-
-          <el-button v-permission="'sys:user:import'" link type="primary" @click="onDownloadTemplate">
-            下载模板
+            导入
           </el-button>
 
-          <el-button v-permission="'sys:user:export'" :icon="Download" @click="onExport">
+          <el-button
+            v-permission="'sys:user:export'"
+            :icon="Download"
+            :loading="exporting"
+            @click="onExport"
+          >
             导出
           </el-button>
         </template>
@@ -408,6 +434,13 @@ onMounted(() => {
               <el-option v-for="d in deptOptions" :key="d.id" :label="d.name" :value="d.id" />
             </el-select>
           </el-form-item>
+          <el-form-item label="岗位" prop="post_id">
+            <el-select v-model="form.post_id" clearable style="width: 100%" placeholder="未设置"
+                       @change="onPostChange(form)">
+              <el-option v-for="p in postOptions" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+            <div v-if="!editingId" class="tip">选中岗位会带出它的默认角色，之后可以自行调整</div>
+          </el-form-item>
           <el-form-item label="角色" prop="role_ids">
             <el-select v-model="form.role_ids" multiple style="width: 100%" placeholder="可多选">
               <el-option v-for="r in roleOptions" :key="r.id" :label="r.name" :value="r.id" />
@@ -430,6 +463,16 @@ onMounted(() => {
         </template>
       </template>
     </FormDrawer>
+
+    <ImportDialog
+      ref="importRef"
+      title="导入用户"
+      accept=".xlsx,.csv"
+      :max-size="10"
+      :download-template="onDownloadTemplate"
+      :upload="importUsers"
+      @success="tableRef?.refresh()"
+    />
   </div>
 </template>
 

@@ -112,6 +112,9 @@ Route::group('/admin', function () {
 
     // ---------------- 岗位 ----------------
     Route::get('/posts', [PostController::class, 'index'])->setParams(['perm' => 'sys:post:list']);
+    // 固定路径排在 {id} 之前，否则 options 会被当成 id 匹配掉
+    Route::get('/posts/options', [PostController::class, 'options'])
+        ->setParams(['perm' => ['sys:post:list', 'sys:user:list']]);
     Route::get('/posts/{id:\d+}', [PostController::class, 'show'])
         ->setParams(['perm' => 'sys:post:list']);
     Route::post('/posts', [PostController::class, 'store'])->setParams([

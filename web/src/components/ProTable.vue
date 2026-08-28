@@ -100,8 +100,14 @@ const props = withDefaults(
     /** 挂载时是否立即取数 */
     immediate?: boolean
     pageSize?: number
-    /** 序号列 */
-    index?: boolean
+    /**
+     * 首列显示主键 ID
+     *
+     * 不是序号列。序号（第几行）翻一页就变，指认不了任何东西——
+     * 排查问题时说「第 3 行」没用，说「ID 12」才对得上库里的记录、日志里的
+     * 操作对象、以及接口返回的主键。
+     */
+    idColumn?: boolean
     /**
      * 树形模式：不分页，request 直接返回数组
      *
@@ -123,7 +129,7 @@ const props = withDefaults(
      * 也和接口的默认值对上（docs/api.md §1.3、Paginator::DEFAULT_SIZE）。
      */
     pageSize: 20,
-    index: false,
+    idColumn: false,
     syncUrl: true,
     tree: false,
     defaultExpandAll: true
@@ -515,8 +521,39 @@ defineExpose({ reload, refresh, selected, loading })
         @sort-change="onSortChange"
         @selection-change="onSelectionChange"
       >
-      <el-table-column v-if="selection" type="selection" width="46" align="center" :reserve-selection="true" />
-      <el-table-column v-if="index" type="index" label="#" width="56" align="center" />
+      <!-- 与 ID 列一起固定：只固定其中一个的话，固定列会被拉到非固定列左边，
+           表头就成了「ID | ☑ | 名称」，勾选框跑到第二个去了 -->
+      <el-table-column
+        v-if="selection"
+        type="selection"
+        width="46"
+        align="center"
+        fixed="left"
+        :reserve-selection="true"
+      />
+      <!--
+        ID 列固定在左侧
+
+        `fixed` 不只是为了横向滚动时还能看见——它同时保证 ID 真的是**第一列**：
+        用户页的「账号」是 fixed:'left'，非固定列会被它挤到右边去，
+        表头就变成「账号 | ID | 姓名」了。固定列之间按模板顺序排，这一列写在
+        v-for 之前，于是稳定在最左。
+
+        ⚠️ 树形模式下不出这一列（`&& !tree`）。EP 把展开箭头与层级缩进画在
+        **第一个 type=default 的列**上（源码 table-body/render-helper 的
+        firstDefaultColumnIndex）。原先那个序号列是 type="index"，会被跳过；
+        而 ID 是普通列，一加上去箭头和缩进就从「名称」搬到 ID 上，树看着就散了。
+        树形表的第一列本来就该是承载层级的那一列，ID 挪到普通列里去显示。
+      -->
+      <el-table-column
+        v-if="idColumn && !tree"
+        prop="id"
+        label="ID"
+        width="80"
+        align="center"
+        header-align="center"
+        fixed="left"
+      />
 
       <!--
         表头一律居中，正文的对齐仍由列自己的 align 决定。
@@ -613,5 +650,25 @@ defineExpose({ reload, refresh, selected, loading })
   justify-content: flex-end;
   /* 与工具栏到表格的距离取同一个令牌，上下留白才对称 */
   margin-top: var(--keel-gap);
+}
+
+/*
+ * 去掉表格底部那条收尾线
+ *
+ * EP 用 `.el-table__inner-wrapper::before` 在容器最底部画一条 1px 横线。
+ * 表格自然高度时它就是最后一行的下边框，没问题；但 ProTable 是**定高**的
+ * （见上面「表体滚动」那段），数据不足一页时这条线落在留白的**下方**，
+ * 等于把一片空白框成了一个盒子——最后一页只有几条数据时，
+ * 看到的是「几行内容 + 一个空盒子 + 分页」，而不是「列表到此为止」。
+ *
+ * 去掉之后留白直接连到分页条，视觉上是内容自然结束。最后一行自己的
+ * `td` 下边框还在，列表末尾照样有收口；外层 `.panel` 的边框也已经
+ * 把整块围住了，这条线本来就是重复的。
+ *
+ * 表体滚动时它同样多余：底部露出半行才是「下面还有」的正确暗示，
+ * 压一条实线上去反而像是到底了。
+ */
+:deep(.el-table__inner-wrapper::before) {
+  display: none;
 }
 </style>

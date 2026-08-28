@@ -134,7 +134,7 @@ onMounted(() => dictStore.preload(['log_action', 'log_status']))
       :request="requestLogs"
       :param-parsers="paramParsers"
       :columns="columns"
-      index
+      id-column
     >
       <template #toolbar>
         <el-button

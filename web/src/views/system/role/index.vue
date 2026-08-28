@@ -144,7 +144,7 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
       :request="fetchRoles"
       :param-parsers="paramParsers"
       :columns="columns"
-      index
+      id-column
     >
       <template #toolbar>
         <el-button v-permission="'sys:role:create'" type="primary" :icon="Plus" @click="onCreate">
