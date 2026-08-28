@@ -56,12 +56,59 @@ class AuthService
      *
      * 两个计数器都是固定窗口（`Cache::incr` 只在首次设 TTL），窗口一到自动清零——
      * 滑动窗口会让持续攻击把整个办公室的出口 IP 永久堵死。
+     *
+     * ## 阈值从哪来
+     *
+     * 失败次数与锁定时长走 `threshold()`：**参数表优先，`.env` 兜底**。
+     * 在此之前它们只读 `.env`，而「参数配置」界面里那两项（`sys.login.failLimit`
+     * / `sys.login.lockMinutes`）从来没有被任何代码读过——管理员在界面上改成 3，
+     * 保存成功、没有报错、列表显示新值，实际锁定行为纹丝不动。
+     * 这比「功能没做」更糟：没做至少看得出来，这个是看着生效其实没生效，
+     * 而且是安全设置。
+     *
+     * IP 总闸仍然只读 `.env`：种子里没有对应参数，不凭空造一个界面上看不见的键。
      */
+    /**
+     * 安全阈值：参数表 → .env → 字面量，并夹到合法区间
+     *
+     * 夹区间不是防御性编程的洁癖，是这次改动**必须**带的一步。
+     * 阈值以前只有会改 `.env` 的人能动，现在界面上任何有 `sys:param:update`
+     * 的人都能填，而这两个值填 0 都会出事：
+     *
+     * - `failLimit = 0` → `$fails >= 0` 恒真，第一次输错密码就锁号，全员锁死
+     * - `lockMinutes = 0` → `$window = 0`，两个失败计数器的 TTL 变成 0，
+     *   等于计数永不过期或立即过期（取决于 Redis 语义），锁定机制直接失效
+     *
+     * 参数表那边只校验类型是 int，管不到取值范围，所以只能在用的地方夹。
+     * 上界同理：lockMinutes 填 999999 会把人锁到下辈子，而全仓没有任何解锁入口。
+     *
+     * ## 「没配」与「配了 0」按同一件事处理
+     *
+     * `<= 0` 一律回落到 `.env`，而不是夹到下界。这两个阈值都没有「0」这个语义，
+     * 所以 0 只可能是「留空」或「填错了」——
+     * 而 `ParamService` 对 int 型参数的空值返回的正是 `(int) '' = 0`，
+     * 从这里看不出到底是没填还是填了 0。
+     *
+     * 夹到下界（失败 1 次就锁号）是这两种情况下最糟的解释；
+     * 回落到运维配的 `.env` 才是「这项没配好，按原来的来」。
+     * 第一版就是夹到下界，实测把参数清空后生效值变成 1，等于把系统锁死。
+     */
+    private static function threshold(string $key, string $envKey, int $fallback, int $min, int $max): int
+    {
+        $value = (int) ParamService::value($key);
+
+        if ($value <= 0) {
+            $value = Env::int($envKey, $fallback);
+        }
+
+        return max($min, min($max, $value));
+    }
+
     public static function login(string $username, string $password, string $ip, string $ua): array
     {
-        $limit       = Env::int('LOGIN_FAIL_LIMIT', 5);
+        $limit       = self::threshold('sys.login.failLimit', 'LOGIN_FAIL_LIMIT', 5, 1, 100);
+        $lockMinutes = self::threshold('sys.login.lockMinutes', 'LOGIN_LOCK_MINUTES', 30, 1, 1440);
         $ipLimit     = Env::int('LOGIN_IP_FAIL_LIMIT', 20);
-        $lockMinutes = Env::int('LOGIN_LOCK_MINUTES', 30);
         $window      = $lockMinutes * 60;
 
         // 同一 IP 的失败次数按 IP 归集，与具体账号无关
