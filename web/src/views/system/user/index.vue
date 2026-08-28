@@ -80,6 +80,22 @@ async function loadPosts() {
   postOptions.value = await fetchPostOptions()
 }
 
+/**
+ * 下拉候选要显式带上 0
+ *
+ * 0 是「未设置」这个取值，不是「没选」。placeholder 只在值为空时出现，
+ * 而初始值就是 0——el-select 找不到对应选项时会把原始值直接渲染出来，
+ * 于是新增用户时「岗位」显示成一个光秃秃的 `0`（隔壁「部门」不会，
+ * 因为它的候选里本来就有 0 = 未分配）。
+ *
+ * 只取 id 与 name：postOptions 上还挂着 default_role_id，
+ * 那是给 onPostChange 带默认角色用的，与下拉渲染无关。
+ */
+const postChoices = computed(() => [
+  { id: 0, name: '未设置' },
+  ...postOptions.value.map((p) => ({ id: p.id, name: p.name }))
+])
+
 async function loadDeptTree() {
   deptLoading.value = true
   try {
@@ -497,9 +513,8 @@ onMounted(() => {
             </el-select>
           </el-form-item>
           <el-form-item label="岗位" prop="post_id">
-            <el-select v-model="form.post_id" clearable style="width: 100%" placeholder="未设置"
-                       @change="onPostChange(form)">
-              <el-option v-for="p in postOptions" :key="p.id" :label="p.name" :value="p.id" />
+            <el-select v-model="form.post_id" style="width: 100%" @change="onPostChange(form)">
+              <el-option v-for="p in postChoices" :key="p.id" :label="p.name" :value="p.id" />
             </el-select>
             <div v-if="!editingId" class="tip">选中岗位会带出它的默认角色，之后可以自行调整</div>
           </el-form-item>

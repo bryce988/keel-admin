@@ -98,20 +98,11 @@ const parentOptions = computed(() => {
 
 // ---------------------------------------------------------------- 增改删
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入部门名称', trigger: 'blur' }],
-  code: [
-    { required: true, message: '请输入部门编码', trigger: 'blur' },
-    {
-      pattern: /^[A-Za-z0-9_:.-]+$/,
-      message: '只能包含字母、数字与 _ : . -',
-      trigger: 'blur'
-    }
-  ]
+  name: [{ required: true, message: '请输入部门名称', trigger: 'blur' }]
 }
 
-/** 业务码 → 字段，让「编码已存在」红框标在编码上而不是只弹一句 */
+/** 业务码 → 字段，让错误的红框标在对应输入框上而不是只弹一句 */
 const errorFields = {
-  [BizCode.DEPT_CODE_EXISTS]: 'code',
   // 上级部门超出数据范围，红框标在上级选择器上
   [BizCode.DATA_SCOPE_DENIED]: 'parent_id'
 }
@@ -120,7 +111,7 @@ function onCreate(parentId = 0) {
   editingId.value = 0
   drawerRef.value?.open({
     title: parentId ? '新增下级部门' : '新增部门',
-    data: { parent_id: parentId, name: '', code: '', sort: 0, status: 1 }
+    data: { parent_id: parentId, name: '', sort: 0, status: 1 }
   })
 }
 
@@ -139,10 +130,10 @@ function onView(row: DeptNode) {
 }
 
 function submit(form: DeptPayload) {
+  // 不传 code：编码由后端按主键生成，校验器里根本没有这个字段
   const payload = {
     parent_id: form.parent_id ?? 0,
     name: form.name,
-    code: form.code,
     leader_id: form.leader_id ?? 0,
     sort: form.sort ?? 0,
     status: form.status ?? 1
@@ -260,9 +251,6 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="部门名称" prop="name">
           <el-input v-model="form.name" maxlength="64" show-word-limit />
-        </el-form-item>
-        <el-form-item label="部门编码" prop="code" :error="errors.code">
-          <el-input v-model="form.code" maxlength="64" placeholder="如 DEPT-TECH" />
         </el-form-item>
         <el-form-item label="排序" prop="sort">
           <el-input-number v-model="form.sort" :min="0" :max="9999" controls-position="right" />

@@ -110,14 +110,36 @@ class RoleService
 
     // ---------------------------------------------------------------- 增改删
 
+    /**
+     * 角色编码：`ROLE-` 加四位左补零的主键
+     *
+     * ⚠️ 与部门、岗位的编码有一点本质不同，改这里之前先读完：
+     * 那两个编码只是给导入表格用的可读别名，没有任何代码引用；**角色编码是被引用的**——
+     * 登录接口下发的 `roles` 就是编码数组，前端的 `v-role` 指令按它分支
+     * （见 web/src/directives/permission.ts）。所以业务代码里会出现
+     * `v-role="'ROLE-0007'"` 这种读不出含义的写法，得靠角色管理页去对。
+     *
+     * 仍然改成生成，是因为「让人自己编一个全局唯一的字符串」同样有代价，
+     * 而角色数量有限、在管理页一眼能对上。真要按角色分支的地方，
+     * 建议在业务侧自己维护一张「用途 → 角色 id」的配置，别把编码当契约。
+     */
+    public static function makeCode(int $id): string
+    {
+        return sprintf('ROLE-%04d', $id);
+    }
+
     public static function create(array $data): SysRoleModel
     {
-        Guard::unique(SysRoleModel::class, 'code', $data['code'], null, '角色编码已存在', BizCode::ROLE_CODE_EXISTS);
-
         return Db::transaction(function () use ($data) {
             $role = new SysRoleModel();
             $role->fill($data);
             $role->is_builtin = false;   // 内置角色只能由种子脚本产生
+
+            // 先插一行拿主键再回写编码，占位值的理由同 PostService::create()
+            $role->code = '~tmp~' . bin2hex(random_bytes(8));
+            $role->save();
+
+            $role->code = self::makeCode((int) $role->id);
             $role->save();
 
             OpLog::target("角色 {$role->name}({$role->code})");
@@ -132,7 +154,7 @@ class RoleService
         $role = Guard::found(SysRoleModel::find($id));
         Guard::notBuiltin($role, '内置角色不允许修改', BizCode::BUILTIN_ROLE_PROTECTED);
 
-        Guard::unique(SysRoleModel::class, 'code', $data['code'], $id, '角色编码已存在', BizCode::ROLE_CODE_EXISTS);
+        // 编码由主键推导，主键不变编码就不会变；校验规则里也不再收 `code`
         Guard::noCycle(
             SysRoleModel::class,
             $id,

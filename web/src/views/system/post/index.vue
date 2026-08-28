@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
 import { Delete, EditPen, Plus, View } from '@element-plus/icons-vue'
 import {
@@ -73,6 +73,19 @@ async function loadRoles() {
 }
 
 /**
+ * 下拉候选要显式带上 0
+ *
+ * 0 是「不带角色」这个**取值**，不是「没选」。原来靠 clearable + placeholder 表达，
+ * 但 placeholder 只在值为空时才出现，而这一项的初始值就是 0——
+ * el-select 找不到 id 为 0 的选项时会把原始值直接渲染出来，
+ * 于是新增岗位时「默认角色」显示成一个光秃秃的 `0`。
+ *
+ * 同一个表单里的「所属部门」早就是这么处理的（0 = 全公司通用），
+ * 角色的「继承自」、部门与菜单的上级选择器也都是，这里是唯一漏掉的一处。
+ */
+const roleChoices = computed(() => [{ id: 0, name: '不带角色' }, ...roleOptions.value])
+
+/**
  * 详情里把角色 id 显示成名字
  *
  * 0 是「不带角色」，是合法取值不是缺失，所以给明确文案而不是「—」。
@@ -96,15 +109,10 @@ function flatten(nodes: DeptNode[], depth = 0): Array<{ id: number; name: string
 const editingId = ref(0)
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }],
-  code: [
-    { required: true, message: '请输入岗位编码', trigger: 'blur' },
-    { pattern: /^[A-Za-z0-9_:.-]+$/, message: '只能包含字母、数字与 _ : . -', trigger: 'blur' }
-  ]
+  name: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }]
 }
 
 const errorFields = {
-  [BizCode.POST_CODE_EXISTS]: 'code',
   [BizCode.DATA_SCOPE_DENIED]: 'dept_id'
 }
 
@@ -112,7 +120,7 @@ function onCreate() {
   editingId.value = 0
   drawerRef.value?.open({
     title: '新增岗位',
-    data: { name: '', code: '', dept_id: 0, default_role_id: 0, sort: 0, status: 1, remark: '' }
+    data: { name: '', dept_id: 0, default_role_id: 0, sort: 0, status: 1, remark: '' }
   })
 }
 
@@ -127,9 +135,9 @@ function onView(row: PostRow) {
 }
 
 function submit(form: PostPayload) {
+  // 不传 code：编码由后端按主键生成，校验器里根本没有这个字段
   const payload = {
     name: form.name,
-    code: form.code,
     dept_id: form.dept_id ?? 0,
     default_role_id: form.default_role_id ?? 0,
     sort: form.sort ?? 0,
@@ -260,9 +268,6 @@ onMounted(() => {
         <el-form-item label="岗位名称" prop="name">
           <el-input v-model="form.name" maxlength="64" show-word-limit />
         </el-form-item>
-        <el-form-item label="岗位编码" prop="code" :error="errors.code">
-          <el-input v-model="form.code" maxlength="64" placeholder="如 POST-DEV" />
-        </el-form-item>
         <el-form-item label="所属部门" prop="dept_id" :error="errors.dept_id">
           <el-select v-model="form.dept_id" style="width: 100%">
             <el-option
@@ -276,8 +281,8 @@ onMounted(() => {
           </el-select>
         </el-form-item>
         <el-form-item label="默认角色" prop="default_role_id">
-          <el-select v-model="form.default_role_id" clearable style="width: 100%" placeholder="不带角色">
-            <el-option v-for="r in roleOptions" :key="r.id" :label="r.name" :value="r.id" />
+          <el-select v-model="form.default_role_id" style="width: 100%">
+            <el-option v-for="r in roleChoices" :key="r.id" :label="r.name" :value="r.id" />
           </el-select>
           <div class="tip">
             仅在<strong>新建用户</strong>选中此岗位时带出，作为角色的初始值。

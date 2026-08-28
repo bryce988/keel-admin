@@ -22,7 +22,6 @@ class StoreRequest extends FormRequest
     {
         return [
             'name'       => ['required|string|max:64', '角色名称'],
-            'code'       => ['required|code|max:64',   '角色编码'],
             'parent_id'  => ['integer|min:0',          '继承自'],       // 继承哪个角色的权限，0 为不继承（RBAC1）
             'data_scope' => ['integer|in:1,2,3,4,5',   '数据范围'],
             'sort'       => ['integer|min:0|max:9999', '排序'],

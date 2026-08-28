@@ -22,7 +22,6 @@ class StoreRequest extends FormRequest
         return [
             'parent_id' => ['integer|min:0',          '上级部门'],   // 0 为顶级
             'name'      => ['required|string|max:64', '部门名称'],   // ≤64
-            'code'      => ['required|code|max:64',   '部门编码'],   // 唯一，仅限编码字符
             'leader_id' => ['integer|min:0',          '负责人'],     // 用户 ID
             'sort'      => ['integer|min:0|max:9999', '排序'],       // 升序
             'status'    => ['integer|in:0,1',         '状态'],

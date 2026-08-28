@@ -16,7 +16,6 @@ import { useDictStore } from '@/stores/dict'
 import { useUserStore } from '@/stores/user'
 import GrantDrawer from './GrantDrawer.vue'
 import MemberDrawer from './MemberDrawer.vue'
-import { BizCode } from '@/constants/bizCode'
 
 /**
  * 角色管理（RBAC 的授权层）
@@ -87,14 +86,8 @@ const editingId = ref(0)
 const parentOptions = ref<Array<{ id: number; name: string }>>([])
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入角色名称', trigger: 'blur' }],
-  code: [
-    { required: true, message: '请输入角色编码', trigger: 'blur' },
-    { pattern: /^[A-Za-z0-9_:.-]+$/, message: '只能包含字母、数字与 _ : . -', trigger: 'blur' }
-  ]
+  name: [{ required: true, message: '请输入角色名称', trigger: 'blur' }]
 }
-
-const errorFields = { [BizCode.ROLE_CODE_EXISTS]: 'code' }
 
 async function loadParentOptions(excludeId = 0) {
   const roles = await fetchRoleOptions()
@@ -109,7 +102,7 @@ async function onCreate() {
   await loadParentOptions()
   drawerRef.value?.open({
     title: '新增角色',
-    data: { name: '', code: '', parent_id: 0, data_scope: 4, sort: 0, status: 1, remark: '' }
+    data: { name: '', parent_id: 0, data_scope: 4, sort: 0, status: 1, remark: '' }
   })
 }
 
@@ -125,9 +118,9 @@ function onView(row: RoleRow) {
 }
 
 function submit(form: RolePayload) {
+  // 不传 code：编码由后端按主键生成，校验器里根本没有这个字段
   const payload = {
     name: form.name,
-    code: form.code,
     parent_id: form.parent_id ?? 0,
     data_scope: form.data_scope ?? 4,
     sort: form.sort ?? 0,
@@ -230,11 +223,10 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
       ref="drawerRef"
       :submit="submit"
       :rules="rules"
-      :error-fields="errorFields"
       size="560px"
       @success="tableRef?.refresh()"
     >
-      <template #default="{ form, errors, readonly }">
+      <template #default="{ form, readonly }">
         <el-descriptions v-if="readonly" :column="1" border>
           <el-descriptions-item label="角色名称">{{ form.name }}</el-descriptions-item>
           <el-descriptions-item label="角色编码">{{ form.code }}</el-descriptions-item>
@@ -252,9 +244,6 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
         <template v-else>
           <el-form-item label="角色名称" prop="name">
             <el-input v-model="form.name" maxlength="64" show-word-limit />
-          </el-form-item>
-          <el-form-item label="角色编码" prop="code" :error="errors.code">
-            <el-input v-model="form.code" maxlength="64" placeholder="如 ROLE_AUDITOR" />
           </el-form-item>
           <el-form-item label="继承自" prop="parent_id">
             <el-select v-model="form.parent_id" style="width: 100%">

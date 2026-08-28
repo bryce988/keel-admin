@@ -17,7 +17,7 @@
  * @property int     $parent_id  上级部门，0 = 顶级
  * @property string  $ancestors  祖级路径，如 '0,1,3'
  * @property string  $name       名称
- * @property string  $code       部门编码，全表唯一
+ * @property string  $code       部门编码，DEPT- 加四位补零主键，由程序生成（DeptService::makeCode）
  * @property int     $leader_id  部门负责人（sys_users.id）
  * @property int     $sort       排序，值越小越靠前
  * @property int     $status     状态：0 停用 · 1 启用（见 HasStatus）

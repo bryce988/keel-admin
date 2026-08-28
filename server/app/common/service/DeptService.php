@@ -101,10 +101,22 @@ class DeptService
         return $dept->toArray();
     }
 
+    /**
+     * 部门编码：`DEPT-` 加四位左补零的主键
+     *
+     * 与岗位编码同一套做法与同一个理由，见 {@see PostService::makeCode()}。
+     * 编码只在导入用户的 Excel 里出现（那一列「部门编码」），是主键的可读别名；
+     * 手填换来的是重复和同一部门多种写法，没有别的收益。
+     *
+     * 主键超过 9999 时自然变成五位，补零只为按字符串排序时顺序与主键一致。
+     */
+    public static function makeCode(int $id): string
+    {
+        return sprintf('DEPT-%04d', $id);
+    }
+
     public static function create(array $data): SysDeptModel
     {
-        Guard::unique(SysDeptModel::class, 'code', $data['code'], null, '部门编码已存在', BizCode::DEPT_CODE_EXISTS);
-
         $parentId = (int) ($data['parent_id'] ?? 0);
 
         // 部门表的归属列是自己的 id（见 deptColumn），所以判的是新上级。
@@ -118,6 +130,16 @@ class DeptService
             $dept->fill($data);
             $dept->parent_id = $parentId;
             $dept->ancestors = self::ancestorsOf($parentId);
+
+            /*
+             * 先插一行拿主键，再回写编码——编码由主键推导，插之前算不出来。
+             * 占位值不能留空：code 是 NOT NULL + uk_code，并发新增都插 '' 会撞唯一索引。
+             * `~` 不在编码允许的字符集里，撞不上任何真实编码；整段在事务里，外面看不到中间态。
+             */
+            $dept->code = '~tmp~' . bin2hex(random_bytes(8));
+            $dept->save();
+
+            $dept->code = self::makeCode((int) $dept->id);
             $dept->save();
 
             OpLog::target("部门 {$dept->name}({$dept->id})");
@@ -131,8 +153,8 @@ class DeptService
         /** @var SysDeptModel $dept */
         $dept = Guard::found(SysDeptModel::find($id));
 
-        Guard::unique(SysDeptModel::class, 'code', $data['code'], $id, '部门编码已存在', BizCode::DEPT_CODE_EXISTS);
-
+        // 编码没有查重这一步了：它由主键推导，主键不变编码就不会变，
+        // 校验规则里也不再收 `code`，请求体里带上也进不到 $data
         $newParentId = (int) ($data['parent_id'] ?? $dept->parent_id);
         Guard::noCycle(SysDeptModel::class, $id, $newParentId, '上级部门不能是自己或其子部门', BizCode::DEPT_CYCLE);
 

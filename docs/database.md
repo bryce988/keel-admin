@@ -108,7 +108,7 @@ CREATE TABLE `sys_depts` (
   `parent_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0   COMMENT '上级部门，0=顶级',
   `ancestors`  VARCHAR(255)    NOT NULL DEFAULT ''  COMMENT '祖级路径，如 0,1,3',
   `name`       VARCHAR(64)     NOT NULL COMMENT '名称',
-  `code`       VARCHAR(64)     NOT NULL             COMMENT '部门编码',
+  `code`       VARCHAR(64)     NOT NULL             COMMENT '部门编码，DEPT-加四位补零主键，由程序生成',
   `leader_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0   COMMENT '部门负责人',
   `sort`       INT             NOT NULL DEFAULT 0 COMMENT '排序，值越小越靠前',
   `status`     TINYINT         NOT NULL DEFAULT 1   COMMENT '0停用 1启用',
@@ -132,7 +132,7 @@ CREATE TABLE `sys_depts` (
 CREATE TABLE `sys_posts` (
   `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name`            VARCHAR(64)     NOT NULL COMMENT '名称',
-  `code`            VARCHAR(64)     NOT NULL COMMENT '编码',
+  `code`            VARCHAR(64)     NOT NULL COMMENT '编码，POST-加四位补零主键，由程序生成',
   `dept_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0  COMMENT '所属部门，0=全公司通用',
   `default_role_id` BIGINT UNSIGNED NOT NULL DEFAULT 0  COMMENT '入职时带出的默认角色',
   `sort`            INT             NOT NULL DEFAULT 0 COMMENT '排序，值越小越靠前',
@@ -169,7 +169,7 @@ CREATE TABLE `sys_posts` (
 CREATE TABLE `sys_roles` (
   `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name`       VARCHAR(64)     NOT NULL COMMENT '名称',
-  `code`       VARCHAR(64)     NOT NULL             COMMENT '角色编码，如 ROLE_DEPT_MGR',
+  `code`       VARCHAR(64)     NOT NULL             COMMENT '角色编码，ROLE-加四位补零主键，由程序生成',
   `parent_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0   COMMENT '继承自，0=无；仅支持单继承一层',
   `data_scope` TINYINT         NOT NULL DEFAULT 4   COMMENT '1全部 2本部门及下属 3本部门 4仅本人 5自定义',
   `is_builtin` TINYINT(1)      NOT NULL DEFAULT 0   COMMENT '内置角色不可删除',
@@ -443,15 +443,24 @@ VALUES
 
 ### 5.2 内置角色
 
-| code | 名称 | data_scope | 说明 |
+随 `schema.sql` 建库时写入，主键写死，因此编码也是定值。
+后四个是**规划中的示例**，脚手架里没有播种，编码要建出来才有。
+
+| 名称 | code | data_scope | 说明 |
 |---|---|---|---|
-| `ROLE_SUPER` | 超级管理员 | 1 全部 | 内置，不可编辑删除 |
-| `ROLE_DEPT_MGR` | 部门主管 | 2 本部门及下属 | 继承普通员工 |
-| `ROLE_STAFF` | 普通员工 | 4 仅本人 | 大多数账号的基础角色 |
-| `ROLE_DATA_MGR` | 数据管理员 | 1 全部 | 可导出、可删除 |
-| `ROLE_SUPPORT` | 技术支持 | 4 仅本人 | 只读为主 |
-| `ROLE_VIEWER` | 只读访客 | 3 本部门 | 全部只读 |
-| `ROLE_AUDITOR` | 系统审计 | 1 全部 | 只读 + 日志查看，与其他角色互斥 |
+| 超级管理员 | `ROLE-0001` | 1 全部 | 内置，不可编辑删除 |
+| 部门主管 | `ROLE-0002` | 2 本部门及下属 | 继承普通员工 |
+| 普通员工 | `ROLE-0003` | 4 仅本人 | 大多数账号的基础角色 |
+| 数据管理员 | — | 1 全部 | 可导出、可删除 |
+| 技术支持 | — | 4 仅本人 | 只读为主 |
+| 只读访客 | — | 3 本部门 | 全部只读 |
+| 系统审计 | — | 1 全部 | 只读 + 日志查看，与其他角色互斥 |
+
+⚠️ **角色编码由程序按主键生成（`ROLE-` 加四位补零），不再是可读标识符。**
+表里以「名称」为主键列就是这个原因——写文档、写脚本、跟人沟通都该用名称。
+前端的 `v-role` 指令匹配的仍是编码（登录接口下发的就是编码数组），
+所以真要按角色分支，建议在业务侧维护一张「用途 → 角色 id」的配置，
+而不是把 `ROLE-0007` 这种字符串直接写进模板。
 
 ### 5.3 权限点
 

@@ -134,9 +134,12 @@ OPS_DEPT=$(sql "SELECT dept_id FROM sys_users WHERE username='ops01'")
 CUSTOM_DEPTS=$(sql "SELECT GROUP_CONCAT(id) FROM sys_depts WHERE deleted_at IS NULL AND id<>$OPS_DEPT")
 OPS_ROLES_ORIG=$(sql "SELECT GROUP_CONCAT(role_id) FROM sys_user_roles WHERE user_id=(SELECT id FROM sys_users WHERE username='ops01')")
 
+# 角色编码由主键推导（ROLE-0001…），这里绕过接口直接插库，所以插完再按主键回写编码。
+# 认领与查找都用名称：编码此刻还不知道，而名称是这条临时数据自己定的
 sql "INSERT INTO sys_roles (name,code,data_scope,is_builtin,sort,status,remark,created_at,updated_at)
-     VALUES ('验收-自定义范围','ROLE_ACCEPT_CUSTOM',5,0,99,1,'验收脚本临时角色，跑完即删',NOW(),NOW());"
-CUSTOM_ROLE=$(sql "SELECT id FROM sys_roles WHERE code='ROLE_ACCEPT_CUSTOM'")
+     VALUES ('验收-自定义范围',CONCAT('~tmp~',UUID()),5,0,99,1,'验收脚本临时角色，跑完即删',NOW(),NOW());"
+CUSTOM_ROLE=$(sql "SELECT id FROM sys_roles WHERE name='验收-自定义范围'")
+sql "UPDATE sys_roles SET code=CONCAT('ROLE-',LPAD($CUSTOM_ROLE,4,'0')) WHERE id=$CUSTOM_ROLE;"
 USER_LIST_PID=$(pid 'sys:user:list')
 sql "INSERT IGNORE INTO sys_role_permissions (role_id,permission_id) VALUES ($CUSTOM_ROLE,$USER_LIST_PID);"
 for d in $(echo "$CUSTOM_DEPTS" | tr ',' ' '); do

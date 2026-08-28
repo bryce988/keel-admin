@@ -68,7 +68,16 @@ export const permission: Directive<HTMLElement, string | string[]> = {
   }
 }
 
-/** 角色指令：极少数按角色而非权限点控制的场景 */
+/**
+ * 角色指令：极少数按角色而非权限点控制的场景
+ *
+ * ⚠️ 匹配的是**角色编码**（登录接口下发的 `roles` 就是编码数组），
+ * 而编码现在由程序按主键生成——`v-role="'ROLE-0007'"` 读不出是哪个角色。
+ * 真要按角色分支，在业务侧维护一张「用途 → 角色 id/编码」的配置再引用，
+ * 别把生成出来的编码字面量散落在模板里。
+ *
+ * 另外这只是界面收敛，不是安全边界——真正的拦截在后端路由的 perm 声明上。
+ */
 export const role: Directive<HTMLElement, string | string[]> = {
   mounted(el, binding) {
     const userStore = useUserStore()

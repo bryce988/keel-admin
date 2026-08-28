@@ -79,7 +79,6 @@ class PostController
      * 新增岗位
      * @url POST /admin/posts
      * @perm sys:post:create
-     * @error 409 `20801` 岗位编码已存在
      */
     public function store(StoreRequest $request): Response
     {
@@ -90,7 +89,6 @@ class PostController
      * 编辑岗位
      * @url PUT /admin/posts/{id}
      * @perm sys:post:update
-     * @error 409 `20801` 岗位编码已被其他岗位占用
      */
     public function update(UpdateRequest $request, int $id): Response
     {

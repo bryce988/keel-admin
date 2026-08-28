@@ -394,7 +394,7 @@ class UserService
     public static function importTemplate(): string
     {
         return Spreadsheet::writeXlsx('users_template', self::IMPORT_HEADERS, function (callable $emit) {
-            $emit(['zhangsan', '张三', '13800138000', 'zhangsan@example.com', 'DEPT-TECH', 'POST-DEV', '示例行，导入前请删除']);
+            $emit(['zhangsan', '张三', '13800138000', 'zhangsan@example.com', 'DEPT-0002', 'POST-0002', '示例行，导入前请删除']);
         });
     }
 

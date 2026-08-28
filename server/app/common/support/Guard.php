@@ -20,8 +20,8 @@ use app\common\model\scope\DataScope;
  *
  * 用法都是「不满足就抛」，service 里读起来像前置条件声明：
  *
- *   Guard::unique(SysDeptModel::class, 'code', $code, exceptId: $id,
- *                 message: '部门编码已存在', bizCode: BizCode::DEPT_CODE_EXISTS);
+ *   Guard::unique(SysDictTypeModel::class, 'code', $code, exceptId: $id,
+ *                 message: '字典编码已存在', bizCode: BizCode::DICT_CODE_EXISTS);
  */
 final class Guard
 {

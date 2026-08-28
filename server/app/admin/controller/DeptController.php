@@ -55,7 +55,6 @@ class DeptController
      * 新增部门
      * @url POST /admin/depts
      * @perm sys:dept:create
-     * @error 409 `20201` 部门编码已存在
      */
     public function store(StoreRequest $request): Response
     {
@@ -70,7 +69,7 @@ class DeptController
      * @perm sys:dept:update
      * @description 改 `parent_id` 等于移动整棵子树，service 会挡住「把自己挂到自己子孙下面」
      * 这种会形成环的操作。
-     * @error 409 `20201` 部门编码已被占用 · 400 `20202` 上级是自己或自己的子部门
+     * @error 400 `20202` 上级是自己或自己的子部门
      */
     public function update(UpdateRequest $request, int $id): Response
     {

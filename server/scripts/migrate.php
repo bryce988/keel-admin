@@ -220,6 +220,49 @@ $dataPatches = [
                 MODIFY COLUMN `status` TINYINT NOT NULL DEFAULT 1 COMMENT '0停用 1启用'",
         ],
     ],
+    [
+        'sys_posts.code 归一为 POST-0000 格式',
+        // 只要还有一行的编码不等于「按主键推导出来的那个」就重刷。
+        // 含软删的行：它们照样占着 uk_code，漏掉的话新岗位可能撞上一个看不见的编码
+        "SELECT 1 FROM `sys_posts`
+          WHERE `code` <> CONCAT('POST-', LPAD(`id`, 4, '0')) LIMIT 1",
+        [],
+        [
+            /*
+             * 分两步走，不能一条 UPDATE 直接改到位。
+             *
+             * uk_code 是逐行判定的：假如 5 号岗位手填过 `POST-0001`，
+             * 而 1 号岗位正要拿到 `POST-0001`，单条 UPDATE 会在改到某一行时
+             * 撞上另一行还没来得及腾出的旧值，直接报 1062。
+             * 先把所有行挪进一个不可能被占用的命名空间（`~` 不在编码字符集里），
+             * 再统一改成目标值，中间态由 id 保证唯一。
+             */
+            "UPDATE `sys_posts` SET `code` = CONCAT('~tmp~', `id`)",
+            "UPDATE `sys_posts` SET `code` = CONCAT('POST-', LPAD(`id`, 4, '0'))",
+        ],
+    ],
+    [
+        // 与上一条同源同做法。分开写而不是合成一条：两张表的补丁要能各自判定，
+        // 只改了其中一张的库不该被另一张的「已经对了」挡住
+        'sys_depts.code 归一为 DEPT-0000 格式',
+        "SELECT 1 FROM `sys_depts`
+          WHERE `code` <> CONCAT('DEPT-', LPAD(`id`, 4, '0')) LIMIT 1",
+        [],
+        [
+            "UPDATE `sys_depts` SET `code` = CONCAT('~tmp~', `id`)",
+            "UPDATE `sys_depts` SET `code` = CONCAT('DEPT-', LPAD(`id`, 4, '0'))",
+        ],
+    ],
+    [
+        'sys_roles.code 归一为 ROLE-0000 格式',
+        "SELECT 1 FROM `sys_roles`
+          WHERE `code` <> CONCAT('ROLE-', LPAD(`id`, 4, '0')) LIMIT 1",
+        [],
+        [
+            "UPDATE `sys_roles` SET `code` = CONCAT('~tmp~', `id`)",
+            "UPDATE `sys_roles` SET `code` = CONCAT('ROLE-', LPAD(`id`, 4, '0'))",
+        ],
+    ],
 ];
 
 $dataPatched = 0;

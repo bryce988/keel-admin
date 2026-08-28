@@ -82,8 +82,11 @@ class PostService
      *
      * 只给启用的：停用岗位不该出现在「给新人选岗位」的下拉里。
      * 但已经挂在停用岗位上的存量用户不受影响，那是历史数据，
-     * 编辑他时下拉里选不到当前值，界面会显示成空——这是有意的，
-     * 提醒操作者这个人的岗位已经废弃了，该重新选一个。
+     * 编辑他时下拉里选不到当前值——这是有意的，提醒操作者这个人的岗位
+     * 已经废弃了，该重新选一个。
+     *
+     * ⚠️ 此时 el-select 显示的是**岗位 id 本身**，不是空（它找不到匹配项就把
+     * 原始值渲染出来）。原来这里写的是「显示成空」，是错的。
      */
     public static function options(): array
     {
@@ -101,16 +104,43 @@ class PostService
             ->all();
     }
 
+    /**
+     * 岗位编码：`POST-` 加四位左补零的主键
+     *
+     * 编码不再由人填。它的用处只有一个——导入用户的 Excel 里有一列「岗位编码」，
+     * 让填表的人不必知道数据库主键。既然只是主键的可读别名，就该由程序保证
+     * 与主键一一对应；手填带来的两个问题（重复、以及 POST-DEV / dev / 研发
+     * 这种同一岗位多种写法）都是白付的成本。
+     *
+     * 主键超过 9999 时自然变成五位——`sprintf('%04d', 10000)` 得到 `10000` 而不是截断。
+     * 补零是为了按字符串排序时顺序与主键一致，不是长度上限。
+     */
+    public static function makeCode(int $id): string
+    {
+        return sprintf('POST-%04d', $id);
+    }
+
     public static function create(array $data): SysPostModel
     {
-        Guard::unique(SysPostModel::class, 'code', $data['code'], null, '岗位编码已存在', BizCode::POST_CODE_EXISTS);
-
         // dept_id = 0 是「全公司通用」，天然不在任何受限集合里 → 只有全部数据范围能建
         Guard::inDeptScope((int) ($data['dept_id'] ?? 0));
 
         return Db::transaction(function () use ($data) {
             $post = new SysPostModel();
             $post->fill($data);
+
+            /*
+             * 先插一行拿到主键，再回写编码——编码是从主键推导的，插之前算不出来。
+             *
+             * 占位值不能留空：`code` 是 NOT NULL + uk_code，两个人同时新增都插 ''
+             * 会撞唯一索引，第二个人直接 500。`~` 不在编码允许的字符集里
+             * （校验规则 `code` 只放行字母数字与 _ : . -），所以占位值不可能
+             * 和任何真实编码撞上。整段在事务里，外面永远看不到这个中间态。
+             */
+            $post->code = '~tmp~' . bin2hex(random_bytes(8));
+            $post->save();
+
+            $post->code = self::makeCode((int) $post->id);
             $post->save();
 
             OpLog::target("岗位 {$post->name}({$post->id})");
@@ -124,7 +154,8 @@ class PostService
         /** @var SysPostModel $post */
         $post = Guard::found(SysPostModel::find($id));
 
-        Guard::unique(SysPostModel::class, 'code', $data['code'], $id, '岗位编码已存在', BizCode::POST_CODE_EXISTS);
+        // 编码没有查重这一步了：它由主键推导，主键不变编码就不会变，
+        // 而校验规则里也不再收 `code`，请求体里带上也进不到 $data
         Guard::inDeptScope((int) ($data['dept_id'] ?? $post->dept_id), (int) $post->dept_id);
 
         $before = $post->toArray();

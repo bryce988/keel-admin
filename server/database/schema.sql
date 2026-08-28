@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS `sys_depts` (
   `parent_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '上级部门，0=顶级',
   `ancestors`  VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '祖级路径，如 0,1,3',
   `name`       VARCHAR(64)     NOT NULL                COMMENT '名称',
-  `code`       VARCHAR(64)     NOT NULL                COMMENT '部门编码',
+  `code`       VARCHAR(64)     NOT NULL                COMMENT '部门编码，DEPT-加四位补零主键，由程序生成',
   `leader_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '部门负责人',
   `sort`       INT             NOT NULL DEFAULT 0      COMMENT '排序，值越小越靠前',
   `status`     TINYINT         NOT NULL DEFAULT 1      COMMENT '0停用 1启用',
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `sys_depts` (
 CREATE TABLE IF NOT EXISTS `sys_roles` (
   `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name`       VARCHAR(64)     NOT NULL                COMMENT '名称',
-  `code`       VARCHAR(64)     NOT NULL                COMMENT '角色编码，如 ROLE_DEPT_MGR',
+  `code`       VARCHAR(64)     NOT NULL                COMMENT '角色编码，ROLE-加四位补零主键，由程序生成',
   `parent_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '继承自，0=无',
   `data_scope` TINYINT         NOT NULL DEFAULT 4      COMMENT '1全部 2本部门及下属 3本部门 4仅本人 5自定义',
   `is_builtin` TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '内置角色不可删除',
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS `sys_login_logs` (
 CREATE TABLE IF NOT EXISTS `sys_posts` (
   `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name`            VARCHAR(64)     NOT NULL                COMMENT '名称',
-  `code`            VARCHAR(64)     NOT NULL                COMMENT '编码',
+  `code`            VARCHAR(64)     NOT NULL                COMMENT '编码，POST-加四位补零主键，由程序生成',
   `dept_id`         BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '所属部门，0=全公司通用',
   `default_role_id` BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '入职时带出的默认角色',
   `sort`            INT             NOT NULL DEFAULT 0      COMMENT '排序，值越小越靠前',
@@ -260,13 +260,16 @@ CREATE TABLE IF NOT EXISTS `sys_operation_logs` (
 -- ---------------------------------------------------------------- 基础数据
 -- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）
 INSERT INTO `sys_depts` (`id`,`parent_id`,`ancestors`,`name`,`code`,`sort`,`created_at`,`updated_at`) VALUES
-  (1, 0, '0',   '总公司', 'DEPT-ROOT', 1, NOW(), NOW()),
-  (2, 1, '0,1', '技术部', 'DEPT-TECH', 1, NOW(), NOW()),
-  (3, 1, '0,1', '运营部', 'DEPT-OPS',  2, NOW(), NOW())
+  -- 编码直接写成推导值：这三行的主键是写死的，DEPT-000{id} 与 DeptService::makeCode() 一致。
+  -- 存量库靠 migrate.php 的数据补丁刷（这里的 ON DUPLICATE 只更新 updated_at，改不到 code）
+  (1, 0, '0',   '总公司', 'DEPT-0001', 1, NOW(), NOW()),
+  (2, 1, '0,1', '技术部', 'DEPT-0002', 1, NOW(), NOW()),
+  (3, 1, '0,1', '运营部', 'DEPT-0003', 2, NOW(), NOW())
 ON DUPLICATE KEY UPDATE `updated_at` = NOW();
 
 INSERT INTO `sys_roles` (`id`,`name`,`code`,`data_scope`,`is_builtin`,`sort`,`remark`,`created_at`,`updated_at`) VALUES
-  (1, '超级管理员', 'ROLE_SUPER',    1, 1, 1, '内置角色，拥有全部权限，不可编辑删除', NOW(), NOW()),
-  (2, '部门主管',   'ROLE_DEPT_MGR', 2, 0, 2, '可见本部门及下属部门数据',             NOW(), NOW()),
-  (3, '普通员工',   'ROLE_STAFF',    4, 0, 3, '仅可见本人数据',                       NOW(), NOW())
+  -- 编码写成推导值，与 RoleService::makeCode() 一致（主键在这里是写死的）
+  (1, '超级管理员', 'ROLE-0001', 1, 1, 1, '内置角色，拥有全部权限，不可编辑删除', NOW(), NOW()),
+  (2, '部门主管',   'ROLE-0002', 2, 0, 2, '可见本部门及下属部门数据',             NOW(), NOW()),
+  (3, '普通员工',   'ROLE-0003', 4, 0, 3, '仅可见本人数据',                       NOW(), NOW())
 ON DUPLICATE KEY UPDATE `updated_at` = NOW();

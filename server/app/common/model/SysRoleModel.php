@@ -13,7 +13,7 @@
  *
  * @property int     $id         主键
  * @property string  $name       名称
- * @property string  $code       角色编码，如 ROLE_DEPT_MGR，全表唯一
+ * @property string  $code       角色编码，ROLE- 加四位补零主键，由程序生成（RoleService::makeCode）
  * @property int     $parent_id  继承自哪个角色，0 = 无（RBAC1，权限取并集）
  * @property int     $data_scope 数据范围：1 全部 · 2 本部门及下属 · 3 本部门 · 4 仅本人 · 5 自定义
  * @property bool    $is_builtin 内置角色，不可修改也不可删除

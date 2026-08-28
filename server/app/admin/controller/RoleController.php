@@ -80,7 +80,6 @@ class RoleController
      * @url POST /admin/roles
      * @perm sys:role:create
      * @description 新建的角色不带任何权限，要到授权抽屉里逐项勾选。
-     * @error 409 `20301` 角色编码已存在
      */
     public function store(StoreRequest $request): Response
     {
@@ -93,7 +92,7 @@ class RoleController
      * @perm sys:role:update
      * @description 内置角色不允许修改：它们被 `scripts/seed.php` 按编码 upsert，
      * 改了下次播种又会被覆盖回去，白改一场。
-     * @error 403 `20302` 内置角色不允许修改 · 409 `20301` 角色编码已被占用
+     * @error 403 `20302` 内置角色不允许修改
      * · 400 `20306` 继承关系成环
      */
     public function update(UpdateRequest $request, int $id): Response

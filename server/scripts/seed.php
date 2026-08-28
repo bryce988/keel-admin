@@ -15,6 +15,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use app\common\service\DictService;
+use app\common\service\PostService;
 use app\common\support\Db;
 
 $withDemo = in_array('--demo', $argv, true);
@@ -193,10 +194,10 @@ echo '  ✓ 权限点 ' . Db::table('sys_permissions')->count() . " 条\n";
 
 // ─────────────────────────────────────────── 角色授权
 //
-// 内置角色的功能权限。ROLE_SUPER 不用配——is_super 的账号跳过一切校验，
+// 内置角色的功能权限。超级管理员不用配——is_super 的账号跳过一切校验，
 // 这里给它全量只是为了角色详情页能正常展示。
 $grants = [
-    'ROLE_SUPER'    => ['*'],
+    '超级管理员' => ['*'],
     /**
      * 部门主管：管得了本部门的人，看得到组织结构与日志，但碰不到系统级配置
      *
@@ -208,7 +209,7 @@ $grants = [
      * - 有 `sys:field:user:phone` 但没有 `sys:field:user:email` → 手机号看得见、
      *   邮箱是掩码，一个账号上就能看出字段级权限的效果
      */
-    'ROLE_DEPT_MGR' => [
+    '部门主管' => [
         'sys:dashboard:view',
         'sys',
         'sys:user:list', 'sys:user:create', 'sys:user:update',
@@ -220,14 +221,24 @@ $grants = [
 
     // 普通员工：只有概览。它是对照组——越权测试要有一个「什么都没有」的账号，
     // 才能验证 fail-closed 是真的关着，而不是碰巧没人去点
-    'ROLE_STAFF'    => ['sys:dashboard:view'],
+    '普通员工' => ['sys:dashboard:view'],
 ];
 
 $permIdByCode = Db::table('sys_permissions')->pluck('id', 'perm_code')->all();
 
-foreach ($grants as $roleCode => $codes) {
-    $role = Db::table('sys_roles')->where('code', $roleCode)->first();
+/*
+ * 按**名称**找角色，不是按编码
+ *
+ * 角色编码已改成由主键推导（ROLE-0001…），写死编码就再也对不上。
+ * 而且这个查找原来是静默 `continue` 的：找不到就什么都不授，不报错、不提示，
+ * 表现是「部门主管和普通员工权限全没了」而日志里一片安静。
+ * 现在找不到会明确喊一声——内置角色本来就该在 schema.sql 里存在，
+ * 找不到只可能是数据被改坏了，那是需要人看一眼的事。
+ */
+foreach ($grants as $roleName => $codes) {
+    $role = Db::table('sys_roles')->where('name', $roleName)->first();
     if (!$role) {
+        echo "  · 跳过授权：找不到内置角色「{$roleName}」\n";
         continue;
     }
 
@@ -245,17 +256,34 @@ foreach ($grants as $roleCode => $codes) {
 echo "  ✓ 内置角色授权\n";
 
 // ─────────────────────────────────────────── 岗位
+/*
+ * 岗位不带 code：编码由 PostService::makeCode() 按主键生成，这里插完再回写。
+ *
+ * 对齐用的唯一键也随之从 code 换成 name。这一步是必须的而不是顺手改的——
+ * 编码从 POST-DEV 变成 POST-0002 之后，还按 code 找旧行会一个都找不到，
+ * 于是每次播种都往库里再插一份「研发工程师」，越播越多。
+ */
 $posts = [
-    ['name' => '技术负责人', 'code' => 'POST-TECH-LEAD', 'dept_id' => 2, 'default_role_id' => 2, 'sort' => 1],
-    ['name' => '研发工程师', 'code' => 'POST-DEV',       'dept_id' => 2, 'default_role_id' => 3, 'sort' => 2],
-    ['name' => '运营专员',   'code' => 'POST-OPS',       'dept_id' => 3, 'default_role_id' => 3, 'sort' => 3],
+    ['name' => '技术负责人', 'dept_id' => 2, 'default_role_id' => 2, 'sort' => 1],
+    ['name' => '研发工程师', 'dept_id' => 2, 'default_role_id' => 3, 'sort' => 2],
+    ['name' => '运营专员',   'dept_id' => 3, 'default_role_id' => 3, 'sort' => 3],
 ];
 foreach ($posts as $post) {
     $post += ['status' => 1, 'remark' => '', 'updated_at' => $now];
-    $exists = Db::table('sys_posts')->where('code', $post['code'])->first();
-    $exists
-        ? Db::table('sys_posts')->where('id', $exists->id)->update($post)
-        : Db::table('sys_posts')->insert($post + ['created_at' => $now]);
+    $exists = Db::table('sys_posts')->where('name', $post['name'])->first();
+
+    if ($exists) {
+        // 不带 code，已有行的编码保持不动
+        Db::table('sys_posts')->where('id', $exists->id)->update($post);
+        continue;
+    }
+
+    // 占位值同 PostService::create()：code 是 NOT NULL + uk_code，
+    // 三条一起插的话留空会在第二条上撞唯一索引
+    $id = Db::table('sys_posts')->insertGetId(
+        $post + ['code' => '~tmp~' . bin2hex(random_bytes(8)), 'created_at' => $now]
+    );
+    Db::table('sys_posts')->where('id', $id)->update(['code' => PostService::makeCode((int) $id)]);
 }
 echo "  ✓ 岗位 " . count($posts) . " 个\n";
 
@@ -399,9 +427,9 @@ echo '  ✓ 系统参数 ' . count($params) . " 项\n";
 if ($withDemo) {
     $demoPassword = 'demo123456';
     $demoUsers = [
-        ['username' => 'manager', 'real_name' => '王强', 'dept_id' => 2, 'post_id' => 1, 'role' => 'ROLE_DEPT_MGR', 'phone' => '13800138001'],
-        ['username' => 'dev01',   'real_name' => '李娜', 'dept_id' => 2, 'post_id' => 2, 'role' => 'ROLE_STAFF',    'phone' => '13800138002'],
-        ['username' => 'ops01',   'real_name' => '赵敏', 'dept_id' => 3, 'post_id' => 3, 'role' => 'ROLE_STAFF',    'phone' => '13800138003'],
+        ['username' => 'manager', 'real_name' => '王强', 'dept_id' => 2, 'post_id' => 1, 'role' => '部门主管', 'phone' => '13800138001'],
+        ['username' => 'dev01',   'real_name' => '李娜', 'dept_id' => 2, 'post_id' => 2, 'role' => '普通员工', 'phone' => '13800138002'],
+        ['username' => 'ops01',   'real_name' => '赵敏', 'dept_id' => 3, 'post_id' => 3, 'role' => '普通员工', 'phone' => '13800138003'],
     ];
 
     $created = 0;
@@ -409,7 +437,7 @@ if ($withDemo) {
         if (Db::table('sys_users')->where('username', $demo['username'])->exists()) {
             continue;
         }
-        $role = Db::table('sys_roles')->where('code', $demo['role'])->first();
+        $role = Db::table('sys_roles')->where('name', $demo['role'])->first();
 
         Db::transaction(function () use ($demo, $role, $demoPassword, $now) {
             $uid = Db::table('sys_users')->insertGetId([
