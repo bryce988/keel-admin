@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { Expand, Fold, Moon, Setting, Sunny } from '@element-plus/icons-vue'
+import { Expand, Fold, FullScreen, Moon, ScaleToOriginal, Setting, Sunny } from '@element-plus/icons-vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import MenuSearch from './components/MenuSearch.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
@@ -12,6 +12,7 @@ import TopMenu from './components/TopMenu.vue'
 import PasswordDialog from '@/views/profile/PasswordDialog.vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useFullscreen, fullscreenSupported } from '@/composables/useFullscreen'
 import { useMenuNav } from '@/composables/useMenuNav'
 import { useSignOut } from '@/composables/useSignOut'
 
@@ -22,6 +23,18 @@ const userStore = useUserStore()
 const signOut = useSignOut()
 
 const { activeChildren } = useMenuNav()
+
+/*
+ * 全屏
+ *
+ * 不支持的浏览器直接不渲染这个按钮（`canFullscreen` 只在启动时算一次，
+ * 浏览器能力不会中途变）。留一个点了没反应的按钮比没有更糟。
+ *
+ * 进出全屏会改变视口高度，表格的定高要跟着重算——ProTable 自己显式听了
+ * fullscreenchange（没有只靠 resize），所以这里不用做任何事。
+ */
+const canFullscreen = fullscreenSupported()
+const { isFullscreen, toggle: toggleFullscreen } = useFullscreen()
 
 const isMix = computed(() => appStore.layout === 'mix')
 
@@ -145,6 +158,12 @@ async function onUserCommand(cmd: string) {
       <el-tooltip :content="appStore.theme === 'dark' ? '切换到浅色' : '切换到深色'">
         <el-icon class="icon-btn" @click="appStore.toggleTheme()">
           <component :is="appStore.theme === 'dark' ? Sunny : Moon" />
+        </el-icon>
+      </el-tooltip>
+
+      <el-tooltip v-if="canFullscreen" :content="isFullscreen ? '退出全屏' : '全屏'">
+        <el-icon class="icon-btn" @click="toggleFullscreen()">
+          <component :is="isFullscreen ? ScaleToOriginal : FullScreen" />
         </el-icon>
       </el-tooltip>
 
