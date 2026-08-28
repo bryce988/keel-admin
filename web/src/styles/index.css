@@ -69,6 +69,27 @@
    * Windows 下汉字落到浏览器的默认回退字体（各机器设置不同，观感不可控）。 */
   --el-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans', 'Noto Sans SC', sans-serif;
+
+  /* ---------------------------------------------------------------- 阴影
+   * 用带蓝调的深色（#0f172a，Tailwind slate-900）而不是纯黑。
+   *
+   * 纯黑阴影会把底下的颜色往灰里拉，浅色界面上尤其明显——白底卡片周围
+   * 会出现一圈发脏的灰。同样不透明度换成偏冷的深色，边缘看着是"暗"而不是"脏"，
+   * 与页面底色 #f2f3f5（本身也是偏冷的灰）也更搭。
+   *
+   * 顺带修掉 EP `--el-box-shadow-light` 的一个问题：它是 `0 0 12px`，
+   * 没有垂直偏移，等于一圈均匀光晕而不是阴影——登录卡用的就是它，
+   * 看着像在发光而不是浮起。这里都给了向下的偏移。
+   *
+   * 四档的用途（EP 内部各组件按需引用，改这里等于全站浮层一起变）：
+   *   lighter 贴边小元素   light 卡片、下拉    base 弹出层    dark 对话框
+   *
+   * ⚠️ 深色模式必须换成纯黑，不能沿用这套，原因见 html.dark 里的注释。
+   */
+  --el-box-shadow-lighter: 0 1px 2px rgb(15 23 42 / 6%);
+  --el-box-shadow-light: 0 2px 8px rgb(15 23 42 / 8%), 0 1px 2px rgb(15 23 42 / 4%);
+  --el-box-shadow: 0 8px 24px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 5%);
+  --el-box-shadow-dark: 0 16px 40px rgb(15 23 42 / 14%), 0 4px 12px rgb(15 23 42 / 8%);
 }
 
 html.dark {
@@ -113,6 +134,20 @@ html.dark {
   --el-color-info-light-8: #2c2c2f;
   --el-color-info-light-9: #202021;
   --el-color-info-dark-2: #a5a3ae;
+
+  /* 阴影：深色模式退回纯黑，并大幅提高不透明度
+   *
+   * 浅色那套的 #0f172a 在这里等于隐形——页面底色是 #0a0a0a，
+   * 用一个亮度接近的深蓝去投影，什么都看不出来。深色界面的"浮起"
+   * 靠的是浮层本身（#141414）比页面底更亮，阴影的作用是把周围压得更暗，
+   * 所以要用纯黑、且不透明度得比浅色高一个数量级（6~14% → 32~56%）。
+   *
+   * 偏移与模糊沿用浅色那套，切主题时几何形状不变，只有明度在变。
+   */
+  --el-box-shadow-lighter: 0 1px 2px rgb(0 0 0 / 32%);
+  --el-box-shadow-light: 0 2px 8px rgb(0 0 0 / 40%), 0 1px 2px rgb(0 0 0 / 24%);
+  --el-box-shadow: 0 8px 24px rgb(0 0 0 / 48%), 0 2px 6px rgb(0 0 0 / 28%);
+  --el-box-shadow-dark: 0 16px 40px rgb(0 0 0 / 56%), 0 4px 12px rgb(0 0 0 / 36%);
 }
 
 :root {
@@ -136,7 +171,24 @@ html.dark {
    *
    * 收敛成令牌之后，「面板长什么样」只有一处定义（见下面的 .panel）。
    */
+  /* ---------------------------------------------------------------- 圆角两档
+   * 容器 8px、控件 4px，不是一刀切。
+   *
+   * 曾经只有一个 4px，全站从面板到按钮都用它。问题出在容器上：
+   * 一张 500px 宽的卡片配 4px 圆角，边角几乎是直的，观感偏工程化。
+   * 而反过来把控件也提到 8px 更糟——30px 高的页签、32px 的图标按钮
+   * 会圆到接近胶囊，一排下来像一串药丸。
+   *
+   * 分界按「这东西是装内容的还是被点的」：
+   *   容器（.panel / el-card / 抽屉里的选项卡片）→ --keel-radius-lg
+   *   控件（按钮 / 页签 / 图标按钮 / 分页）      → --keel-radius
+   *
+   * 控件那档保持 4px 还有一层原因：EP 自己的 --el-border-radius-base 就是 4px，
+   * 输入框、下拉、标签全跟着它。控件档一旦偏离，就得把 EP 那个也一起改，
+   * 否则同一行里按钮 8px、输入框 4px，比统一 4px 还难看。
+   */
   --keel-radius: 4px;
+  --keel-radius-lg: 8px;
   --keel-panel-pad: 16px;
   --keel-gap: 12px;       /* 面板**内部**：标题与内容、工具栏与表格 */
   --keel-gap-lg: 16px;    /* 面板**之间** */
@@ -151,7 +203,7 @@ html.dark {
   padding: var(--keel-panel-pad);
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--keel-radius);
+  border-radius: var(--keel-radius-lg);
 }
 
 * {
@@ -227,12 +279,17 @@ html.theme-switching *::after {
 /* ---------------------------------------------------------------- 圆角统一
  * EP 给 small 尺寸的按钮用 `calc(base - 1px)`=3px、分页按钮 2px，
  * 而同一行并排的输入框、下拉、标签都是 4px。三个值挨在一起看着就是没对齐。
- * 这里把控件拉回与面板同一个值——本项目只有一个圆角。
+ * 这里把它们拉回控件档的 4px，与 EP 的 --el-border-radius-base 一致。
+ *
+ * 注意用的是 --keel-radius 而不是 --keel-radius-lg：按钮是控件不是容器，
+ * 跟着面板一起变圆会圆过头（理由见令牌定义处）。
  */
-.el-button,
-.el-button--small,
-.el-pagination .el-pager li,
-.el-pagination button {
+/* `:root` 前缀的原因同 .el-card 那处：按需注入的 EP 组件样式排在本文件之后，
+   不提特异性就压不住。分页左右箭头此前一直是 EP 的 2px，正是压不住的结果 */
+:root .el-button,
+:root .el-button--small,
+:root .el-pagination .el-pager li,
+:root .el-pagination button {
   border-radius: var(--keel-radius);
 }
 
@@ -241,15 +298,35 @@ html.theme-switching *::after {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------------- 卡片：原型里是发丝线 + 4px 圆角，不用重阴影 ----------------
+/* ---------------- 卡片：发丝线 + 容器档圆角，不用重阴影 ----------------
  * 内边距也拉到与 .panel 同一个令牌。EP 默认 20px，而列表页的面板是 16px——
  * 概览、参数、个人中心用 el-card，列表页用 .panel，两者并存时
  * 内容起始位置差 4px，翻页时能看出来在「呼吸」。
  */
-.el-card {
+/*
+ * ⚠️ 选择器必须比 `.el-card` 更"重"（这里用 `:root .el-card`）
+ *
+ * 按需导入之后，EP 的组件样式是插件**按页注入**的，排在 `styles/index.css` 之后。
+ * 于是同为 `.el-card` 的两条规则里，EP 那条（`--el-card-border-radius: 4px`）后出现、
+ * 后者胜出——本文件顶部那句「排在 EP 的 css 之后所以能盖住」只对
+ * `main.ts` 里显式 import 的那几份全局样式成立，对按需注入的组件样式不成立。
+ *
+ * 这个坑很隐蔽：改完令牌看不出任何变化，DevTools 里变量值也"对"，
+ * 只有把两条规则并排列出来才看得见是谁赢了。加一层 `:root` 把特异性从
+ * (0,1,0) 提到 (0,2,0)，就与注入顺序无关了。
+ */
+:root .el-card {
   --el-card-border-color: var(--el-border-color-lighter);
-  --el-card-border-radius: var(--keel-radius);
+  --el-card-border-radius: var(--keel-radius-lg);
   --el-card-padding: var(--keel-panel-pad);
+}
+
+/* 对话框也是容器，跟面板、卡片同一档。
+   EP 没在 :root 上定义 --el-dialog-border-radius，而是在 .el-dialog 里给了 4px，
+   所以只能连选择器一起盖（`:root` 前缀的原因同上）。
+   抽屉不在此列：它贴着屏幕边缘展开，圆角只会在贴边处露出一道缝 */
+:root .el-dialog {
+  --el-dialog-border-radius: var(--keel-radius-lg);
 }
 
 .el-card.is-never-shadow {

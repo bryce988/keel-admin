@@ -77,7 +77,8 @@ defineExpose({ open })
   gap: 6px;
   padding: 10px;
   border: 1px solid var(--el-border-color);
-  border-radius: var(--keel-radius);
+  /* 它是张卡片（装着缩略图与说明），走容器档 */
+  border-radius: var(--keel-radius-lg);
   background: var(--el-bg-color);
   font-family: inherit;
   text-align: left;

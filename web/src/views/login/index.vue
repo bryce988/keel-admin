@@ -132,7 +132,9 @@ onMounted(loadCaptcha)
   padding: 32px 36px 28px;
   background: var(--el-bg-color, #fff);
   border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  border-radius: 4px;
+  /* 容器档：登录卡与全站的面板、卡片是同一类东西，圆角必须跟着走，
+     否则登录页会是全站唯一一张直角感更强的卡 */
+  border-radius: var(--keel-radius-lg);
   box-shadow: var(--el-box-shadow-light);
 }
 /* 竖排 flex 而不是 text-align：标记是 inline-flex，按行内元素排会带上
@@ -157,7 +159,8 @@ onMounted(loadCaptcha)
   width: 104px;
   height: 40px;
   border: 1px solid var(--el-border-color);
-  border-radius: 4px;
+  /* 控件档：它与验证码输入框并排，得和输入框同圆角 */
+  border-radius: var(--keel-radius);
   cursor: pointer;
   user-select: none;
 }

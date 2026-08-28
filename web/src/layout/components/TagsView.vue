@@ -231,7 +231,9 @@ onUnmounted(() => {
   padding: 0 16px;
   background: var(--el-bg-color);
   border-bottom: 1px solid var(--el-border-color-light);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 4%);
+  /* 走令牌而不是写死纯黑：深浅两套主题的阴影颜色不同（见 styles/index.css），
+     写死的话深色模式下这条 4% 的黑投在 #0a0a0a 上完全看不见 */
+  box-shadow: var(--el-box-shadow-lighter);
 }
 
 .strip {
