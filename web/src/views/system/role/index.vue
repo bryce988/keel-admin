@@ -176,7 +176,15 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <el-button
+            v-permission="'sys:role:detail'"
+            :icon="View"
+            link
+            type="primary"
+            @click="onView(row)"
+          >
+            详情
+          </el-button>
           <!-- 角色页最常用的是授权：改名排序偶尔为之，配权限是天天要做的 -->
           <el-button
             v-permission.any="['sys:role:grantPerm', 'sys:role:grantData']"

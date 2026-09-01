@@ -216,7 +216,15 @@ async function onBatchDelete() {
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <el-button
+            v-permission="'sys:notice:detail'"
+            :icon="View"
+            link
+            type="primary"
+            @click="onView(row)"
+          >
+            详情
+          </el-button>
           <!-- 发布与撤回互斥：同一个位置只出现其中一个，避免误点 -->
           <el-button
             v-if="!row.status"

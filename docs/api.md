@@ -376,7 +376,7 @@ POST /admin/auth/login
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/users` | `sys:user:list` | 列表，支持 `dept_id` `include_child_dept` `status` `role_id` `keyword` |
-| GET | `/admin/users/{id}` | `sys:user:list` | 详情 |
+| GET | `/admin/users/{id}` | `sys:user:detail` 或 `sys:user:update` | 详情。编辑表单要靠它回填，所以两个权限点任一命中即可 |
 | POST | `/admin/users` | `sys:user:create` | 新建 |
 | PUT | `/admin/users/{id}` | `sys:user:update` | 编辑 |
 | DELETE | `/admin/users/{id}` | `sys:user:delete` | 删除（软删） |
@@ -414,13 +414,13 @@ PUT /admin/users/12/roles
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/depts/tree` | `sys:dept:list` 或 `sys:user:list` | 部门树，含每个节点的用户数 |
-| GET | `/admin/depts/{id}` | `sys:dept:list` | 详情 |
+| GET | `/admin/depts/{id}` | `sys:dept:detail` | 详情 |
 | POST | `/admin/depts` | `sys:dept:create` | 新建 |
 | PUT | `/admin/depts/{id}` | `sys:dept:update` | 编辑（移动时同步更新子孙 `ancestors`） |
 | DELETE | `/admin/depts/{id}` | `sys:dept:delete` | 删除（有用户或子部门时 409 + `20203`） |
 | GET | `/admin/posts` | `sys:post:list` | 岗位列表 |
 | GET | `/admin/posts/options` | `sys:post:list` 或 `sys:user:list` | 岗位下拉选项，含 `default_role_id` |
-| GET | `/admin/posts/{id}` | `sys:post:list` | 岗位详情 |
+| GET | `/admin/posts/{id}` | `sys:post:detail` | 岗位详情 |
 | POST/PUT/DELETE | `/admin/posts/{id}` | `sys:post:create` / `update` / `delete` | 岗位增改删 |
 
 岗位的 `code` **不收请求体里的值**，由服务端按主键生成：`POST-` 加四位左补零的主键
@@ -443,7 +443,7 @@ PUT /admin/users/12/roles
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/roles` | `sys:role:list` | 列表（内置/自定义分组） |
-| GET | `/admin/roles/{id}` | `sys:role:list` | 详情，含继承与约束 |
+| GET | `/admin/roles/{id}` | `sys:role:detail` / `update` / `grantPerm` / `grantData` | 详情，含继承与约束。授权抽屉打开时要先取它，所以两个授权权限点也放行 |
 | POST | `/admin/roles` | `sys:role:create` | 新建 |
 | PUT | `/admin/roles/{id}` | `sys:role:update` | 编辑 |
 | DELETE | `/admin/roles/{id}` | `sys:role:delete` | 删除（内置 403 + `20302`，有成员 409 + `20303`） |
@@ -485,7 +485,7 @@ PUT /admin/roles/3/data-scope
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/menus/tree` | `sys:menu:list` | 菜单与权限点树（全量，含停用） |
-| GET | `/admin/menus/{id}` | `sys:menu:list` | 节点详情 |
+| GET | `/admin/menus/{id}` | `sys:menu:detail` | 节点详情 |
 | POST | `/admin/menus` | `sys:menu:create` | 新建节点 |
 | PUT | `/admin/menus/{id}` | `sys:menu:update` | 编辑 |
 | DELETE | `/admin/menus/{id}` | `sys:menu:delete` | 删除（被引用 409 + `20402`） |
@@ -553,7 +553,7 @@ GET /admin/dicts/common_status/items → 200 OK
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/notices` | `sys:notice:list` | 列表，默认按创建时间倒序；只返回 60 字 `summary`，正文要看详情 |
-| GET | `/admin/notices/{id}` | `sys:notice:list` | 详情（含正文） |
+| GET | `/admin/notices/{id}` | `sys:notice:detail` 或 `sys:notice:update` | 详情（含正文）。列表只给摘要，编辑要靠它回填 |
 | POST | `/admin/notices` | `sys:notice:create` | 新增；`status=1` 表示存好就发 |
 | PUT | `/admin/notices/{id}` | `sys:notice:update` | 编辑 |
 | POST | `/admin/notices/{id}/publish` | `sys:notice:publish` | 发布，**幂等** |
@@ -737,7 +737,7 @@ PUT /admin/params
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/logs/operation` | `sys:log:operation:list` | 操作日志，必带时间范围 |
-| GET | `/admin/logs/operation/{id}` | `sys:log:operation:list` | 详情，含字段级变更与脱敏后的入参 |
+| GET | `/admin/logs/operation/{id}` | `sys:log:operation:detail` | 详情，含字段级变更与脱敏后的入参 |
 | GET | `/admin/logs/operation/export` | `sys:log:operation:export` | 导出（导出行为本身也记日志） |
 | GET | `/admin/logs/login` | `sys:log:login:list` | 登录日志 |
 | GET | `/admin/logs/login/export` | `sys:log:login:export` | 导出 |

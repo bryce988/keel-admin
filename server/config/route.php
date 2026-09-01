@@ -114,7 +114,7 @@ Route::group('/admin', function () {
     Route::get('/depts/tree', [DeptController::class, 'tree'])
         ->setParams(['perm' => ['sys:dept:list', 'sys:user:list']]);
     Route::get('/depts/{id:\d+}', [DeptController::class, 'show'])
-        ->setParams(['perm' => 'sys:dept:list']);
+        ->setParams(['perm' => 'sys:dept:detail']);
     Route::post('/depts', [DeptController::class, 'store'])->setParams([
         'perm' => 'sys:dept:create',
         'log'  => ['module' => '系统管理/部门', 'action' => 1, 'title' => '新增部门'],
@@ -134,7 +134,7 @@ Route::group('/admin', function () {
     Route::get('/posts/options', [PostController::class, 'options'])
         ->setParams(['perm' => ['sys:post:list', 'sys:user:list']]);
     Route::get('/posts/{id:\d+}', [PostController::class, 'show'])
-        ->setParams(['perm' => 'sys:post:list']);
+        ->setParams(['perm' => 'sys:post:detail']);
     Route::post('/posts', [PostController::class, 'store'])->setParams([
         'perm' => 'sys:post:create',
         'log'  => ['module' => '系统管理/岗位', 'action' => 1, 'title' => '新增岗位'],
@@ -169,8 +169,15 @@ Route::group('/admin', function () {
     // 接收端那三个接口在上面「我的消息」处，两组权限口径完全不同，别接错
     Route::get('/notices', [NoticeController::class, 'index'])
         ->setParams(['perm' => 'sys:notice:list']);
+    /*
+     * 详情接口的权限写成数组，是因为它有两个消费方
+     *
+     * 一个是「详情」按钮（sys:*:detail），另一个是**编辑表单的回填**——列表只给
+     * 摘要，点编辑得把正文取回来。只声明 detail 的话，有编辑权限却没有详情权限的人
+     * 点编辑会拿到 403，而他明明有权改这条。
+     */
     Route::get('/notices/{id:\d+}', [NoticeController::class, 'show'])
-        ->setParams(['perm' => 'sys:notice:list']);
+        ->setParams(['perm' => ['sys:notice:detail', 'sys:notice:update']]);
     Route::post('/notices', [NoticeController::class, 'store'])->setParams([
         'perm' => 'sys:notice:create',
         'log'  => ['module' => '数据管理/公告', 'action' => 1, 'title' => '新增公告'],
@@ -202,8 +209,11 @@ Route::group('/admin', function () {
     Route::get('/roles', [RoleController::class, 'index'])->setParams(['perm' => 'sys:role:list']);
     Route::get('/roles/options', [RoleController::class, 'options'])
         ->setParams(['perm' => ['sys:role:list', 'sys:user:list']]);
-    Route::get('/roles/{id:\d+}', [RoleController::class, 'show'])
-        ->setParams(['perm' => 'sys:role:list']);
+    // 授权抽屉打开时要先取角色详情（已授权的权限点、数据范围、互斥角色都在里面），
+    // 所以两个授权权限点也要放行——只声明 detail 的话，有授权权限的人打不开授权抽屉
+    Route::get('/roles/{id:\d+}', [RoleController::class, 'show'])->setParams([
+        'perm' => ['sys:role:detail', 'sys:role:update', 'sys:role:grantPerm', 'sys:role:grantData'],
+    ]);
     Route::get('/roles/{id:\d+}/members', [RoleController::class, 'members'])
         ->setParams(['perm' => 'sys:role:list']);
     Route::post('/roles', [RoleController::class, 'store'])->setParams([
@@ -243,7 +253,7 @@ Route::group('/admin', function () {
     Route::get('/menus/tree', [MenuController::class, 'tree'])
         ->setParams(['perm' => 'sys:menu:list']);
     Route::get('/menus/{id:\d+}', [MenuController::class, 'show'])
-        ->setParams(['perm' => 'sys:menu:list']);
+        ->setParams(['perm' => 'sys:menu:detail']);
     Route::post('/menus', [MenuController::class, 'store'])->setParams([
         'perm' => 'sys:menu:create',
         'log'  => ['module' => '系统管理/菜单权限', 'action' => 1, 'title' => '新增权限点'],
@@ -274,7 +284,7 @@ Route::group('/admin', function () {
         'log'  => ['module' => '系统管理/用户', 'action' => 1, 'title' => '导入用户'],
     ]);
     Route::get('/users/{id:\d+}', [UserController::class, 'show'])
-        ->setParams(['perm' => 'sys:user:list']);
+        ->setParams(['perm' => ['sys:user:detail', 'sys:user:update']]);
     Route::post('/users', [UserController::class, 'store'])->setParams([
         'perm' => 'sys:user:create',
         'log'  => ['module' => '系统管理/用户', 'action' => 1, 'title' => '新增用户'],
@@ -367,7 +377,7 @@ Route::group('/admin', function () {
         'log'  => ['module' => '日志审计/操作日志', 'action' => 4, 'title' => '导出操作日志'],
     ]);
     Route::get('/logs/operation/{id:\d+}', [LogController::class, 'operationDetail'])
-        ->setParams(['perm' => 'sys:log:operation:list']);
+        ->setParams(['perm' => 'sys:log:operation:detail']);
 
     Route::get('/logs/login', [LogController::class, 'login'])
         ->setParams(['perm' => 'sys:log:login:list']);

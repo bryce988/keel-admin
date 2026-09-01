@@ -71,44 +71,77 @@ async function open(target: RoleRow) {
     dataScope.value = detail.data_scope
     mutexIds.value = detail.mutex_ids
 
-    // 只回填叶子节点：父节点由 el-tree 自己按子节点状态推导，
-    // 直接把父节点也塞进 setCheckedKeys 会让它变成全选，把没授的子节点一起勾上
+    /*
+     * 授权了哪些就回填哪些，一个不多一个不少
+     *
+     * 树是 check-strictly 的（见模板那段注释），父子勾选互不牵连，
+     * 所以这里可以直接把服务端给的 id 全塞进去。
+     * 从前不行——非 strict 模式下塞一个父节点等于「全选它的子节点」，
+     * 所以旧代码得先把父节点挑掉（`leafOnly`），再靠 el-tree 反推父节点状态。
+     */
     await nextTick()
-    permTreeRef.value?.setCheckedKeys(leafOnly(menus, detail.permission_ids), false)
+    permTreeRef.value?.setCheckedKeys(detail.permission_ids, false)
     deptTreeRef.value?.setCheckedKeys(detail.dept_ids, false)
   } finally {
     loading.value = false
   }
 }
 
-/** 从已授权 id 里挑出叶子节点（没有子节点，或子节点一个都没被授权） */
-function leafOnly(nodes: MenuNodeRow[], granted: number[]): number[] {
-  const result: number[] = []
+/**
+ * 勾选联动：勾子补父、取消父清子
+ *
+ * 树本身是 `check-strictly`（父子独立），联动在这里手写，因为两个方向的规则**不对称**：
+ *
+ * - **勾一个子节点 → 自动补上它的所有祖先**。「新增用户」这个按钮权限脱离
+ *   「用户管理」这个菜单毫无意义：菜单进不去，按钮也就无从点起；而且服务端
+ *   构建菜单树时会把没有子节点的目录剪掉，父节点缺了整棵子树都不下发。
+ * - **取消一个父节点 → 清掉它的整棵子树**。收回了「用户管理」，底下的增删改
+ *   就该一起收回，否则库里留着一堆挂在看不见的菜单下的按钮权限。
+ * - **勾一个父节点 → 什么都不做**。这正是原来最大的问题：想只给「用户管理」
+ *   （只让看列表），一勾把新增/编辑/删除/重置密码/导出/看手机号全带上了，
+ *   得反过来一个个取消，而且很容易漏掉一个就把删除权限发出去了。
+ *
+ * 继承来的节点不动：它们来自父角色，在这里取消不掉（服务端也会拒），
+ * 联动时跳过，免得界面上出现「取消了但一刷新又回来」。
+ */
+function onPermCheck(data: MenuNodeRow) {
+  const tree = permTreeRef.value
+  if (!tree) return
 
-  const walk = (list: MenuNodeRow[]) => {
-    for (const n of list) {
-      if (!granted.includes(n.id)) continue
+  const node = tree.getNode(data.id)
+  if (!node) return
 
-      const kids = n.children ?? []
-      const anyGrantedKid = kids.some((k) => granted.includes(k.id))
-      if (!anyGrantedKid) result.push(n.id)
-      walk(kids)
+  if (node.checked) {
+    // 勾上：把祖先链补齐（leaf=false 表示只设这一个节点，不牵连它的子孙）
+    for (let p = node.parent; p?.data?.id != null; p = p.parent) {
+      if (!inheritedIds.value.includes(p.data.id)) tree.setChecked(p.data.id, true, false)
     }
+
+    return
   }
 
-  walk(nodes)
-  return result
+  // 取消：清掉整棵子树
+  const clear = (target: typeof node) => {
+    for (const child of target.childNodes ?? []) {
+      if (!inheritedIds.value.includes(child.data.id)) tree.setChecked(child.data.id, false, false)
+      clear(child)
+    }
+  }
+  clear(node)
 }
 
 async function savePermissions() {
   if (!role.value) return
   saving.value = true
   try {
-    // 半选的父节点也要提交，否则菜单树在服务端会断链（服务端也会兜底补齐）
-    const ids = [
-      ...(permTreeRef.value?.getCheckedKeys(false) as number[]),
-      ...(permTreeRef.value?.getHalfCheckedKeys() as number[])
-    ]
+    /*
+     * strict 模式下没有「半选」这回事，勾了什么就是什么
+     *
+     * 从前要把 getHalfCheckedKeys() 也拼进来：非 strict 模式下，只授了子节点时
+     * 父节点是半选态，不提交它菜单树在服务端就断链了。
+     * 现在父节点由 `onPermCheck` 在勾子节点时显式补上，是实打实的选中态。
+     */
+    const ids = permTreeRef.value?.getCheckedKeys(false) as number[]
     await grantRolePermissions(role.value.id, ids)
     ElMessage.success('功能权限已保存')
     emit('saved')
@@ -168,8 +201,17 @@ defineExpose({ open })
       <el-tabs v-model="tab">
         <el-tab-pane label="功能权限" name="perm">
           <el-alert type="info" :closable="false" show-icon class="hint">
-            勾选这个角色能访问的菜单与按钮。灰色项是从父角色继承来的，取消不掉。
+            勾选这个角色能访问的菜单与按钮。勾子项会自动补上它所在的菜单；
+            取消菜单会一并收回它下面的按钮。灰色项是从父角色继承来的，取消不掉。
           </el-alert>
+          <!--
+            check-strictly：父子勾选**互不牵连**，联动规则在 `onPermCheck` 里手写
+
+            交给 el-tree 自己联动（check-strictly=false）的话，勾一个父节点等于
+            勾上它的全部子节点——想只给「用户管理」的列表权限，会连新增、删除、
+            重置密码、查看手机号一起授出去，然后得反过来一个个取消。
+            权限界面上「多给了」和「少给了」的代价完全不对等，这个默认行为在这里是错的。
+          -->
           <el-tree
             ref="permTreeRef"
             :data="permTree"
@@ -177,8 +219,9 @@ defineExpose({ open })
             node-key="id"
             show-checkbox
             default-expand-all
-            :check-strictly="false"
+            check-strictly
             class="tree"
+            @check="onPermCheck"
           >
             <template #default="{ data }">
               <span class="node">

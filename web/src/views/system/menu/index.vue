@@ -246,7 +246,15 @@ onMounted(() => {
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+          <el-button
+            v-permission="'sys:menu:detail'"
+            :icon="View"
+            link
+            type="primary"
+            @click="onView(row)"
+          >
+            详情
+          </el-button>
           <el-button :icon="EditPen" v-permission="'sys:menu:update'" link type="primary" @click="onEdit(row)">
             编辑
           </el-button>

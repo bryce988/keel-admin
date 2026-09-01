@@ -55,6 +55,15 @@ $tree = [
             ['name' => '用户管理', 'code' => 'sys:user:list', 'type' => 2,
              'path' => '/system/user', 'component' => 'views/system/user/index.vue', 'icon' => 'User', 'sort' => 10,
              'children' => [
+                 /*
+                  * 详情单列一个权限点，不跟着列表走
+                  *
+                  * 列表页只给概要（姓名、部门、状态），详情才是完整档案——
+                  * 用户详情带角色、备注、岗位，操作日志详情带请求参数与字段变更。
+                  * 「能看名单」和「能看某个人的全部信息」是两回事，
+                  * 合在 list 里就没法只给前者。
+                  */
+                 ['name' => '查看详情',   'code' => 'sys:user:detail',    'type' => 3, 'sort' => 0],
                  ['name' => '新增用户',   'code' => 'sys:user:create',    'type' => 3, 'sort' => 1],
                  ['name' => '编辑用户',   'code' => 'sys:user:update',    'type' => 3, 'sort' => 2],
                  ['name' => '删除用户',   'code' => 'sys:user:delete',    'type' => 3, 'sort' => 3],
@@ -68,6 +77,7 @@ $tree = [
             ['name' => '部门管理', 'code' => 'sys:dept:list', 'type' => 2,
              'path' => '/system/dept', 'component' => 'views/system/dept/index.vue', 'icon' => 'OfficeBuilding', 'sort' => 20,
              'children' => [
+                 ['name' => '查看详情', 'code' => 'sys:dept:detail', 'type' => 3, 'sort' => 0],
                  ['name' => '新增部门', 'code' => 'sys:dept:create', 'type' => 3, 'sort' => 1],
                  ['name' => '编辑部门', 'code' => 'sys:dept:update', 'type' => 3, 'sort' => 2],
                  ['name' => '删除部门', 'code' => 'sys:dept:delete', 'type' => 3, 'sort' => 3],
@@ -75,6 +85,7 @@ $tree = [
             ['name' => '岗位管理', 'code' => 'sys:post:list', 'type' => 2,
              'path' => '/system/post', 'component' => 'views/system/post/index.vue', 'icon' => 'Postcard', 'sort' => 30,
              'children' => [
+                 ['name' => '查看详情', 'code' => 'sys:post:detail', 'type' => 3, 'sort' => 0],
                  ['name' => '新增岗位', 'code' => 'sys:post:create', 'type' => 3, 'sort' => 1],
                  ['name' => '编辑岗位', 'code' => 'sys:post:update', 'type' => 3, 'sort' => 2],
                  ['name' => '删除岗位', 'code' => 'sys:post:delete', 'type' => 3, 'sort' => 3],
@@ -82,6 +93,7 @@ $tree = [
             ['name' => '角色管理', 'code' => 'sys:role:list', 'type' => 2,
              'path' => '/system/role', 'component' => 'views/system/role/index.vue', 'icon' => 'Avatar', 'sort' => 40,
              'children' => [
+                 ['name' => '查看详情',     'code' => 'sys:role:detail',    'type' => 3, 'sort' => 0],
                  ['name' => '新增角色',     'code' => 'sys:role:create',    'type' => 3, 'sort' => 1],
                  ['name' => '编辑角色',     'code' => 'sys:role:update',    'type' => 3, 'sort' => 2],
                  ['name' => '删除角色',     'code' => 'sys:role:delete',    'type' => 3, 'sort' => 3],
@@ -91,6 +103,7 @@ $tree = [
             ['name' => '菜单权限', 'code' => 'sys:menu:list', 'type' => 2,
              'path' => '/system/menu', 'component' => 'views/system/menu/index.vue', 'icon' => 'Menu', 'sort' => 50,
              'children' => [
+                 ['name' => '查看详情', 'code' => 'sys:menu:detail', 'type' => 3, 'sort' => 0],
                  ['name' => '新增节点', 'code' => 'sys:menu:create', 'type' => 3, 'sort' => 1],
                  ['name' => '编辑节点', 'code' => 'sys:menu:update', 'type' => 3, 'sort' => 2],
                  ['name' => '删除节点', 'code' => 'sys:menu:delete', 'type' => 3, 'sort' => 3],
@@ -129,6 +142,7 @@ $tree = [
             ['name' => '系统公告', 'code' => 'sys:notice:list', 'type' => 2,
              'path' => '/data/notice', 'component' => 'views/data/notice/index.vue', 'icon' => 'Bell', 'sort' => 20,
              'children' => [
+                 ['name' => '查看详情', 'code' => 'sys:notice:detail',  'type' => 3, 'sort' => 0],
                  ['name' => '新增公告', 'code' => 'sys:notice:create',  'type' => 3, 'sort' => 1],
                  ['name' => '编辑公告', 'code' => 'sys:notice:update',  'type' => 3, 'sort' => 2],
                  ['name' => '删除公告', 'code' => 'sys:notice:delete',  'type' => 3, 'sort' => 3],
@@ -158,6 +172,7 @@ $tree = [
             ['name' => '操作日志', 'code' => 'sys:log:operation:list', 'type' => 2,
              'path' => '/log/operation', 'component' => 'views/log/operation/index.vue', 'icon' => 'Tickets', 'sort' => 10,
              'children' => [
+                 ['name' => '查看详情',     'code' => 'sys:log:operation:detail', 'type' => 3, 'sort' => 0],
                  ['name' => '导出操作日志', 'code' => 'sys:log:operation:export', 'type' => 3, 'sort' => 1],
              ]],
             ['name' => '登录日志', 'code' => 'sys:log:login:list', 'type' => 2,
@@ -255,6 +270,9 @@ $grants = [
         'sys:user:list', 'sys:user:create', 'sys:user:update',
         'sys:user:resetPwd', 'sys:user:export',
         'sys:dept:list', 'sys:post:list', 'sys:role:list',
+        // 详情从 list 里拆出来了，原先能看的现在要显式给，否则详情按钮会消失
+        'sys:user:detail', 'sys:dept:detail', 'sys:post:detail', 'sys:role:detail',
+        'sys:log:operation:detail',
         // 公告只给读：主管能看到发过什么，但发全员通知是系统管理员的活
         'data', 'sys:notice:list',
         // 他有 sys:user:export，就必须能看到自己的导出任务，否则导了也下不了

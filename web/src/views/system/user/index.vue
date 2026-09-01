@@ -442,7 +442,15 @@ onMounted(() => {
 
         <template #actions="{ row }">
           <div class="table-actions">
-            <el-button :icon="View" link type="primary" @click="onView(row)">详情</el-button>
+            <el-button
+            v-permission="'sys:user:detail'"
+            :icon="View"
+            link
+            type="primary"
+            @click="onView(row)"
+          >
+            详情
+          </el-button>
 
             <template v-if="!row.is_super">
               <el-button :icon="EditPen" v-permission="'sys:user:update'" link type="primary" @click="onEdit(row)">

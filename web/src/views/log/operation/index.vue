@@ -168,7 +168,13 @@ onMounted(() => dictStore.preload(['log_action', 'log_status']))
 
       <template #actions="{ row }">
         <div class="table-actions">
-          <el-button :icon="View" link type="primary" @click="onView(row)">
+          <el-button
+            v-permission="'sys:log:operation:detail'"
+            :icon="View"
+            link
+            type="primary"
+            @click="onView(row)"
+          >
             详情
             <el-badge v-if="row.change_count" :value="row.change_count" class="chg" />
           </el-button>
