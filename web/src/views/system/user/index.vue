@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
 import { ArrowDown, Delete, Download, EditPen, Key, Plus, Upload, View } from '@element-plus/icons-vue'
 import {
   createUser,
   deleteUser,
+  exportUsers,
   fetchDeptTree,
   fetchPostOptions,
   fetchRoleOptions,
@@ -32,6 +34,7 @@ import { BizCode } from '@/constants/bizCode'
  * 这里只把已有角色分给人，不在用户身上单独授权——用户身上一旦能独立加权限，
  * 「这个人为什么能看到这个」就再也说不清了。
  */
+const router = useRouter()
 const dictStore = useDictStore()
 const userStore = useUserStore()
 
@@ -315,11 +318,30 @@ async function onResetPassword(row: UserRow) {
 const importRef = ref<InstanceType<typeof ImportDialog> | null>(null)
 const exporting = ref(false)
 
-/** 把当前筛选一并带上：导出的应该是「我现在看到的这批」，不是全表 */
+/**
+ * 发起导出
+ *
+ * 点一下**不会立刻下载**：后端建一条任务投进队列，文件生成好之后到
+ * 「数据管理 / 数据导出」下载。几万行的 xlsx 要几十秒，同步等下去
+ * 会在浏览器或 nginx 任一层超时（原因见后端 `ExportService` 顶部）。
+ *
+ * 当前筛选一并带上：导出的应该是「我现在看到的这批」，不是全表。
+ * 条件在建任务时就存下来了，之后改筛选不影响已经排队的那条。
+ */
 async function onExport() {
   exporting.value = true
   try {
-    await download('/admin/users/export', { ...query.value }, '用户列表.xlsx')
+    const { message } = await exportUsers({ ...query.value })
+
+    // 文案用后端的 message，前端不维护第二份；带一个直达导出页的入口，
+    // 否则用户得自己去菜单里找「数据管理 / 数据导出」
+    ElMessageBox.confirm(message, '已加入队列', {
+      confirmButtonText: '去查看',
+      cancelButtonText: '知道了',
+      type: 'success'
+    })
+      .then(() => router.push('/data/export'))
+      .catch(() => {})
   } finally {
     exporting.value = false
   }

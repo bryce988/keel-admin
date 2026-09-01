@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import type { ExportAccepted } from '@/api/export'
 import type { PageResult, TableQuery } from '@/components'
 
 /**
@@ -165,6 +166,17 @@ export interface PostOption {
 
 export function fetchPosts(params: TableQuery) {
   return request.get<unknown, PageResult<PostRow>>('/admin/posts', { params })
+}
+
+/**
+ * 发起导出用户
+ *
+ * 返回**任务回执**（202 + `{task_id, message}`），不是文件：文件由队列生成，
+ * 用户到「数据管理 / 数据导出」下载。原先页面直接调 `download()` 拿 blob，
+ * 改异步后那样会拿到一段 JSON。
+ */
+export function exportUsers(params: Record<string, unknown>) {
+  return request.get<unknown, ExportAccepted>('/admin/users/export', { params })
 }
 
 export function fetchPostOptions() {

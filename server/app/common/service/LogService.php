@@ -119,11 +119,11 @@ class LogService
         ];
     }
 
-    public static function exportOperation(array $filters): string
+    public static function exportOperation(array $filters): array
     {
         $query = self::assertExportable(self::operationQuery($filters));
 
-        return Spreadsheet::writeXlsx('operation-logs', [
+        $path = Spreadsheet::writeXlsx('operation-logs', [
             '时间', '操作人', '模块', '操作', '描述', '对象',
             '方法', '路径', 'IP', '结果', '失败原因', '耗时(ms)', 'TraceID',
         ], function (callable $emit) use ($query) {
@@ -146,7 +146,9 @@ class LogService
                     ]);
                 }
             });
-        });
+        }, $rows);
+
+        return ['path' => $path, 'rows' => (int) $rows];
     }
 
     /** 导出用的中文文案。列表页走字典（log_action），导出是纯文本文件，字典帮不上忙 */
@@ -202,12 +204,12 @@ class LogService
         ];
     }
 
-    public static function exportLogin(array $filters): string
+    public static function exportLogin(array $filters): array
     {
         $query = self::assertExportable(self::loginQuery($filters));
         $mapper = self::loginRowMapper();
 
-        return Spreadsheet::writeXlsx('login-logs', [
+        $path = Spreadsheet::writeXlsx('login-logs', [
             '时间', '账号', 'IP', '登录地址', '浏览器', '操作系统', '类型', '结果', '说明',
         ], function (callable $emit) use ($query, $mapper) {
             $query->orderByDesc('id')->chunk(500, function ($rows) use ($emit, $mapper) {
@@ -226,7 +228,9 @@ class LogService
                     ]);
                 }
             });
-        });
+        }, $rows);
+
+        return ['path' => $path, 'rows' => (int) $rows];
     }
 
     // ------------------------------------------------------------ 内部

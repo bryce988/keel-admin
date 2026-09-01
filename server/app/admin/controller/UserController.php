@@ -23,6 +23,7 @@ use app\admin\validation\User\StoreRequest;
 use app\admin\validation\User\UpdateRequest;
 use app\admin\validation\User\UpdateStatusRequest;
 use app\common\exception\BusinessException;
+use app\common\service\ExportService;
 use app\common\service\UserService;
 use app\common\support\OpLog;
 use app\common\support\Paginator;
@@ -164,21 +165,28 @@ class UserController
     // ---------------------------------------------------------------- 导入导出
 
     /**
-     * 导出用户（xlsx）
+     * 发起导出用户
      * @url GET /admin/users/export
      * @perm sys:user:export
-     * @description 筛选条件与列表接口共用 {@see ListRequest}，导出的就是界面上筛出来的那批，
-     * 不是全表。数据权限与字段脱敏同样生效——导出不是绕开字段权限的后门，
-     * 没有手机号权限的人导出来也是掩码。
+     * @description **不直接返回文件**：建一条导出任务投进队列，返回 `202 Accepted` +
+     * `{task_id}`，用户到「数据管理 / 数据导出」下载。几万行的 xlsx 要几十秒，
+     * 同步返回会在浏览器或 nginx 任一层超时，而那个 worker 在这段时间里一个请求都接不了。
+     *
+     * 筛选条件与列表接口共用 {@see ListRequest}，导出的就是界面上筛出来的那批，
+     * 不是全表——条件整份存进任务，排队期间界面改了筛选也不影响。
+     * 数据权限与字段脱敏同样生效（消费进程会还原发起人身份），
+     * 导出不是绕开字段权限的后门：没有手机号权限的人导出来也是掩码。
+     *
      * 路由里这条必须排在 `/users/{id}` 之前，否则 `export` 会被当成 id 匹配掉。
      */
     public function export(ListRequest $request): Response
     {
-        $path = UserService::export($request->validated());
+        $task = ExportService::enqueue('user', $request->validated());
 
-        OpLog::target('导出用户 ' . basename($path));
-
-        return Result::download($path, "用户列表_" . date("Ymd_His") . ".xlsx");
+        return Result::accepted([
+            'task_id' => $task->id,
+            'message' => '已加入导出队列，完成后可在「数据管理 / 数据导出」下载',
+        ]);
     }
 
     /**

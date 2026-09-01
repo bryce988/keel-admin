@@ -289,6 +289,34 @@ CREATE TABLE IF NOT EXISTS `sys_notice_reads` (
   KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公告已读回执';
 
+-- ---------------------------------------------------------------- 数据导出
+-- 异步导出任务。「点一下导出」创建一行，队列消费进程生成文件，用户回来下载。
+CREATE TABLE IF NOT EXISTS `sys_export_tasks` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `biz`         VARCHAR(32)     NOT NULL                COMMENT '业务标识，见 ExportService::BIZ',
+  `biz_name`    VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '冗余，业务标识改名后旧任务仍可读',
+  `params`      TEXT            NOT NULL                COMMENT '导出时的筛选条件（JSON），排队期间界面改了筛选也不影响',
+  `status`      TINYINT         NOT NULL DEFAULT 0      COMMENT '0排队 1处理中 2已完成 3失败',
+  `row_count`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '导出行数',
+  `file_name`   VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '下载时给用户看到的文件名',
+  `file_path`   VARCHAR(500)    NOT NULL DEFAULT ''     COMMENT '服务器上的绝对路径，不下发给前端',
+  `file_size`   BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '字节数',
+  `error_msg`   VARCHAR(500)    NOT NULL DEFAULT ''     COMMENT '失败原因，直接给用户看',
+  `creator_id`  BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '发起人，也是数据权限的归属人列',
+  `creator_name` VARCHAR(64)    NOT NULL DEFAULT ''     COMMENT '冗余存储，发起人改名后仍可读',
+  `dept_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '发起人部门；数据权限在非「仅本人」范围下要按它过滤',
+  `expired_at`  DATETIME        NULL                    COMMENT '文件过期时间，到点后文件被回收、只剩记录',
+  `started_at`  DATETIME        NULL                    COMMENT '开始处理时间',
+  `finished_at` DATETIME        NULL                    COMMENT '完成/失败时间',
+  `created_at`  DATETIME        NOT NULL                COMMENT '创建时间',
+  `updated_at`  DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  -- 列表固定是「我的（或我部门的）+ 按时间倒序」
+  KEY `idx_creator_time` (`creator_id`, `created_at`),
+  KEY `idx_dept_time` (`dept_id`, `created_at`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据导出任务';
+
 -- ---------------------------------------------------------------- 基础数据
 -- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）
 INSERT INTO `sys_depts` (`id`,`parent_id`,`ancestors`,`name`,`code`,`sort`,`created_at`,`updated_at`) VALUES

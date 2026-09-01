@@ -33,7 +33,13 @@ class TaskProcess
             $this->dispatch('keel:log-cleanup', ['trigger' => 'cron']);
         }, 'log-cleanup');
 
-        Log::info('定时任务进程已启动', ['tasks' => ['log-cleanup']]);
+        // 每天 03:40 清理过期的导出任务记录。排在日志清理之后十分钟，
+        // 两件事都要删数据，挤在同一分钟只会让锁竞争没有必要地重叠
+        new Crontab('40 3 * * *', function () {
+            $this->dispatch('keel:export-cleanup', ['trigger' => 'cron']);
+        }, 'export-cleanup');
+
+        Log::info('定时任务进程已启动', ['tasks' => ['log-cleanup', 'export-cleanup']]);
     }
 
     /**

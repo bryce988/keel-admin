@@ -135,6 +135,20 @@ $tree = [
                  // 发布与撤回是同一个权限点：能发就能撤，反过来（只能撤不能发）没有使用场景
                  ['name' => '发布公告', 'code' => 'sys:notice:publish', 'type' => 3, 'sort' => 4],
              ]],
+            /*
+             * 数据导出
+             *
+             * 这一页只是「看任务 + 下载」。发起导出的权限点在各业务模块自己那儿
+             * （sys:user:export 等），所以这里没有 create 之类的按钮权限。
+             *
+             * ⚠️ 谁有 xxx:export 就得有 sys:export:list，否则他导得出来、
+             * 却看不到那条任务，也就永远下载不了。授权时两者要一起给。
+             */
+            ['name' => '数据导出', 'code' => 'sys:export:list', 'type' => 2,
+             'path' => '/data/export', 'component' => 'views/data/export/index.vue', 'icon' => 'Download', 'sort' => 30,
+             'children' => [
+                 ['name' => '删除导出任务', 'code' => 'sys:export:delete', 'type' => 3, 'sort' => 1],
+             ]],
         ],
     ],
     [
@@ -243,6 +257,8 @@ $grants = [
         'sys:dept:list', 'sys:post:list', 'sys:role:list',
         // 公告只给读：主管能看到发过什么，但发全员通知是系统管理员的活
         'data', 'sys:notice:list',
+        // 他有 sys:user:export，就必须能看到自己的导出任务，否则导了也下不了
+        'sys:export:list', 'sys:export:delete',
         'sys:log', 'sys:log:operation:list', 'sys:log:login:list',
         'sys:field:user:phone',
     ],
@@ -345,6 +361,14 @@ $dicts = [
     ]],
     // 单开一份而不是复用 enable_status：公告的 0/1 是「草稿 / 已发布」，
     // 与「停用 / 启用」不是一回事，共用字典会让列表里的公告显示成「已停用」
+    'export_status' => ['导出状态', [
+        ['排队中', '0', 'info'], ['处理中', '1', 'primary'],
+        ['已完成', '2', 'success'], ['失败', '3', 'danger'],
+    ]],
+    'export_biz'    => ['导出业务', [
+        ['用户', 'user', 'primary'], ['操作日志', 'log_operation', 'info'],
+        ['登录日志', 'log_login', 'info'],
+    ]],
     'notice_status' => ['公告状态', [['草稿', '0', 'info'], ['已发布', '1', 'success']]],
     'yes_no'        => ['是否', [['是', '1', 'success'], ['否', '0', 'info']]],
     'gender'        => ['性别', [['男', '1', 'primary'], ['女', '2', 'danger'], ['未知', '0', 'info']]],
@@ -422,6 +446,9 @@ $params = [
     // 头像单开一档：全局的 20MB 对一张头像太宽松，而收进来就要长期占盘
     ['sys.upload.avatarMaxSize', '2097152', 'advanced', 'int',   '头像上传上限（字节）'],
     ['sys.export.maxRows',   '50000',      'advanced', 'int',    '单次导出最大行数'],
+    // 导出文件保留天数。改小了会让「昨天发起、今天来下载」变成文件已过期，
+    // 改大了占磁盘——runtime/exports 没有容量上限，只有这一个阈值管着
+    ['sys.export.retainDays', '3',          'advanced', 'int',    '导出文件保留天数'],
     ['sys.log.retainDays',   '180',        'advanced', 'int',    '日志保留天数'],
     ['sys.cache.ttl',        '300',        'advanced', 'int',    '字典缓存秒数'],
     ['sys.role.maxPerUser',  '5',          'security', 'int',    '单账号最多可持有的角色数'],

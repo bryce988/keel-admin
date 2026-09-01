@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\common\support;
 
+use app\common\service\ExportService;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
@@ -32,11 +33,16 @@ final class Spreadsheet
      * @param  string[]  $headers  表头
      * @param  callable  $feed     fn(callable $emit): void —— 内部按 chunk 取数，
      *                             每行调一次 $emit(array $row)
+     * @param  ?int      $rows     出参：实际写出的数据行数（不含表头）
      * @return string  生成的文件绝对路径
+     *
+     * 行数用**出参**而不是改成返回数组：这个方法有三个调用方，返回值都直接
+     * 当路径用；改成数组要动全部调用方，而其中两个根本不关心行数。
+     * 出参是可选的，不传就是原来的用法。
      */
-    public static function writeXlsx(string $filename, array $headers, callable $feed): string
+    public static function writeXlsx(string $filename, array $headers, callable $feed, ?int &$rows = null): string
     {
-        self::gc();
+        self::gc(self::retainSeconds());
 
         $dir = runtime_path() . '/' . self::EXPORT_DIR;
         if (!is_dir($dir)) {
@@ -54,13 +60,18 @@ final class Spreadsheet
         // - 带样式的行要用 fromValuesWithStyle()
         $writer->addRow(Row::fromValuesWithStyle($headers, (new Style())->withFontBold(true)));
 
+        $written = 0;
+
         try {
-            $feed(function (array $values) use ($writer): void {
+            $feed(function (array $values) use ($writer, &$written): void {
                 $writer->addRow(Row::fromValues($values));
+                $written++;
             });
         } finally {
             $writer->close();
         }
+
+        $rows = $written;
 
         return $path;
     }
@@ -126,7 +137,22 @@ final class Spreadsheet
      * 导出文件是一次性的，下载完就没用了。不清理的话磁盘会被慢慢吃满，
      * 而这种问题通常是在磁盘 100% 的凌晨才被发现。
      */
-    private static function gc(int $ttl = 3600): void
+    /**
+     * 文件保留时长
+     *
+     * 从 1 小时改成按 `sys.export.retainDays`（默认 3 天）：导出改成异步之后，
+     * 文件生成完不会立刻被下载——用户可能第二天才回到「数据导出」页点下载。
+     * 保留一小时的话，晚上发起的导出第二天早上必然是「文件已过期」。
+     *
+     * 与 `ExportService::retainSeconds()` 同源（同一个参数），两边不能各写各的：
+     * 回收比记录上的过期时间早，用户看到的就是「没到期却下不了」。
+     */
+    private static function retainSeconds(): int
+    {
+        return ExportService::retainSeconds();
+    }
+
+    private static function gc(int $ttl): void
     {
         $dir = runtime_path() . '/' . self::EXPORT_DIR;
         if (!is_dir($dir)) {

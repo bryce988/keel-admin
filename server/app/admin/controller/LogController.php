@@ -22,8 +22,8 @@ namespace app\admin\controller;
 
 use app\admin\validation\Log\LoginListRequest;
 use app\admin\validation\Log\OperationListRequest;
+use app\common\service\ExportService;
 use app\common\service\LogService;
-use app\common\support\OpLog;
 use app\common\support\Paginator;
 use app\common\support\Result;
 use support\Response;
@@ -68,19 +68,22 @@ class LogController
     }
 
     /**
-     * 导出操作日志（xlsx）
+     * 发起导出操作日志
      * @url GET /admin/logs/operation/export
      * @perm sys:log:operation:export
-     * @description 筛选条件与列表接口完全一致（共用 {@see OperationListRequest}），
+     * @description **不直接返回文件**，建任务投队列后返回 202 +`{task_id}`，
+     * 到「数据管理 / 数据导出」下载（原因见 `ExportService` 顶部）。
+     * 筛选条件与列表接口完全一致（共用 {@see OperationListRequest}），
      * 导出的就是你在界面上看到的那批数据，不是全表。
      */
     public function exportOperation(OperationListRequest $request): Response
     {
-        $path = LogService::exportOperation($request->validated());
+        $task = ExportService::enqueue('log_operation', $request->validated());
 
-        OpLog::target('导出操作日志 ' . basename($path));
-
-        return Result::download($path, '操作日志_' . date('Ymd_His') . '.xlsx');
+        return Result::accepted([
+            'task_id' => $task->id,
+            'message' => '已加入导出队列，完成后可在「数据管理 / 数据导出」下载',
+        ]);
     }
 
     // ------------------------------------------------------------ 登录日志
@@ -104,16 +107,18 @@ class LogController
     }
 
     /**
-     * 导出登录日志（xlsx）
+     * 发起导出登录日志
      * @url GET /admin/logs/login/export
      * @perm sys:log:login:export
+     * @description 与操作日志导出同一套：建任务、投队列、返回 202。
      */
     public function exportLogin(LoginListRequest $request): Response
     {
-        $path = LogService::exportLogin($request->validated());
+        $task = ExportService::enqueue('log_login', $request->validated());
 
-        OpLog::target('导出登录日志 ' . basename($path));
-
-        return Result::download($path, '登录日志_' . date('Ymd_His') . '.xlsx');
+        return Result::accepted([
+            'task_id' => $task->id,
+            'message' => '已加入导出队列，完成后可在「数据管理 / 数据导出」下载',
+        ]);
     }
 }

@@ -1,4 +1,5 @@
-import request, { download } from '@/utils/request'
+import request from '@/utils/request'
+import type { ExportAccepted } from '@/api/export'
 import type { PageResult, TableQuery } from '@/components'
 
 /**
@@ -81,14 +82,22 @@ export function fetchOperationLog(id: number) {
   return request.get<unknown, OperationLogDetail>(`/admin/logs/operation/${id}`)
 }
 
+/**
+ * 发起导出操作日志
+ *
+ * 返回的是**任务回执**（202 + `{task_id, message}`），不是文件——
+ * 文件由队列生成，用户到「数据管理 / 数据导出」下载。
+ * 原来这里走的是 `download()`（直接拿 blob），改异步后再用它会拿到一段 JSON。
+ */
 export function exportOperationLogs(params: Record<string, unknown>) {
-  return download('/admin/logs/operation/export', params, '操作日志.xlsx')
+  return request.get<unknown, ExportAccepted>('/admin/logs/operation/export', { params })
 }
 
 export function fetchLoginLogs(params: TableQuery) {
   return request.get<unknown, PageResult<LoginLogRow>>('/admin/logs/login', { params })
 }
 
+/** 发起导出登录日志，同样返回任务回执而不是文件 */
 export function exportLoginLogs(params: Record<string, unknown>) {
-  return download('/admin/logs/login/export', params, '登录日志.xlsx')
+  return request.get<unknown, ExportAccepted>('/admin/logs/login/export', { params })
 }

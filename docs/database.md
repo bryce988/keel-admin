@@ -467,6 +467,51 @@ CREATE TABLE `sys_notice_reads` (
 
 ---
 
+### 3.15 sys_export_tasks 数据导出任务
+
+```sql
+CREATE TABLE `sys_export_tasks` (
+  `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `biz`          VARCHAR(32)     NOT NULL COMMENT '业务标识，见 ExportService::BIZ',
+  `biz_name`     VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '冗余，业务改名后旧任务仍可读',
+  `params`       TEXT            NOT NULL COMMENT '导出时的筛选条件（JSON）',
+  `status`       TINYINT         NOT NULL DEFAULT 0 COMMENT '0排队 1处理中 2已完成 3失败',
+  `row_count`    INT UNSIGNED    NOT NULL DEFAULT 0 COMMENT '导出行数',
+  `file_name`    VARCHAR(255)    NOT NULL DEFAULT '' COMMENT '下载文件名',
+  `file_path`    VARCHAR(500)    NOT NULL DEFAULT '' COMMENT '服务器绝对路径，不下发给前端',
+  `file_size`    BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '字节数',
+  `error_msg`    VARCHAR(500)    NOT NULL DEFAULT '' COMMENT '失败原因，直接给用户看',
+  `creator_id`   BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '发起人，也是数据权限的归属人列',
+  `creator_name` VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '冗余存储',
+  `dept_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '发起人部门，数据权限要用',
+  `expired_at`   DATETIME        NULL COMMENT '文件过期时间',
+  `started_at`   DATETIME        NULL COMMENT '开始处理时间',
+  `finished_at`  DATETIME        NULL COMMENT '完成/失败时间',
+  `created_at`   DATETIME        NOT NULL COMMENT '创建时间',
+  `updated_at`   DATETIME        NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_creator_time` (`creator_id`, `created_at`),
+  KEY `idx_dept_time` (`dept_id`, `created_at`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据导出任务';
+```
+
+归属人列是 `creator_id` 而不是 trait 默认的 `owner_id`：导出任务的归属就是发起人，
+「仅本人」范围的账号只看得到自己发起的那些。
+
+⚠️ **`dept_id` 不是可选的**，理由与 `sys_login_logs` 完全一样：数据权限在非「仅本人」
+范围下找不到部门列会**直接放行、不加任何条件**。这张表漏了它的后果比日志表更重——
+后面挂着一个可下载的文件，等于把别人导出的名单也给了出去。
+
+`params` 存的是发起那一刻的筛选条件。不存的话只能在消费时按当前界面重新取，
+而用户完全可能已经改了筛选、甚至关了页面。
+
+`file_path` 只在服务端用，接口从不下发——它是服务器目录结构，属于不必要的信息暴露。
+文件写在 `runtime/exports`：生成的是队列消费进程、下载的是 web 进程，
+两者在同一容器里共享该目录。**多实例部署要换成对象存储或共享卷**。
+
+---
+
 ## 4. 二期预留
 
 C 端用户**独立建表**，与 `sys_users` 永不混用（见项目文档 §8.4）。二期落地时再建，此处仅锁定结构方向：

@@ -16,6 +16,8 @@ final class HttpStatus
     // ---------------------------------------------------------------- 2xx 成功
     public const OK = 200;
     public const CREATED = 201;
+    // 已接收、还没做完：异步导出建完任务就返回它，文件由队列稍后生成
+    public const ACCEPTED = 202;
     public const NO_CONTENT = 204;
 
     // ---------------------------------------------------------------- 4xx 客户端
@@ -24,6 +26,9 @@ final class HttpStatus
     public const FORBIDDEN = 403;
     public const NOT_FOUND = 404;
     public const CONFLICT = 409;
+    // 记录还在、它指向的东西没了（导出文件过期被回收）。
+    // 与 404 的区别对用户是有意义的：404 该返回列表，410 该重做一次
+    public const GONE = 410;
     public const UNPROCESSABLE_ENTITY = 422;
     public const TOO_MANY_REQUESTS = 429;
 

@@ -184,6 +184,7 @@ instance.interceptors.response.use(undefined, (err) => {
 | `403 Forbidden` | 已认证但无权限 | 功能/数据/字段权限不足 | 跳 403 页，给申请入口 |
 | `404 Not Found` | 资源不存在 | ID 不存在，或存在但无权见 | 提示并返回列表 |
 | `409 Conflict` | 资源冲突 | 唯一性冲突、被引用、乐观锁 | Message 提示，聚焦冲突字段 |
+| `410 Gone` | 资源曾经存在，现在没了 | 导出文件过期被回收（任务记录还在） | 提示并给「重新导出」，不是返回列表 |
 | `422 Unprocessable Entity` | 参数校验失败 | 字段格式、必填缺失 | `details` 回填表单 |
 | `429 Too Many Requests` | 触发限流 | 登录、短信、导出 | 提示 `Retry-After` 秒后重试 |
 | `500 Internal Server Error` | 未捕获异常 | 代码 bug、依赖故障 | 提示"服务暂时不可用" + trace_id |
@@ -604,6 +605,69 @@ GET /admin/my/notices → 200 OK
   脚手架不引长连接，公告延迟一分钟没有影响
 - 状态字典是 `notice_status`（0 草稿 / 1 已发布），**不复用 `enable_status`**——
   公告没有「停用」这回事，共用会让列表里显示成「已停用」
+
+---
+
+## 8.3 数据导出（异步）
+
+「点导出 → 立刻下载」在数据量大起来之后必然失败：请求要等文件生成完才有响应，
+几万行就是几十秒，浏览器或 nginx 任一层超时就让用户看到失败页，而文件其实已经生成好了；
+更要紧的是 webman 是常驻内存的多进程模型，一个 worker 卡在导出上，这段时间它一个请求都接不了。
+
+所以导出分两步：**各业务模块的 export 接口建任务并投队列**（返回 202），
+**导出中心负责看进度与下载**。
+
+**发起（在各业务模块，权限也是各模块自己的）**
+
+| 方法 | 路径 | 权限标识 | 返回 |
+|---|---|---|---|
+| GET | `/admin/users/export` | `sys:user:export` | `202` + `{task_id, message}` |
+| GET | `/admin/logs/operation/export` | `sys:log:operation:export` | 同上 |
+| GET | `/admin/logs/login/export` | `sys:log:login:export` | 同上 |
+
+**导出中心**
+
+| 方法 | 路径 | 权限标识 | 说明 |
+|---|---|---|---|
+| GET | `/admin/exports` | `sys:export:list` | 任务列表，默认按创建时间倒序 |
+| GET | `/admin/exports/{id}/download` | `sys:export:list` | 下载文件流 |
+| DELETE | `/admin/exports/{id}` | `sys:export:delete` | 删记录，文件一并删 |
+
+```json
+GET /admin/users/export?status=1 → 202 Accepted
+{ "task_id": 12, "message": "已加入导出队列，完成后可在「数据管理 / 数据导出」下载" }
+
+GET /admin/exports → 200 OK
+{ "list": [{ "id": 12, "biz": "user", "biz_name": "用户", "status": 2,
+             "row_count": 1284, "file_name": "用户列表_20260901_145009.xlsx",
+             "file_size": 84992, "error_msg": "", "creator_name": "王强",
+             "expired_at": "2026-09-04 14:50:09", "finished_at": "2026-09-01 14:50:12",
+             "created_at": "2026-09-01 14:50:09", "downloadable": true }],
+  "total": 1, "page_num": 1, "page_size": 20 }
+```
+
+约定与坑：
+
+- **消费进程会还原发起人身份**（`Ctx::set('user', …)`，用完 `Ctx::clear()`）。
+  这是本模块最要命的一点：数据权限（`DataScope`）在 `Ctx::user() === null` 时
+  **不注入任何条件**，字段脱敏也读当前用户——不还原的话，部门主管发起的导出会生成
+  一份全公司名单且手机号是明文，一次点击绕过两道权限。
+  实测：主管导出得到 2 行（他的部门）而不是 5 行，邮箱仍是掩码
+- **`downloadable` 由服务端算**，前端别按 `status` 自己判：文件会被回收而状态仍是
+  「已完成」，只看状态会给出一个点了报错的按钮
+- 文件过期/被回收后下载返回 **`410` + `20702`**，不是 404：记录还在，用户该做的是
+  「重新导出」而不是「回列表」
+- 看得到哪些任务由数据权限决定（归属人列是 `creator_id`）：「仅本人」范围只看得到
+  自己发起的。**谁有 `xxx:export` 就必须有 `sys:export:list`**，否则他导得出来却看不到任务
+- 筛选条件在建任务时整份存下（`params`），排队期间界面改了筛选也不影响
+- 文件保留 `sys.export.retainDays` 天（默认 3），过期文件由写新文件时顺手回收，
+  过期**记录**由每天 03:40 的定时任务清理
+- 单文件行数上限仍是 `sys.export.maxRows`（默认 50000），超了任务标失败，
+  失败原因原样给用户看（他自己能处理：缩小筛选范围）
+
+⚠️ 文件写在 `runtime/exports`，生成的是消费进程、下载的是 web 进程——
+两者在同一个容器里共享这个目录。**多实例部署时要换成对象存储或共享卷**，
+否则会出现「A 实例生成、B 实例说文件不存在」。
 
 ---
 

@@ -6,6 +6,7 @@ use app\admin\controller\AuthController;
 use app\admin\controller\DashboardController;
 use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
+use app\admin\controller\ExportController;
 use app\admin\controller\LogController;
 use app\admin\controller\MenuController;
 use app\admin\controller\NoticeController;
@@ -151,6 +152,19 @@ Route::group('/admin', function () {
         'log'  => ['module' => '系统管理/岗位', 'action' => 3, 'title' => '批量删除岗位'],
     ]);
 
+    // ---------------- 数据导出 ----------------
+    // 发起导出**不在这里**：那是各业务模块自己的接口（/users/export 等），
+    // 因为「谁能导出用户」由 sys:user:export 决定。这里只管任务本身。
+    Route::get('/exports', [ExportController::class, 'index'])
+        ->setParams(['perm' => 'sys:export:list']);
+    // 下载与列表同权限：看得见就下得了——看得见本身已经过了数据权限
+    Route::get('/exports/{id:\d+}/download', [ExportController::class, 'download'])
+        ->setParams(['perm' => 'sys:export:list']);
+    Route::delete('/exports/{id:\d+}', [ExportController::class, 'destroy'])->setParams([
+        'perm' => 'sys:export:delete',
+        'log'  => ['module' => '数据管理/导出', 'action' => 3, 'title' => '删除导出任务'],
+    ]);
+
     // ---------------- 系统公告（管理端）----------------
     // 接收端那三个接口在上面「我的消息」处，两组权限口径完全不同，别接错
     Route::get('/notices', [NoticeController::class, 'index'])
@@ -246,8 +260,11 @@ Route::group('/admin', function () {
     // ---------------- 用户（分配层）----------------
     Route::get('/users', [UserController::class, 'index'])->setParams(['perm' => 'sys:user:list']);
     // 固定路径要排在 {id} 之前，否则 export / import-template 会被当成 id 匹配掉
+    // 导出现在是「发起一个任务」，属于要留痕的动作，所以补了 log 声明；
+    // 原来同步下载时没记，是因为它就是一次读
     Route::get('/users/export', [UserController::class, 'export'])->setParams([
         'perm' => 'sys:user:export',
+        'log'  => ['module' => '系统管理/用户', 'action' => 4, 'title' => '导出用户'],
         'log'  => ['module' => '系统管理/用户', 'action' => 4, 'title' => '导出用户'],
     ]);
     Route::get('/users/import-template', [UserController::class, 'importTemplate'])

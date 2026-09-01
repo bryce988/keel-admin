@@ -30,6 +30,18 @@ class Result
         return self::json(HttpStatus::CREATED, $data ?? new \stdClass());
     }
 
+    /**
+     * 202 已接收，处理还没完成
+     *
+     * 异步任务专用（目前只有数据导出）：请求本身成功了，但结果要等队列。
+     * 不用 200 是因为前端要能区分「事情做完了」和「事情排上队了」——
+     * 后者的提示语、后续动作都不一样（不是「导出成功」，是「去导出列表等」）。
+     */
+    public static function accepted(mixed $data = null): Response
+    {
+        return self::json(HttpStatus::ACCEPTED, $data ?? new \stdClass());
+    }
+
     /** 204 删除等无返回内容的成功 */
     public static function noContent(): Response
     {

@@ -202,6 +202,7 @@ start.php                 # 启动入口
 | `/system/param` | 参数配置 | `sys:param:edit` | 基础、安全、集成、高级参数 |
 | `/data/dict` | 数据字典 | `sys:dict:list` | 字典类型与字典项。挂在「数据管理」下，不在「系统管理」里 |
 | `/data/notice` | 系统公告 | `sys:notice:list` | 公告的草稿、发布、撤回；发布后所有登录用户在顶栏铃铛收到 |
+| `/data/export` | 数据导出 | `sys:export:list` | 异步导出任务的进度与下载；发起导出在各业务模块自己的页面上 |
 | `/system/log` | 操作日志 | `sys:log:list` | 操作/登录/接口日志 |
 | `/profile` | 个人中心 | — | 基本资料、安全设置（改密/换绑手机）、我的登录记录 |
 

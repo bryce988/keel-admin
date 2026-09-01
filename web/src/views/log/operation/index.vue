@@ -75,8 +75,10 @@ const exporting = ref(false)
 async function onExport() {
   exporting.value = true
   try {
-    await exportOperationLogs(splitDateRange(query.value))
-    ElMessage.success('导出完成')
+    // 导出是异步的：这里拿到的是任务回执，不是文件。
+    // 文案用后端给的 message，前端不维护第二份
+    const { message } = await exportOperationLogs(splitDateRange(query.value))
+    ElMessage.success(message)
   } finally {
     exporting.value = false
   }

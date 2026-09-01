@@ -290,7 +290,7 @@ class UserService
      * 必须 chunk 分批：一次 `get()` 全表在常驻进程里就是内存炸弹，
      * 而且这条红线在 CLAUDE.md 里写着（大数据量查询用 chunk）。
      */
-    public static function export(array $filters): string
+    public static function export(array $filters): array
     {
         $limit = (int) ParamService::value('sys.export.maxRows', 50000);
         $query = self::listQuery($filters);
@@ -301,7 +301,7 @@ class UserService
 
         $mapper = self::rowMapper();
 
-        return Spreadsheet::writeXlsx('users', [
+        $path = Spreadsheet::writeXlsx('users', [
             'ID', '账号', '姓名', '手机号', '邮箱', '部门', '岗位', '状态', '最后登录', '创建时间',
         ], function (callable $emit) use ($query, $mapper) {
             $query->orderBy('id')->chunk(500, function ($rows) use ($emit, $mapper) {
@@ -323,7 +323,9 @@ class UserService
                     ]);
                 }
             });
-        });
+        }, $rows);
+
+        return ['path' => $path, 'rows' => (int) $rows];
     }
 
     /**
