@@ -134,7 +134,17 @@ async function setLink() {
 
 <template>
   <div class="rich-editor" :class="{ 'is-disabled': disabled }">
-    <div v-if="!disabled && editor" class="toolbar">
+    <!--
+      @mousedown.prevent 是这条工具栏能用的前提，不是可有可无的优化
+      ————————————————————————————————————————————————
+      按钮是真实的 <button>，鼠标按下时浏览器会把焦点从 ProseMirror 的可编辑区
+      抢走，编辑器里的选区随之塌掉。表现非常具体：点「H2」再打字，标题格式套在了
+      那个空节点上（`<h2><br></h2>`），文字却落进后面新起的 `<p>`；点「列表」同理，
+      得到一个空的 `<li>` 加两段普通段落。命令本身没错，错的是它作用在了哪儿。
+      在 mousedown 上 preventDefault 就不会发生焦点转移，选区原样留在编辑器里。
+      放在容器上而不是逐个按钮：漏一个就是漏一个坏按钮，而且看不出来。
+    -->
+    <div v-if="!disabled && editor" class="toolbar" @mousedown.prevent>
       <button
         v-for="m in marks"
         :key="m.key"
