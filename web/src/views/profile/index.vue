@@ -146,7 +146,12 @@ onMounted(() => {
             accept="image/jpeg,image/png,image/gif,image/webp"
           >
             <div v-loading="uploading" class="avatar-wrap">
-              <el-avatar :size="64" :src="info?.avatar || undefined">
+              <!-- --keel-avatar-size 要与 :size 一致，兜底字号靠它算（见 styles/index.css） -->
+              <el-avatar
+                :size="64"
+                :src="info?.avatar || undefined"
+                style="--keel-avatar-size: 64px"
+              >
                 {{ info?.real_name?.charAt(0) || '?' }}
               </el-avatar>
               <span class="avatar-mask">更换</span>
