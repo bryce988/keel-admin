@@ -506,3 +506,117 @@ html.theme-switching *::after {
 .table-actions .el-dropdown:hover .el-button:focus-visible {
   outline: none;
 }
+
+/* ---------------------------------------------------------------- 富文本正文
+ *
+ * 三处共用这一套：编辑器的编辑区（`<RichEditor>`）、公告详情、顶栏铃铛的弹窗。
+ * 放全局而不是各写各的，是因为**所见即所得只有在两边样式一致时才成立**——
+ * 编辑时列表有缩进、看的时候没有，作者会以为自己排错了版。
+ *
+ * 不能写成组件的 scoped 样式：正文是 `v-html` 插进去的，scoped 的作用域属性
+ * 不会加到这些运行时生成的节点上，整套规则会全部落空（只有 `:deep()` 能穿透，
+ * 而那要在每个渲染点各写一遍）。
+ *
+ * 也不属于 Element Plus 覆盖，所以不需要 `:root` 前缀（check-css 只管那类规则）。
+ */
+.rich-content {
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.rich-content > *:first-child {
+  margin-top: 0;
+}
+
+.rich-content > *:last-child {
+  margin-bottom: 0;
+}
+
+.rich-content p {
+  margin: 0 0 8px;
+}
+
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4 {
+  margin: 16px 0 8px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rich-content h1 {
+  font-size: 20px;
+}
+
+.rich-content h2 {
+  font-size: 17px;
+}
+
+.rich-content h3 {
+  font-size: 15px;
+}
+
+.rich-content h4 {
+  font-size: 14px;
+}
+
+/* 列表要显式给 padding-left：全局 reset 把它清了，
+   不补回来的话有序列表的序号会跑到容器外面被裁掉 */
+.rich-content ul,
+.rich-content ol {
+  margin: 0 0 8px;
+  padding-left: 22px;
+}
+
+.rich-content li {
+  margin: 2px 0;
+}
+
+.rich-content blockquote {
+  margin: 8px 0;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--el-border-color);
+  color: var(--el-text-color-regular);
+}
+
+.rich-content code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--el-fill-color);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+.rich-content pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: var(--keel-radius);
+  background: var(--el-fill-color);
+  overflow-x: auto;
+}
+
+/* pre 里的 code 已经在代码块的底色上了，再叠一层底色会出现色块套色块 */
+.rich-content pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.rich-content hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--el-border-color-light);
+}
+
+.rich-content a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.rich-content a:hover {
+  text-decoration: underline;
+}
+
+.rich-content img {
+  max-width: 100%;
+}

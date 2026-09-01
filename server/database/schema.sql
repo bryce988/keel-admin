@@ -257,6 +257,38 @@ CREATE TABLE IF NOT EXISTS `sys_operation_logs` (
   KEY `idx_dept_time` (`dept_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志';
 
+-- ---------------------------------------------------------------- 系统公告
+CREATE TABLE IF NOT EXISTS `sys_notices` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title`          VARCHAR(128)    NOT NULL                COMMENT '标题',
+  `content`        TEXT            NOT NULL                COMMENT '正文，富文本 HTML（写入时已按白名单净化，见 support/Html.php）',
+  `type`           VARCHAR(32)     NOT NULL DEFAULT 'notice' COMMENT '公告类型，取值来自字典 notice_type',
+  `status`         TINYINT         NOT NULL DEFAULT 0      COMMENT '0草稿 1已发布',
+  `published_at`   DATETIME        NULL                    COMMENT '发布时间，草稿为 NULL；未读与推送都以它为准',
+  `publisher_id`   BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '发布人',
+  `publisher_name` VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '冗余存储，发布人改名或离职后公告仍可读',
+  `creator_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '创建人',
+  `updater_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '最后修改人',
+  `created_at`     DATETIME        NOT NULL                COMMENT '创建时间',
+  `updated_at`     DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  -- 未读查询固定是「已发布 + 按发布时间倒序」，两列一个索引
+  KEY `idx_status_published` (`status`, `published_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告';
+
+-- 已读回执。没有「未读表」：未读 = 已发布公告里没有本人回执的那些，
+-- 只记已读才不必在发公告时给每个用户插一行（1000 人的系统发一条公告就是 1000 行）
+CREATE TABLE IF NOT EXISTS `sys_notice_reads` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `notice_id`  BIGINT UNSIGNED NOT NULL                COMMENT '公告 ID',
+  `user_id`    BIGINT UNSIGNED NOT NULL                COMMENT '阅读人',
+  `created_at` DATETIME        NOT NULL                COMMENT '已读时间',
+  PRIMARY KEY (`id`),
+  -- 唯一键既防重复回执，也是「我读过哪些」这个查询的索引
+  UNIQUE KEY `uk_notice_user` (`notice_id`, `user_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公告已读回执';
+
 -- ---------------------------------------------------------------- 基础数据
 -- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）
 INSERT INTO `sys_depts` (`id`,`parent_id`,`ancestors`,`name`,`code`,`sort`,`created_at`,`updated_at`) VALUES

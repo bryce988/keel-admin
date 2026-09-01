@@ -8,6 +8,7 @@ use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
 use app\admin\controller\LogController;
 use app\admin\controller\MenuController;
+use app\admin\controller\NoticeController;
 use app\admin\controller\ParamController;
 use app\admin\controller\PostController;
 use app\admin\controller\ProfileController;
@@ -87,6 +88,22 @@ Route::group('/admin', function () {
     Route::get('/dashboard/overview', [DashboardController::class, 'overview'])
         ->setParams(['perm' => 'sys:dashboard:view']);
 
+    /*
+     * 我的消息（顶栏铃铛）—— 登录即可，不挂权限点
+     *
+     * 公告的受众是每一个登录用户，给它挂权限点等于「没被授权的人收不到全员通知」。
+     * 越权面由结构挡住：用户 id 只从令牌取，路径里没有 user_id 这类参数。
+     *
+     * 也不落操作日志：轮询接口每分钟一次、每个在线用户一条，
+     * 记下来只会把真正的操作淹掉（读公告不是需要审计的行为）。
+     */
+    Route::get('/my/notices', [NoticeController::class, 'bell'])->setParams(['perm' => '']);
+    // 固定路径排在 {id} 之前，否则 read-all 会被当成 id 匹配掉
+    Route::post('/my/notices/read-all', [NoticeController::class, 'readAll'])
+        ->setParams(['perm' => '']);
+    Route::get('/my/notices/{id:\d+}', [NoticeController::class, 'readOne'])
+        ->setParams(['perm' => '']);
+
     // 数据字典：所有页面的下拉与标签都依赖它，登录即可读
     Route::get('/dicts/batch', [DictController::class, 'batch'])->setParams(['perm' => '']);
     Route::get('/dicts/{code}/items', [DictController::class, 'items'])->setParams(['perm' => '']);
@@ -132,6 +149,39 @@ Route::group('/admin', function () {
     Route::post('/posts/batch-delete', [PostController::class, 'batchDestroy'])->setParams([
         'perm' => 'sys:post:delete',
         'log'  => ['module' => '系统管理/岗位', 'action' => 3, 'title' => '批量删除岗位'],
+    ]);
+
+    // ---------------- 系统公告（管理端）----------------
+    // 接收端那三个接口在上面「我的消息」处，两组权限口径完全不同，别接错
+    Route::get('/notices', [NoticeController::class, 'index'])
+        ->setParams(['perm' => 'sys:notice:list']);
+    Route::get('/notices/{id:\d+}', [NoticeController::class, 'show'])
+        ->setParams(['perm' => 'sys:notice:list']);
+    Route::post('/notices', [NoticeController::class, 'store'])->setParams([
+        'perm' => 'sys:notice:create',
+        'log'  => ['module' => '数据管理/公告', 'action' => 1, 'title' => '新增公告'],
+    ]);
+    Route::put('/notices/{id:\d+}', [NoticeController::class, 'update'])->setParams([
+        'perm' => 'sys:notice:update',
+        'log'  => ['module' => '数据管理/公告', 'action' => 2, 'title' => '编辑公告'],
+    ]);
+    // 发布与撤回单独立接口而不是用编辑改 status：它们在操作日志里要各自成条，
+    // 「谁在什么时候把这条发给了全员」是公告唯一真正需要审计的事
+    Route::post('/notices/{id:\d+}/publish', [NoticeController::class, 'publish'])->setParams([
+        'perm' => 'sys:notice:publish',
+        'log'  => ['module' => '数据管理/公告', 'action' => 6, 'title' => '发布公告'],
+    ]);
+    Route::post('/notices/{id:\d+}/revoke', [NoticeController::class, 'revoke'])->setParams([
+        'perm' => 'sys:notice:publish',
+        'log'  => ['module' => '数据管理/公告', 'action' => 6, 'title' => '撤回公告'],
+    ]);
+    Route::delete('/notices/{id:\d+}', [NoticeController::class, 'destroy'])->setParams([
+        'perm' => 'sys:notice:delete',
+        'log'  => ['module' => '数据管理/公告', 'action' => 3, 'title' => '删除公告'],
+    ]);
+    Route::post('/notices/batch-delete', [NoticeController::class, 'batchDestroy'])->setParams([
+        'perm' => 'sys:notice:delete',
+        'log'  => ['module' => '数据管理/公告', 'action' => 3, 'title' => '批量删除公告'],
     ]);
 
     // ---------------- 角色（授权层）----------------

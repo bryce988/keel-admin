@@ -68,6 +68,7 @@ declare module 'vue' {
     ImportDialog: typeof import('./../components/ImportDialog.vue')['default']
     PageSkeleton: typeof import('./../components/PageSkeleton.vue')['default']
     ProTable: typeof import('./../components/ProTable.vue')['default']
+    RichEditor: typeof import('./../components/RichEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SearchForm: typeof import('./../components/SearchForm.vue')['default']

@@ -95,19 +95,45 @@ $tree = [
                  ['name' => '编辑节点', 'code' => 'sys:menu:update', 'type' => 3, 'sort' => 2],
                  ['name' => '删除节点', 'code' => 'sys:menu:delete', 'type' => 3, 'sort' => 3],
              ]],
-            ['name' => '数据字典', 'code' => 'sys:dict:list', 'type' => 2,
-             'path' => '/system/dict', 'component' => 'views/system/dict/index.vue', 'icon' => 'Collection', 'sort' => 60,
-             'children' => [
-                 ['name' => '新增字典', 'code' => 'sys:dict:create', 'type' => 3, 'sort' => 1],
-                 ['name' => '编辑字典', 'code' => 'sys:dict:update', 'type' => 3, 'sort' => 2],
-                 ['name' => '删除字典', 'code' => 'sys:dict:delete', 'type' => 3, 'sort' => 3],
-             ]],
             ['name' => '参数配置', 'code' => 'sys:param:list', 'type' => 2,
              'path' => '/system/param', 'component' => 'views/system/param/index.vue', 'icon' => 'Tools', 'sort' => 70,
              'children' => [
                  ['name' => '新增参数', 'code' => 'sys:param:create', 'type' => 3, 'sort' => 1],
                  ['name' => '编辑参数', 'code' => 'sys:param:update', 'type' => 3, 'sort' => 2],
                  ['name' => '删除参数', 'code' => 'sys:param:delete', 'type' => 3, 'sort' => 3],
+             ]],
+        ],
+    ],
+    /*
+     * 数据管理
+     *
+     * 字典从「系统管理」里挪出来单立一级：它是**业务侧**每天都要维护的东西
+     * （加一个状态值、调一次排序），而系统管理里其余几项是搭好就基本不动的
+     * 组织与权限配置，两者的使用频次和使用人差着一个量级。
+     *
+     * 路径跟着改成 `/data/dict`：动态路由是拍平的，父级换了不改子路径也能跑，
+     * 但那样菜单里在「数据管理」下、地址栏却是 `/system/`，
+     * 排查问题时按 URL 找不到人。
+     */
+    [
+        'name' => '数据管理', 'code' => 'data', 'type' => 1,
+        'path' => '/data', 'component' => 'Layout', 'icon' => 'Coin', 'sort' => 92,
+        'children' => [
+            ['name' => '数据字典', 'code' => 'sys:dict:list', 'type' => 2,
+             'path' => '/data/dict', 'component' => 'views/system/dict/index.vue', 'icon' => 'Collection', 'sort' => 10,
+             'children' => [
+                 ['name' => '新增字典', 'code' => 'sys:dict:create', 'type' => 3, 'sort' => 1],
+                 ['name' => '编辑字典', 'code' => 'sys:dict:update', 'type' => 3, 'sort' => 2],
+                 ['name' => '删除字典', 'code' => 'sys:dict:delete', 'type' => 3, 'sort' => 3],
+             ]],
+            ['name' => '系统公告', 'code' => 'sys:notice:list', 'type' => 2,
+             'path' => '/data/notice', 'component' => 'views/data/notice/index.vue', 'icon' => 'Bell', 'sort' => 20,
+             'children' => [
+                 ['name' => '新增公告', 'code' => 'sys:notice:create',  'type' => 3, 'sort' => 1],
+                 ['name' => '编辑公告', 'code' => 'sys:notice:update',  'type' => 3, 'sort' => 2],
+                 ['name' => '删除公告', 'code' => 'sys:notice:delete',  'type' => 3, 'sort' => 3],
+                 // 发布与撤回是同一个权限点：能发就能撤，反过来（只能撤不能发）没有使用场景
+                 ['name' => '发布公告', 'code' => 'sys:notice:publish', 'type' => 3, 'sort' => 4],
              ]],
         ],
     ],
@@ -215,6 +241,8 @@ $grants = [
         'sys:user:list', 'sys:user:create', 'sys:user:update',
         'sys:user:resetPwd', 'sys:user:export',
         'sys:dept:list', 'sys:post:list', 'sys:role:list',
+        // 公告只给读：主管能看到发过什么，但发全员通知是系统管理员的活
+        'data', 'sys:notice:list',
         'sys:log', 'sys:log:operation:list', 'sys:log:login:list',
         'sys:field:user:phone',
     ],
@@ -311,6 +339,13 @@ $dicts = [
     ]],
     'log_status'    => ['执行结果', [['成功', '1', 'success'], ['失败', '0', 'danger']]],
     'login_type'    => ['登录类型', [['登录', '1', 'primary'], ['登出', '2', 'info']]],
+    'notice_type'   => ['公告类型', [
+        ['通知', 'notice', 'primary'], ['公告', 'announcement', 'success'],
+        ['维护', 'maintenance', 'warning'], ['紧急', 'urgent', 'danger'],
+    ]],
+    // 单开一份而不是复用 enable_status：公告的 0/1 是「草稿 / 已发布」，
+    // 与「停用 / 启用」不是一回事，共用字典会让列表里的公告显示成「已停用」
+    'notice_status' => ['公告状态', [['草稿', '0', 'info'], ['已发布', '1', 'success']]],
     'yes_no'        => ['是否', [['是', '1', 'success'], ['否', '0', 'info']]],
     'gender'        => ['性别', [['男', '1', 'primary'], ['女', '2', 'danger'], ['未知', '0', 'info']]],
 ];

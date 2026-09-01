@@ -282,7 +282,7 @@ class DashboardService
             ['name' => '岗位',     'count' => $c['post'],         'to' => '/system/post',   'perm' => 'sys:post:list'],
             ['name' => '角色',     'count' => $c['role'],         'to' => '/system/role',   'perm' => 'sys:role:list'],
             ['name' => '权限点',   'count' => $c['perm_total'],   'to' => '/system/menu',   'perm' => 'sys:menu:list'],
-            ['name' => '字典',     'count' => $c['dict'],         'to' => '/system/dict',   'perm' => 'sys:dict:list'],
+            ['name' => '字典',     'count' => $c['dict'],         'to' => '/data/dict',     'perm' => 'sys:dict:list'],
             ['name' => '参数',     'count' => $c['param'],        'to' => '/system/param',  'perm' => 'sys:param:list'],
             ['name' => '操作日志', 'count' => $c['op_total'],     'to' => '/log/operation', 'perm' => 'sys:log:operation:list'],
         ];

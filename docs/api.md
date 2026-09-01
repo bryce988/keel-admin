@@ -543,6 +543,70 @@ GET /admin/dicts/common_status/items → 200 OK
 
 ---
 
+## 8.2 系统公告
+
+一张表，两组接口，**权限口径完全不同**——这是本模块最容易接错的地方。
+
+**管理端**（`/admin/notices*`，看得到草稿）
+
+| 方法 | 路径 | 权限标识 | 说明 |
+|---|---|---|---|
+| GET | `/admin/notices` | `sys:notice:list` | 列表，默认按创建时间倒序；只返回 60 字 `summary`，正文要看详情 |
+| GET | `/admin/notices/{id}` | `sys:notice:list` | 详情（含正文） |
+| POST | `/admin/notices` | `sys:notice:create` | 新增；`status=1` 表示存好就发 |
+| PUT | `/admin/notices/{id}` | `sys:notice:update` | 编辑 |
+| POST | `/admin/notices/{id}/publish` | `sys:notice:publish` | 发布，**幂等** |
+| POST | `/admin/notices/{id}/revoke` | `sys:notice:publish` | 撤回到草稿，已读回执保留 |
+| DELETE | `/admin/notices/{id}` | `sys:notice:delete` | 删除，回执一并清除 |
+| POST | `/admin/notices/batch-delete` | `sys:notice:delete` | 批量删除，逐条尽力执行（§1.4） |
+
+**接收端**（`/admin/my/notices*`，**登录即可**，只看得到已发布的）
+
+| 方法 | 路径 | 权限标识 | 说明 |
+|---|---|---|---|
+| GET | `/admin/my/notices` | 登录态 | 铃铛用：未读数 + 最新未读 id/标题 + 最近 10 条 |
+| GET | `/admin/my/notices/{id}` | 登录态 | 读一条，**同时落已读回执** |
+| POST | `/admin/my/notices/read-all` | 登录态 | 全部已读，返回 `{count}`（本次新增的回执数） |
+
+接收端不挂权限点是刻意的：公告的受众是每一个登录用户，挂了等于
+「没被授权的人收不到全员通知」。越权面由结构挡住——用户 id 只从令牌取，
+路径里没有 `user_id` 这类参数，与 §11 个人中心同一套思路。
+
+```json
+GET /admin/my/notices → 200 OK
+{
+  "unread_count": 2,
+  "latest_id": 17,
+  "latest_title": "系统维护通知",
+  "list": [
+    { "id": 17, "title": "系统维护通知", "summary": "本周六 00:00-02:00 例行维护…",
+      "type": "maintenance", "published_at": "2026-09-01 14:06:47",
+      "publisher_name": "系统管理员", "is_read": false }
+  ]
+}
+```
+
+几条约定，改动前先读：
+
+- **未读是算出来的**：未读 = 已发布公告 ∖ 我的已读回执。反过来做（发布时给每人插一行）
+  会把「发一条公告」变成一次全表写入，新入职的人还得补发
+- **`latest_id` 而不是 `unread_count` 判断有没有新的**：读掉一条、同时又发来一条时数量不变
+- **发布时间只在状态跨过发布线时盖章**：已发布的公告改错别字不刷新 `published_at`，
+  否则它会把这条重新顶到所有人消息列表的最上面，而内容其实没变。
+  `published_at` / `publisher_id` / `publisher_name` 三个字段前端传了也不生效
+- **正文是富文本 HTML，写入时净化**：`POST` / `PUT` 都会过 `support/Html.php` 的
+  白名单（`p/br/strong/em/u/s/code/pre/blockquote/hr/h1-h4/ul/ol/li/a/span`），
+  `<script>`、`on*` 事件属性、`javascript:` 协议、`<iframe>` 一律剥掉，外链自动补
+  `target="_blank" rel="noopener"`。**存进去的就是干净的**，所以读的地方直接 `v-html`。
+  反过来（渲染时净化）要求每个渲染点都记得做一次，漏一个就是漏一个洞
+- 列表的 `summary` 是正文**剥成纯文字**后的前 60 字，不是截断的 HTML
+- **没有推送**：前端每 60 秒轮询一次 `/admin/my/notices`，标签页不可见时不轮询。
+  脚手架不引长连接，公告延迟一分钟没有影响
+- 状态字典是 `notice_status`（0 草稿 / 1 已发布），**不复用 `enable_status`**——
+  公告没有「停用」这回事，共用会让列表里显示成「已停用」
+
+---
+
 ## 9. 参数配置
 
 | 方法 | 路径 | 权限标识 | 说明 |

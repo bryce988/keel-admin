@@ -412,6 +412,61 @@ CREATE TABLE `sys_login_logs` (
 
 ---
 
+### 3.14 sys_notices / sys_notice_reads 系统公告
+
+```sql
+CREATE TABLE `sys_notices` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title`          VARCHAR(128)    NOT NULL COMMENT '标题',
+  `content`        TEXT            NOT NULL COMMENT '正文，富文本 HTML（写入时已净化）',
+  `type`           VARCHAR(32)     NOT NULL DEFAULT 'notice' COMMENT '类型，字典 notice_type',
+  `status`         TINYINT         NOT NULL DEFAULT 0 COMMENT '0草稿 1已发布',
+  `published_at`   DATETIME        NULL     COMMENT '发布时间，草稿为 NULL',
+  `publisher_id`   BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '发布人',
+  `publisher_name` VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '冗余，发布人改名/离职后仍可读',
+  `creator_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '创建人',
+  `updater_id`     BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '最后修改人',
+  `created_at`     DATETIME        NOT NULL COMMENT '创建时间',
+  `updated_at`     DATETIME        NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_status_published` (`status`, `published_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告';
+
+CREATE TABLE `sys_notice_reads` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `notice_id`  BIGINT UNSIGNED NOT NULL COMMENT '公告 ID',
+  `user_id`    BIGINT UNSIGNED NOT NULL COMMENT '阅读人',
+  `created_at` DATETIME        NOT NULL COMMENT '已读时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_notice_user` (`notice_id`, `user_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公告已读回执';
+```
+
+**只记已读，不记未读**。未读 = 已发布公告 ∖ 我的回执，是算出来的。
+反过来做（发布时给每个用户插一行未读）会让「发一条公告」变成一次全表写入——
+1000 人的系统就是 1000 行，新入职的人还得补发。
+只记已读，写入量与实际阅读行为成正比，而不是与人数成正比。
+
+`uk_notice_user` 既防重复回执，也是「我读过哪些」这个查询的索引。
+并发插入（同一个人两个标签页同时点开）由它兜住，服务端捕获后当成功处理。
+
+⚠️ **这张表不挂 `HasDataScope`**，与其他业务表相反。公告的受众就是所有登录用户，
+按部门过滤会让「总部发的通知分公司看不到」，而这恰恰是公告最没用的一种失败。
+它也没有部门列可过滤——公告不属于任何部门。
+
+⚠️ **不用软删**：公告删掉就是不该再出现在任何人的消息里，回执由
+`NoticeService::delete()` 一并清掉，否则 `sys_notice_reads` 会积压指向空 id 的行。
+
+`status` 的 0/1 是「草稿 / 已发布」，字典单开一份 `notice_status`，
+不复用 `enable_status`——公告没有「停用」这回事。
+
+`content` 存的是**已净化的** HTML（`support/Html.php` 的白名单，写入时过一遍）。
+库里不再存一份纯文本副本：管理端按关键词搜正文时理论上会命中标签名（搜 "li" 多出几条），
+但那要多一列、多一处同步，而搜公告本身是低频操作。列表摘要是查询时现剥的。
+
+---
+
 ## 4. 二期预留
 
 C 端用户**独立建表**，与 `sys_users` 永不混用（见项目文档 §8.4）。二期落地时再建，此处仅锁定结构方向：

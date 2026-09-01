@@ -6,6 +6,7 @@ import { Expand, Fold, FullScreen, Moon, ScaleToOriginal, Setting, Sunny } from 
 import BrandLogo from '@/components/BrandLogo.vue'
 import ColumnRail from './components/ColumnRail.vue'
 import MenuSearch from './components/MenuSearch.vue'
+import NoticeBell from './components/NoticeBell.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
 import TagsView from './components/TagsView.vue'
@@ -200,6 +201,9 @@ async function onUserCommand(cmd: string) {
           <component :is="isFullscreen ? ScaleToOriginal : FullScreen" />
         </el-icon>
       </el-tooltip>
+
+      <!-- 消息铃铛排在界面设置左边：它是每天都会看的东西，设置不是 -->
+      <NoticeBell />
 
       <el-tooltip content="界面设置">
         <el-icon class="icon-btn" @click="settingsDrawer?.open()">

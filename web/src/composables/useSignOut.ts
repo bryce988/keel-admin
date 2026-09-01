@@ -1,13 +1,14 @@
 import { useRouter } from 'vue-router'
 import { resetDynamicRoutes } from '@/router'
 import { useDictStore } from '@/stores/dict'
+import { useNoticeStore } from '@/stores/notice'
 import { useTagsViewStore } from '@/stores/tagsView'
 import { useUserStore } from '@/stores/user'
 
 /**
  * 退出登录
  *
- * 登出要清四样东西：登录态、页签、字典缓存、动态路由。
+ * 登出要清五样东西：登录态、页签、字典缓存、未读消息、动态路由。
  * 少清任何一样，换账号后都会残留上一个账号的痕迹——
  * 最刺眼的是动态路由：新账号明明没这个菜单，直接敲 URL 却进得去。
  *
@@ -23,11 +24,15 @@ export function useSignOut() {
   const userStore = useUserStore()
   const tagsStore = useTagsViewStore()
   const dictStore = useDictStore()
+  const noticeStore = useNoticeStore()
 
   return async function signOut(): Promise<void> {
     await userStore.logout()
     tagsStore.reset()
     dictStore.forget()
+    // 铃铛的角标不清的话，下一个人登录进来会先看到上一个人的未读数，
+    // 直到第一次轮询回来才纠正
+    noticeStore.reset()
     resetDynamicRoutes()
     await router.replace('/login')
   }
