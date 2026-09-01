@@ -14,7 +14,8 @@ const visible = ref(false)
 
 const options: Array<{ value: LayoutMode; label: string; desc: string }> = [
   { value: 'side', label: '经典布局', desc: '一级、二级都在左侧栏' },
-  { value: 'mix', label: '混合布局', desc: '一级在顶栏，二级在左侧栏' }
+  { value: 'mix', label: '混合布局', desc: '一级在顶栏，二级在左侧栏' },
+  { value: 'columns', label: '分栏布局', desc: '一级在左窄条，二级在第二栏' }
 ]
 
 function open() {
@@ -148,6 +149,30 @@ defineExpose({ open })
   inset: 12px auto 0 0;
   width: 30%;
   background: var(--el-color-primary-light-5);
+}
+
+/*
+ * 分栏：最左窄条（深）+ 第二栏（浅）+ 右上顶栏
+ *
+ * 窄条与第二栏的深浅差是这张图的全部信息量——两列同色的话，
+ * 缩略图看起来就只是「侧栏比经典宽了一点」。
+ */
+.thumb--columns .thumb-body {
+  inset: 0 auto 0 0;
+  width: 18%;
+  background: var(--el-color-primary);
+}
+
+.thumb--columns .thumb-side {
+  inset: 0 auto 0 18%;
+  width: 26%;
+  background: var(--el-color-primary-light-5);
+}
+
+.thumb--columns .thumb-top {
+  inset: 0 0 auto 44%;
+  height: 12px;
+  background: var(--el-color-primary-light-7);
 }
 
 .tip {

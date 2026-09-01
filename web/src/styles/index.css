@@ -78,6 +78,13 @@ html.dark {
   --keel-sidebar-width: 210px;
   --keel-sidebar-collapsed: 64px;
   /*
+   * 分栏版式的一级导航条
+   *
+   * 80px 是「图标在上、两个汉字在下」放得开的最小值：再窄一档（64px，
+   * 也就是折叠侧栏的宽度）四字模块名就得断行，条目高度参差不齐。
+   */
+  --keel-rail-width: 80px;
+  /*
    * 顶栏与侧栏 logo 区**共用这一个高度**
    *
    * 曾经是两个变量（logo 区 60px、顶栏 56px），结果两条底边差 4px，

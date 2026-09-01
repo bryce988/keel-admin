@@ -4,6 +4,7 @@ import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-rou
 import { ElMessageBox } from 'element-plus'
 import { Expand, Fold, FullScreen, Moon, ScaleToOriginal, Setting, Sunny } from '@element-plus/icons-vue'
 import BrandLogo from '@/components/BrandLogo.vue'
+import ColumnRail from './components/ColumnRail.vue'
 import MenuSearch from './components/MenuSearch.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
@@ -22,7 +23,7 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 const signOut = useSignOut()
 
-const { activeChildren } = useMenuNav()
+const { activeChildren, activeTop } = useMenuNav()
 
 /*
  * 全屏
@@ -37,15 +38,42 @@ const canFullscreen = fullscreenSupported()
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen()
 
 const isMix = computed(() => appStore.layout === 'mix')
+const isColumns = computed(() => appStore.layout === 'columns')
 
 /**
- * 混合版式下侧栏该不该出现
+ * 一级菜单不在侧栏里的两种版式（混合放顶栏、分栏放左窄条）
  *
- * 「概览」这种一级项本身就是页面、没有子菜单，此时侧栏会是一条空白竖条。
- * 与其留个空壳，不如整列收掉，把宽度还给内容区。
- * 个人中心、403 这些不在菜单树里的页面（activeTop 为 null）同理。
+ * 侧栏对它们是同一种东西——只画当前模块的子菜单，所以下面凡是「侧栏画什么」
+ * 的判断都用这个，而不是逐个列举版式：漏掉一个的表现是侧栏把整棵树又画一遍，
+ * 一级项在两个地方同时出现。
  */
-const showSidebar = computed(() => !isMix.value || activeChildren.value.length > 0)
+const isSubOnly = computed(() => isMix.value || isColumns.value)
+
+/**
+ * 侧栏该不该出现
+ *
+ * 两种情况收掉：
+ * 1. 当前模块没有子菜单（「概览」这种一级项本身就是页面，个人中心、403 这些
+ *    不在菜单树里的页面同理，`activeTop` 为 null）——留着就是一条空白竖条；
+ * 2. 分栏版式下用户主动折叠。分栏里「折叠」的语义是**收起第二栏**而不是把它
+ *    压成图标条：左边已经有一条图标窄条了，再来一条只有图标的列，
+ *    两条谁是谁分不出来。
+ */
+const showSidebar = computed(() => {
+  if (!isSubOnly.value) return true
+  if (activeChildren.value.length === 0) return false
+  return !(isColumns.value && appStore.sidebarCollapsed)
+})
+
+/**
+ * 折叠按钮该不该出现
+ *
+ * 不能直接复用 `showSidebar`：分栏折叠后侧栏消失，按钮跟着消失就再也展不开了。
+ * 判断依据是「有没有可折叠的东西」，与它当前是不是折叠着无关。
+ */
+const showHamburger = computed(() =>
+  isSubOnly.value ? activeChildren.value.length > 0 : true
+)
 
 /** 面包屑：一级分组 / 当前页 */
 const breadcrumb = computed(() => {
@@ -105,22 +133,28 @@ async function onUserCommand(cmd: string) {
     :class="{
       'is-collapsed': appStore.sidebarCollapsed,
       'is-mix': isMix,
+      'is-columns': isColumns,
       'no-sidebar': !showSidebar
     }"
   >
+<!-- 分栏版式的一级导航：竖排窄条，占住整个左边缘 -->
+    <ColumnRail v-if="isColumns" class="rail" />
+
     <!--
       侧边栏
 
-      两种版式共用这一块，差别只在渲染哪一层：
-      经典给整棵树，混合只给当前一级模块的子菜单（一级已经在顶栏了）。
-      品牌标记则相反——混合版式下顶栏是通宽的，标记跟着挪进顶栏左端。
+      三种版式共用这一块，差别只在渲染哪一层：
+      经典给整棵树，混合与分栏只给当前一级模块的子菜单（一级已经在别处了）。
+      品牌标记则跟着一级走——混合挪进通宽顶栏的左端，分栏挪进左窄条的顶部，
+      腾出来的位置留给当前模块名，否则第二栏顶上会空一块、跟顶栏那条横线接不上。
     -->
     <aside v-if="showSidebar" class="sidebar">
-      <div v-if="!isMix" class="brand">
+      <div v-if="!isSubOnly" class="brand">
         <BrandLogo :text="!appStore.sidebarCollapsed" />
       </div>
+      <div v-else-if="isColumns" class="sub-title">{{ activeTop?.name }}</div>
       <el-scrollbar class="menu-scroll">
-        <SidebarMenu :nodes="isMix ? activeChildren : undefined" />
+        <SidebarMenu :nodes="isSubOnly ? activeChildren : undefined" />
       </el-scrollbar>
     </aside>
 
@@ -135,8 +169,8 @@ async function onUserCommand(cmd: string) {
     <header class="topbar">
       <BrandLogo v-if="isMix" class="topbar-brand" />
 
-      <!-- 侧栏被收掉时没有可折叠的东西，按钮也就没有意义 -->
-      <el-icon v-if="showSidebar" class="hamburger" @click="appStore.toggleSidebar()">
+      <!-- 当前模块没有子菜单时没有可折叠的东西，按钮也就没有意义 -->
+      <el-icon v-if="showHamburger" class="hamburger" @click="appStore.toggleSidebar()">
         <component :is="appStore.sidebarCollapsed ? Expand : Fold" />
       </el-icon>
 
@@ -286,6 +320,43 @@ async function onUserCommand(cmd: string) {
     'main';
 }
 
+/*
+ * 分栏：最左窄条通高（跨两行）放一级，第二栏放当前模块的子菜单
+ *
+ *   ┌────┬────────┬──────────┐
+ *   │ 标 │ 模块名 │  顶栏    │
+ *   │ 识 ├────────┼──────────┤
+ *   │ 一 │ 二级   │  内容    │
+ *   │ 级 │        │          │
+ *   └────┴────────┴──────────┘
+ *
+ * 放在 `.is-collapsed` / `.no-sidebar` 之后：那两条规则写的是两列与一列的
+ * 模板，分栏永远比它们多一列，靠源码顺序压过去（选择器权重相同）。
+ */
+.layout.is-columns {
+  grid-template-columns: var(--keel-rail-width) var(--keel-sidebar-width) minmax(0, 1fr);
+  grid-template-areas:
+    'rail sidebar topbar'
+    'rail sidebar main';
+}
+
+/*
+ * 第二栏收起（用户主动折叠，或当前模块没有子菜单）
+ *
+ * 分栏版式下不存在「压成图标条」这一档，见 `showSidebar` 的注释。
+ */
+.layout.is-columns.no-sidebar,
+.layout.is-columns.no-sidebar.is-collapsed {
+  grid-template-columns: var(--keel-rail-width) minmax(0, 1fr);
+  grid-template-areas:
+    'rail topbar'
+    'rail main';
+}
+
+.rail {
+  grid-area: rail;
+}
+
 /* ---------------- 侧边栏 ---------------- */
 .sidebar {
   display: flex;
@@ -312,6 +383,27 @@ async function onUserCommand(cmd: string) {
   flex: none;
   border-bottom: 1px solid var(--el-border-color-light);
   white-space: nowrap;
+}
+
+/*
+ * 分栏版式下第二栏顶部的模块名
+ *
+ * 尺寸必须与 `.brand`、顶栏一致（同一个高度令牌 + 同一条描边），
+ * 三列的横线要在同一水平上——差一档就能在两条竖直分界处同时看出来。
+ */
+.sub-title {
+  display: flex;
+  align-items: center;
+  height: var(--keel-topbar-height);
+  padding: 0 16px;
+  flex: none;
+  border-bottom: 1px solid var(--el-border-color-light);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .menu-scroll {
@@ -424,7 +516,8 @@ async function onUserCommand(cmd: string) {
    */
   .layout,
   .layout.is-collapsed,
-  .layout.is-mix {
+  .layout.is-mix,
+  .layout.is-columns {
     grid-template-columns: minmax(0, 1fr);
     /*
      * 单列下三块竖着堆：顶栏 → 侧栏 → 内容。
@@ -440,6 +533,22 @@ async function onUserCommand(cmd: string) {
     height: auto;
     min-height: 100vh;
     overflow: visible;
+  }
+
+  /*
+   * 分栏在窄屏下多一块：一级窄条横过来堆在最上面（它在 ColumnRail 里自己
+   * 改成了横排）。没有子菜单时 sidebar 这个区域是空的，grid 允许区域没有对应
+   * 元素，所以不必再分出一套模板。
+   */
+  .layout.is-columns,
+  .layout.is-columns.is-collapsed,
+  .layout.is-columns.no-sidebar {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'rail'
+      'topbar'
+      'sidebar'
+      'main';
   }
 
   .content {

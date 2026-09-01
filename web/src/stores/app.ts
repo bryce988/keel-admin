@@ -10,17 +10,29 @@ export type ThemeMode = 'light' | 'dark'
 /**
  * 导航版式
  *
- * - `side` 经典：一级、二级都在左侧栏，二级嵌套展开
- * - `mix`  混合：一级在顶栏横排，左侧栏只显示当前一级项的子菜单
+ * - `side`    经典：一级、二级都在左侧栏，二级嵌套展开
+ * - `mix`     混合：一级在顶栏横排，左侧栏只显示当前一级项的子菜单
+ * - `columns` 分栏：一级在最左窄条竖排（图标在上、名字在下），第二栏显示子菜单
  *
- * 两者用的是**同一棵**后端菜单树（`userStore.menus`），只是分层渲染的位置不同，
+ * 三者用的是**同一棵**后端菜单树（`userStore.menus`），只是分层渲染的位置不同，
  * 所以切换版式不涉及路由重注册，也不需要后端配合。
+ *
+ * `mix` 与 `columns` 只差「一级放顶栏还是放左窄条」，推导逻辑完全共用
+ * （见 `useMenuNav`），两者都要求「当前一级模块」这个概念。
  */
-export type LayoutMode = 'side' | 'mix'
+export type LayoutMode = 'side' | 'mix' | 'columns'
 
-/** 读版式：localStorage 里可能是历史遗留的脏值，只认已知的两个 */
+const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'mix', 'columns']
+
+/**
+ * 读版式：localStorage 里可能是历史遗留的脏值，只认白名单内的值
+ *
+ * 用白名单而不是逐个比对字符串——加第三种版式时忘了改这里，
+ * 表现是选了新版式、刷新后又弹回经典，而且不报任何错。
+ */
 function readLayout(): LayoutMode {
-  return localStorage.getItem(LAYOUT_KEY) === 'mix' ? 'mix' : 'side'
+  const saved = localStorage.getItem(LAYOUT_KEY) as LayoutMode | null
+  return saved && LAYOUT_MODES.includes(saved) ? saved : 'side'
 }
 
 /**
@@ -95,7 +107,7 @@ export const useAppStore = defineStore('app', {
     /**
      * 切换导航版式
      *
-     * 顺手把折叠态复位：混合版式下侧栏只剩当前模块的几个二级项，
+     * 顺手把折叠态复位：混合、分栏版式下侧栏只剩当前模块的几个二级项，
      * 带着上一个版式的折叠状态过来，用户会看到一条只有图标的窄条，
      * 而这时候他刚点完「混合布局」，最需要看清的恰恰是侧栏变成了什么。
      */
