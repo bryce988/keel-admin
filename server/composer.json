@@ -14,6 +14,7 @@
         "monolog/monolog": "^3.0",
         "openspout/openspout": "^5.10",
         "predis/predis": "^2.2",
+        "symfony/mailer": "^7.3",
         "webman/redis-queue": "^2.1",
         "webman/validation": "^2.2",
         "workerman/crontab": "^1.0",

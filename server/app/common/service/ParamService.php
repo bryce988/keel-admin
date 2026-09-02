@@ -31,6 +31,9 @@ class ParamService
         'security'    => '安全策略',
         'integration' => '第三方集成',
         'advanced'    => '高级选项',
+        // 放在最后：邮件是「配了才多出一个登录入口」的可选能力，
+        // 不像上面四组那样每个部署都要过一遍
+        'system'      => '系统配置',
     ];
 
     /**
@@ -80,6 +83,18 @@ class ParamService
         foreach ($rows as $row) {
             $out[$row->param_key] = $row->typedValue();
         }
+
+        /*
+         * 邮箱登录是否可用
+         *
+         * 不是某一个参数键，而是「SMTP 配没配」的投影（`sys.mail.host` 与
+         * `sys.mail.from` 都有值，见 MailService::configured）。登录页得知道
+         * 要不要显示那个入口：没配还把「邮箱登录」摆出来，用户点了发码只会
+         * 拿到一个错误，而他并不知道那是部署方没配。
+         *
+         * 只下发一个布尔，不带主机名账号这些东西——这是个免登录接口。
+         */
+        $out['sys.login.emailEnabled'] = MailService::configured();
 
         return $out;
     }
@@ -268,7 +283,10 @@ class ParamService
             'group'       => $row->group,
             'name'        => $row->name,
             'param_key'   => $row->param_key,
-            'param_value' => $row->is_secret ? self::MASK : $row->param_value,
+            // 密钥回掩码，但**没设过的密钥回空串**：一律回 ******，界面上
+            // 「已经配了一个我看不见的口令」和「压根没配」长得一模一样，
+            // 而这两种状态下该做的事正相反（前者不用动，后者非填不可）
+            'param_value' => $row->is_secret && $row->param_value !== '' ? self::MASK : $row->param_value,
             'value_type'  => $row->value_type,
             'is_builtin'  => $row->is_builtin,
             'is_secret'   => $row->is_secret,

@@ -41,12 +41,26 @@ while (true) {
 // 一棵树，type：1 目录 · 2 菜单 · 3 按钮 · 4 接口 · 5 数据(字段)
 // 目录和菜单的 path/component 直接驱动前端动态路由，改这里就等于改菜单。
 $tree = [
-    // 概览是一级菜单，不套目录：底下只有一个页面，为它单独立一层
-    // 只会让侧边栏多一次展开点击，面包屑还会出现「概览 / 系统概览」这种同义重复。
-    // 一级节点直接当页面用是支持的（component 不填 Layout 即可），见 docs/api.md §菜单
+    /*
+     * 首页（目录）→ 仪表盘（页面）
+     *
+     * 这块反复过两次，记一下免得再翻回来：最早是目录套一个页面，2026-08-19 拍平成
+     * 一级菜单（理由是「底下只有一个页面，多一层只是多一次展开」），现在又改回目录——
+     * 因为「首页」这一级往后要放不止一块内容（仪表盘之外还会有别的看板），
+     * 而一级菜单一旦有了第二个页面就必须变成目录，那时候路径又得再改一次。
+     *
+     * ⚠️ 目录本身的 code（`home`）必须一并授权给角色，只给 `sys:dashboard:view`
+     * 的话，`buildMenuTree` 从根找不到这条链，仪表盘会整条消失——
+     * 普通员工会得到一个空侧边栏。见下面 $grants。
+     */
     [
-        'name' => '概览', 'code' => 'sys:dashboard:view', 'type' => 2,
-        'path' => '/dashboard', 'component' => 'views/dashboard/index.vue', 'icon' => 'Odometer', 'sort' => 10,
+        'name' => '首页', 'code' => 'home', 'type' => 1,
+        'path' => '/home', 'component' => 'Layout', 'icon' => 'HomeFilled', 'sort' => 10,
+        'children' => [
+            ['name' => '仪表盘', 'code' => 'sys:dashboard:view', 'type' => 2,
+             'path' => '/home/dashboard', 'component' => 'views/dashboard/index.vue',
+             'icon' => 'Odometer', 'sort' => 10],
+        ],
     ],
     [
         'name' => '系统管理', 'code' => 'sys', 'type' => 1,
@@ -107,13 +121,6 @@ $tree = [
                  ['name' => '新增节点', 'code' => 'sys:menu:create', 'type' => 3, 'sort' => 1],
                  ['name' => '编辑节点', 'code' => 'sys:menu:update', 'type' => 3, 'sort' => 2],
                  ['name' => '删除节点', 'code' => 'sys:menu:delete', 'type' => 3, 'sort' => 3],
-             ]],
-            ['name' => '参数配置', 'code' => 'sys:param:list', 'type' => 2,
-             'path' => '/system/param', 'component' => 'views/system/param/index.vue', 'icon' => 'Tools', 'sort' => 70,
-             'children' => [
-                 ['name' => '新增参数', 'code' => 'sys:param:create', 'type' => 3, 'sort' => 1],
-                 ['name' => '编辑参数', 'code' => 'sys:param:update', 'type' => 3, 'sort' => 2],
-                 ['name' => '删除参数', 'code' => 'sys:param:delete', 'type' => 3, 'sort' => 3],
              ]],
         ],
     ],
@@ -182,6 +189,29 @@ $tree = [
              ]],
         ],
     ],
+    /*
+     * 系统配置：放全站运行方式的开关，与「系统管理」（管人、管组织、管授权）分开
+     *
+     * 参数配置从「系统管理」挪到了这里，路径跟着从 `/system/param` 变成 `/config/param`。
+     * 路由是菜单驱动的，改这一行就够了，前端不用发版——但**写死了旧路径的地方要跟着改**
+     * （概览页的快捷入口 `DashboardService`、PROJECT.md 的路由表）。
+     *
+     * 目录 code `config` 同样要授权给用到它的角色，否则子菜单被 buildMenuTree 剪掉。
+     * 内置角色里只有超管有 `sys:param:list`，所以这次只影响超管（`*`，自动全有）。
+     */
+    [
+        'name' => '系统配置', 'code' => 'config', 'type' => 1,
+        'path' => '/config', 'component' => 'Layout', 'icon' => 'SetUp', 'sort' => 96,
+        'children' => [
+            ['name' => '参数配置', 'code' => 'sys:param:list', 'type' => 2,
+             'path' => '/config/param', 'component' => 'views/system/param/index.vue', 'icon' => 'Tools', 'sort' => 10,
+             'children' => [
+                 ['name' => '新增参数', 'code' => 'sys:param:create', 'type' => 3, 'sort' => 1],
+                 ['name' => '编辑参数', 'code' => 'sys:param:update', 'type' => 3, 'sort' => 2],
+                 ['name' => '删除参数', 'code' => 'sys:param:delete', 'type' => 3, 'sort' => 3],
+             ]],
+        ],
+    ],
 ];
 
 /** 按 perm_code upsert，返回节点 id；父子关系用 code 解析，不依赖自增 id */
@@ -234,7 +264,8 @@ foreach ($tree as $node) {
  * 子节点要一并登记，别指望这里级联。
  */
 $retired = [
-    // 概览原来是目录（sys:dashboard）套一个页面，2026-08-19 改成一级菜单后不再需要
+    // 概览时期的目录 code。首页那一级现在用的是 `home`，这个不再出现在树里，
+    // 存量库里的行要清掉——留着的话侧边栏会渲染一个点开空无一物的死目录
     'sys:dashboard',
 ];
 
@@ -265,7 +296,8 @@ $grants = [
      *   邮箱是掩码，一个账号上就能看出字段级权限的效果
      */
     '部门主管' => [
-        'sys:dashboard:view',
+        // 目录 code 与页面 code 都要给：少了目录，子菜单会被 buildMenuTree 剪掉
+        'home', 'sys:dashboard:view',
         'sys',
         'sys:user:list', 'sys:user:create', 'sys:user:update',
         'sys:user:resetPwd', 'sys:user:export',
@@ -281,9 +313,10 @@ $grants = [
         'sys:field:user:phone',
     ],
 
-    // 普通员工：只有概览。它是对照组——越权测试要有一个「什么都没有」的账号，
-    // 才能验证 fail-closed 是真的关着，而不是碰巧没人去点
-    '普通员工' => ['sys:dashboard:view'],
+    // 普通员工：只有首页下的仪表盘。它是对照组——越权测试要有一个「什么都没有」的账号，
+    // 才能验证 fail-closed 是真的关着，而不是碰巧没人去点。
+    // 目录 code 不能漏，漏了这个账号会得到一个空侧边栏
+    '普通员工' => ['home', 'sys:dashboard:view'],
 ];
 
 $permIdByCode = Db::table('sys_permissions')->pluck('id', 'perm_code')->all();
@@ -372,7 +405,11 @@ $dicts = [
         ['导出', '4', 'warning'], ['授权', '5', 'info'], ['其他', '6', 'info'],
     ]],
     'log_status'    => ['执行结果', [['成功', '1', 'success'], ['失败', '0', 'danger']]],
-    'login_type'    => ['登录类型', [['登录', '1', 'primary'], ['登出', '2', 'info']]],
+    // 3 是邮箱登录的发码动作：它不是一次登录，但要留在同一条时间线上，
+    // 否则「有人拿着我的密码在申请验证码」这件事在后台里查不到
+    'login_type'    => ['登录类型', [
+        ['登录', '1', 'primary'], ['登出', '2', 'info'], ['发送验证码', '3', 'warning'],
+    ]],
     'notice_type'   => ['公告类型', [
         ['通知', 'notice', 'primary'], ['公告', 'announcement', 'success'],
         ['维护', 'maintenance', 'warning'], ['紧急', 'urgent', 'danger'],
@@ -481,23 +518,48 @@ $params = [
     ['sys.sms.accessKey',    '',           'integration', 'string', '短信 AccessKey', 1],
     ['sys.oss.endpoint',     '',           'integration', 'string', '对象存储 Endpoint'],
     ['sys.oss.accessSecret', '',           'integration', 'string', '对象存储 AccessSecret', 1],
+    /*
+     * 邮件（邮箱登录用）
+     *
+     * 全部留空，由使用者自己填——脚手架不预置任何真实凭据。
+     * `sys.mail.host` 与 `sys.mail.from` 都有值时，登录页才多出「邮箱登录」入口。
+     *
+     * 这几项**参数表优先、`.env` 兜底**（见 MailService::conf）：容器化部署
+     * 可以继续把 SMTP 放在 `.env` 里一次配好、界面留空；要在界面上改的就填这里。
+     *
+     * ⚠️ 口令是 is_secret：列表接口只回掩码，保存时提交掩码等于「不改」。
+     * 但要清楚它挡不住的是什么——有 `sys:param:update` 的人虽然看不到旧口令，
+     * 却能把 host 改到自己的服务器上，之后全站的邮箱验证码都投到那里。
+     * 这个权限点该只给运维。
+     */
+    // 第 7 位是 remark：说明写这里而不是塞进 name——name 是界面上的字段标签，
+    // 写长了会折成两行，把整组表单撑得参差不齐
+    ['sys.mail.host',       '',    'system', 'string', 'SMTP 服务器', 0, 'QQ 邮箱是 smtp.qq.com'],
+    ['sys.mail.port',       '465', 'system', 'int',    'SMTP 端口',   0, 'ssl 用 465，tls 用 587'],
+    ['sys.mail.encryption', 'ssl', 'system', 'string', '加密方式',    0, 'ssl(465) / tls(587) / none'],
+    ['sys.mail.username',   '',    'system', 'string', 'SMTP 账号',   0, '通常就是完整的邮箱地址'],
+    ['sys.mail.password',   '',    'system', 'string', 'SMTP 密码',   1, 'QQ / 163 等要填授权码，不是邮箱的登录密码'],
+    ['sys.mail.from',       '',    'system', 'string', '发件人地址',  0, '多数服务商要求与 SMTP 账号一致，否则被拒收'],
+    ['sys.mail.fromName',   '',    'system', 'string', '发件人显示名', 0, '留空取系统名称'],
 ];
 foreach ($params as $row) {
     [$key, $value, $group, $type, $name] = $row;
     $isSecret = (int) ($row[5] ?? 0);
+    $remark   = (string) ($row[6] ?? '');
 
     $exists = Db::table('sys_params')->where('param_key', $key)->first();
     if ($exists) {
-        // 只补齐元信息，不覆盖已改过的值
+        // 只补齐元信息，不覆盖已改过的值。remark 也算元信息——
+        // 它是给运维看的说明，改了措辞就该在存量库里一起更新
         Db::table('sys_params')->where('id', $exists->id)->update([
             'name' => $name, 'group' => $group, 'value_type' => $type,
-            'is_builtin' => 1, 'is_secret' => $isSecret, 'updated_at' => $now,
+            'is_builtin' => 1, 'is_secret' => $isSecret, 'remark' => $remark, 'updated_at' => $now,
         ]);
         continue;
     }
     Db::table('sys_params')->insert([
         'group' => $group, 'name' => $name, 'param_key' => $key, 'param_value' => $value,
-        'value_type' => $type, 'is_builtin' => 1, 'is_secret' => $isSecret, 'remark' => '',
+        'value_type' => $type, 'is_builtin' => 1, 'is_secret' => $isSecret, 'remark' => $remark,
         'created_at' => $now, 'updated_at' => $now,
     ]);
 }

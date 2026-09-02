@@ -52,6 +52,10 @@ Route::get('/admin/ping', fn () => Result::ok(['pong' => true, 'app' => 'admin']
 Route::group('/admin/auth', function () {
     Route::get('/captcha', [AuthController::class, 'captcha']);
     Route::post('/login', [AuthController::class, 'login']);
+    // 邮箱登录：先发码后登录，两步都免登录。发码那步自带图形验证码与失败计数，
+    // 与账号密码登录共用同一套锁定（AuthService::gate）
+    Route::post('/email/code', [AuthController::class, 'emailCode']);
+    Route::post('/login/email', [AuthController::class, 'loginByEmail']);
     Route::post('/refresh', [AuthController::class, 'refresh']);
 });
 

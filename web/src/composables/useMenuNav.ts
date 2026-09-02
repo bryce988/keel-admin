@@ -47,7 +47,7 @@ export function useMenuNav() {
     return topMenus.value.find((group) => contains(group, path)) ?? null
   })
 
-  /** 当前模块的子菜单；一级本身就是页面（如「概览」）时为空数组 */
+  /** 当前模块的子菜单；一级本身就是页面（不套目录的一级菜单）时为空数组 */
   const activeChildren = computed<MenuNode[]>(
     () => activeTop.value?.children?.filter((c) => c.visible) ?? []
   )

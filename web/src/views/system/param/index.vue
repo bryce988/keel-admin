@@ -235,11 +235,17 @@ onMounted(async () => {
               type="textarea"
               :rows="3"
             />
+            <!--
+              密钥类走 show-password：SMTP 授权码这种东西是在办公室里当着人改的，
+              明文摊在屏幕上没道理。占位文案只在**空**的时候才看得见，
+              而密钥为空只有一种含义——没配过（配过的回显是掩码，非空）
+            -->
             <el-input
               v-else
               v-model="form[row.param_key]"
               :type="row.value_type === 'int' ? 'number' : 'text'"
-              :placeholder="row.is_secret ? '留空的掩码表示不修改' : ''"
+              :show-password="row.is_secret"
+              :placeholder="row.is_secret ? '尚未配置' : ''"
             />
 
             <div class="param-meta">

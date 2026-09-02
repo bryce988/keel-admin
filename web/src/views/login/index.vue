@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Lock, Picture, User } from '@element-plus/icons-vue'
+import { Lock, Message, Picture, User } from '@element-plus/icons-vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import request, { BizError } from '@/utils/request'
 import { useAppStore } from '@/stores/app'
@@ -77,22 +77,75 @@ const hullRings = computed(() =>
   }))
 )
 
-const formRef = ref<FormInstance>()
+/**
+ * 两种登录方式
+ *
+ * `account` 账号 + 密码 + 图形验证码；
+ * `email`   邮箱 + 密码 + 图形验证码 → 收邮箱验证码 → 提交。
+ *
+ * 邮箱这条路只有在后端配了 SMTP 时才出现（`appStore.site.emailLogin`）——
+ * 没配还把页签摆出来，用户点「发送验证码」只会拿到一个他无从处理的错误。
+ */
+type LoginMode = 'account' | 'email'
+
+const mode = ref<LoginMode>('account')
+const accountFormRef = ref<FormInstance>()
+const emailFormRef = ref<FormInstance>()
 const loading = ref(false)
 const captchaImage = ref('')
 
-// form 直接作为登录接口的请求体，所以键名用 snake_case
+/*
+ * 一个 model 两套规则，而不是两个 model
+ *
+ * 密码、图形验证码两栏是两种方式共用的，拆成两份的话「切个页签密码就没了」，
+ * 而两个页签的密码本来就是同一个东西。规则分开是因为必填项不同：
+ * 账号页签要 `username`，邮箱页签要 `email` 与 `email_code`。
+ * Element Plus 只校验**当前渲染出来的** el-form-item，所以同一个 model
+ * 挂两套规则不会互相牵连。
+ *
+ * 键名用 snake_case：它直接就是登录接口的请求体。
+ */
 const form = reactive({
-  username: 'admin',
-  password: 'admin123',
+  username: '',
+  password: '',
+  email: '',
   captcha_key: '',
-  captcha_code: ''
+  captcha_code: '',
+  email_code: ''
 })
 
-const rules: FormRules = {
+/**
+ * 「其他登录方式」列表：当前方式不在其中
+ *
+ * 邮箱那项要后端配了 SMTP 才出现（`appStore.site.emailLogin`）——
+ * 没配还把入口摆出来，点进去发码只会拿到一个用户无从处理的错误。
+ */
+const altMethods = computed(() => {
+  const all = [
+    { mode: 'account' as const, label: '账号登录', icon: User, enabled: true },
+    { mode: 'email' as const, label: '邮箱登录', icon: Message, enabled: appStore.site.emailLogin }
+  ]
+
+  return all.filter((item) => item.enabled && item.mode !== mode.value)
+})
+
+const captchaRule: FormRules[string] = [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+const passwordRule: FormRules[string] = [{ required: true, message: '请输入密码', trigger: 'blur' }]
+
+const accountRules: FormRules = {
   username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  captcha_code: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+  password: passwordRule,
+  captcha_code: captchaRule
+}
+
+const emailRules: FormRules = {
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
+  ],
+  password: passwordRule,
+  captcha_code: captchaRule,
+  email_code: [{ required: true, message: '请输入邮箱验证码', trigger: 'blur' }]
 }
 
 async function loadCaptcha() {
@@ -104,12 +157,112 @@ async function loadCaptcha() {
   captchaImage.value = data.captcha_image
 }
 
+/* ---------------------------------------------------------------- 邮箱验证码 */
+
+const sending = ref(false)
+/** 距离可以再次发码还剩多少秒，>0 时按钮禁用 */
+const countdown = ref(0)
+let countdownTimer = 0
+
+function startCountdown(seconds: number) {
+  window.clearInterval(countdownTimer)
+  countdown.value = seconds
+
+  countdownTimer = window.setInterval(() => {
+    if (--countdown.value <= 0) window.clearInterval(countdownTimer)
+  }, 1000)
+}
+
+// 定时器不清会跟着组件一起泄漏：登录成功后这个页面就被卸载了，
+// 而 interval 还在按秒改一个没人再看的 ref
+onUnmounted(() => window.clearInterval(countdownTimer))
+
+/**
+ * 发验证码
+ *
+ * 只校验发码要用的三项——`email_code` 这时当然是空的，
+ * 整表校验会先弹一个「请输入邮箱验证码」，而那正是这一步要去取的东西。
+ *
+ * 倒计时秒数用后端返回的 `resend_in` 而不是页面里写死的 60：
+ * 真正的间隔限制在后端（`EMAIL_CODE_RESEND_SECONDS`），部署方调了那个值之后
+ * 前端跟着走，不会出现「按钮亮了但点了还是 429」。
+ */
+async function onSendCode() {
+  const ok = await emailFormRef.value
+    ?.validateField(['email', 'password', 'captcha_code'])
+    .catch(() => false)
+  if (!ok) return
+
+  sending.value = true
+  try {
+    const data = await request.post<unknown, { expires_in: number; resend_in: number }>(
+      '/admin/auth/email/code',
+      {
+        email: form.email,
+        password: form.password,
+        captcha_key: form.captcha_key,
+        captcha_code: form.captcha_code
+      }
+    )
+
+    ElMessage.success(`验证码已发送至 ${form.email}，${Math.ceil(data.expires_in / 60)} 分钟内有效`)
+    startCountdown(data.resend_in)
+  } catch (e) {
+    showError(e)
+  } finally {
+    sending.value = false
+    // 图形验证码是一次性的，后端校验完就删了——无论成败都得换一张，
+    // 否则用户拿着一个已经作废的 key 反复提交
+    loadCaptcha()
+  }
+}
+
+/* ---------------------------------------------------------------- 提交 */
+
+/** 422 的字段级错误由拦截器放行到这里，取第一条提示 */
+function showError(e: unknown) {
+  if (!(e instanceof BizError)) return
+
+  if (e.status === 422 && e.details) {
+    const first = Object.values(e.details)[0]?.[0]
+    ElMessage.error(first || e.message)
+  } else {
+    ElMessage.error(e.message)
+  }
+}
+
 async function onSubmit() {
-  if (!(await formRef.value?.validate().catch(() => false))) return
+  /*
+   * 邮箱登录这一步**不校验图形验证码**
+   *
+   * 它在发码那一步就被后端消费掉了（一次性），提交时那一栏必然是空的——
+   * 整表校验会在这里弹「请输入验证码」，把用户卡在一个填了也没人看的框上。
+   * 第一版就是这么写的，实测拿到验证码之后根本登不进去。
+   */
+  const ok =
+    mode.value === 'account'
+      ? await accountFormRef.value?.validate().catch(() => false)
+      : await emailFormRef.value
+          ?.validateField(['email', 'password', 'email_code'])
+          .catch(() => false)
+  if (!ok) return
 
   loading.value = true
   try {
-    const res = await userStore.login({ ...form })
+    const res =
+      mode.value === 'account'
+        ? await userStore.login({
+            username: form.username,
+            password: form.password,
+            captcha_key: form.captcha_key,
+            captcha_code: form.captcha_code
+          })
+        : await userStore.loginByEmail({
+            email: form.email,
+            password: form.password,
+            email_code: form.email_code
+          })
+
     await userStore.fetchProfile()
 
     if (res.must_change_password) {
@@ -120,16 +273,16 @@ async function onSubmit() {
     // 否则没有概览权限的账号一登录就撞 404
     router.replace((route.query.redirect as string) || '/')
   } catch (e) {
-    // 422 的字段级错误由拦截器放行到这里，回填到表单
-    if (e instanceof BizError) {
-      if (e.status === 422 && e.details) {
-        const first = Object.values(e.details)[0]?.[0]
-        ElMessage.error(first || e.message)
-      } else if (e.status === 401) {
-        ElMessage.error(e.message)
-      }
+    showError(e)
+
+    if (mode.value === 'account') {
+      // 账号登录每次提交都消费一张图形验证码，失败就得换新的。
+      // 邮箱登录这一步没有图形验证码（它在发码那步用掉了），
+      // 跟着刷新只会把用户刚填好的那栏清空
+      loadCaptcha()
+    } else {
+      form.email_code = ''
     }
-    loadCaptcha()
   } finally {
     loading.value = false
   }
@@ -184,9 +337,20 @@ onMounted(loadCaptcha)
       </aside>
 
       <section class="form">
-        <h1 class="form-title">登录</h1>
+        <!--
+          标题跟着方式走。去掉页签之后，它是「我现在在用哪种方式登录」的唯一提示，
+          没有它的话切过去只看到表单换了一副样子，不知道自己在哪
+        -->
+        <h1 class="form-title">{{ mode === 'account' ? '登录' : '邮箱登录' }}</h1>
 
-        <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="onSubmit">
+        <el-form
+          v-if="mode === 'account'"
+          ref="accountFormRef"
+          :model="form"
+          :rules="accountRules"
+          size="large"
+          @keyup.enter="onSubmit"
+        >
           <el-form-item prop="username">
             <el-input v-model="form.username" :prefix-icon="User" placeholder="账号" clearable />
           </el-form-item>
@@ -230,7 +394,119 @@ onMounted(loadCaptcha)
           </el-button>
         </el-form>
 
-        <p class="login-tip">演示环境默认账号 admin / admin123</p>
+        <!--
+          邮箱登录：邮箱、密码、图形验证码三项填完才发得出验证码。
+          顺序是刻意的——后端要先确认「这个邮箱确实绑在某个账号上，且密码正确」
+          才肯发信，否则任何人填个邮箱就能让别人收信，还能靠「收没收到」
+          试出谁是这个系统的用户
+        -->
+        <el-form
+          v-else
+          ref="emailFormRef"
+          :model="form"
+          :rules="emailRules"
+          size="large"
+          @keyup.enter="onSubmit"
+        >
+          <el-form-item prop="email">
+            <el-input
+              v-model="form.email"
+              :prefix-icon="Message"
+              placeholder="账号绑定的邮箱"
+              maxlength="128"
+              clearable
+            />
+          </el-form-item>
+
+          <el-form-item prop="password">
+            <el-input
+              v-model="form.password"
+              type="password"
+              :prefix-icon="Lock"
+              placeholder="密码"
+              show-password
+            />
+          </el-form-item>
+
+          <el-form-item prop="captcha_code">
+            <div class="captcha-row">
+              <el-input
+                v-model="form.captcha_code"
+                :prefix-icon="Picture"
+                placeholder="验证码"
+                maxlength="4"
+              />
+              <img
+                v-if="captchaImage"
+                :src="captchaImage"
+                class="captcha-img"
+                title="点击刷新"
+                alt="验证码"
+                @click="loadCaptcha"
+              />
+            </div>
+          </el-form-item>
+
+          <el-form-item prop="email_code">
+            <div class="captcha-row">
+              <el-input
+                v-model="form.email_code"
+                :prefix-icon="Message"
+                placeholder="邮箱验证码"
+                maxlength="6"
+              />
+              <!--
+                按钮宽度写死，与图形验证码那张图同宽：倒计时文案（「59s」）
+                比「获取验证码」短得多，不定宽的话上下两行的输入框会不等长，
+                每过一秒还跟着抖一下
+              -->
+              <el-button
+                class="code-btn"
+                :loading="sending"
+                :disabled="countdown > 0"
+                @click="onSendCode"
+              >
+                {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
+              </el-button>
+            </div>
+          </el-form-item>
+
+          <el-button type="primary" class="login-btn" :loading="loading" @click="onSubmit">
+            登 录
+          </el-button>
+        </el-form>
+
+        <p v-if="mode === 'account'" class="login-tip">演示环境默认账号 admin / admin123</p>
+        <p v-else class="login-tip">验证码会发到该账号绑定的邮箱</p>
+
+        <!--
+          其他登录方式
+          
+          只列**当前没在用**的那些，用的这种不重复出现——这一排的语义是
+          「还可以怎么登」，把当前方式也摆进去就变成了一个没有选中态的单选组。
+          两种方式时它退化成一个图标，看着单薄，但结构是对的：
+          将来加微信、钉钉往 `altMethods` 里追加一项即可，布局不用动。
+
+          后端没配 SMTP 时整块不画（`emailLogin` 为 false 时列表为空）——
+          留一条「其他登录方式」的分隔线下面空无一物，比没有更奇怪
+        -->
+        <div v-if="altMethods.length" class="alt-login">
+          <div class="alt-divider"><span>其他登录方式</span></div>
+
+          <div class="alt-list">
+            <button
+              v-for="item in altMethods"
+              :key="item.mode"
+              type="button"
+              class="alt-item"
+              :title="item.label"
+              @click="mode = item.mode"
+            >
+              <el-icon :size="18"><component :is="item.icon" /></el-icon>
+              <span class="alt-label">{{ item.label }}</span>
+            </button>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -349,6 +625,12 @@ onMounted(loadCaptcha)
   width: 100%;
 }
 
+/* 与验证码图片同宽，理由见模板里的注释 */
+.code-btn {
+  width: 104px;
+  flex: none;
+}
+
 .captcha-img {
   width: 104px;
   height: 40px;
@@ -370,6 +652,94 @@ onMounted(loadCaptcha)
   font-size: 12px;
   text-align: center;
   color: var(--el-text-color-secondary);
+}
+
+/* ---------------------------------------------------------------- 其他登录方式 */
+.alt-login {
+  margin-top: 24px;
+}
+
+/*
+ * 带文字的分隔线：两条 1px 线由伪元素画，中间的文字用 flex 撑开。
+ * 不用 <el-divider content-position="center">——它的默认间距是给正文段落
+ * 之间用的，塞在这里会把卡片撑高一截，而登录卡的高度直接决定它在视口里居不居中
+ */
+.alt-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+.alt-divider::before,
+.alt-divider::after {
+  flex: 1;
+  height: 1px;
+  content: '';
+  background: var(--el-border-color-lighter);
+}
+
+.alt-list {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+/*
+ * 图标按钮
+ *
+ * 用 <button> 而不是 <div @click>：键盘能 Tab 到、回车能触发、读屏器认得出是按钮。
+ * 这是登录页上除了提交之外唯一的动作，不能只有鼠标能用。
+ */
+.alt-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: color 0.2s;
+}
+
+.alt-item .el-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--el-text-color-regular);
+  border: 1px solid var(--el-border-color);
+  border-radius: 50%;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    background-color 0.2s;
+}
+
+.alt-item:hover {
+  color: var(--el-color-primary);
+}
+
+.alt-item:hover .el-icon {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary-light-5);
+}
+
+/* 键盘焦点必须看得见：hover 态只有鼠标能触发 */
+.alt-item:focus-visible {
+  outline: none;
+}
+
+.alt-item:focus-visible .el-icon {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
 }
 
 /* ----------------------------------------------------------------

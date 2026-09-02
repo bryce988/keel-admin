@@ -39,6 +39,9 @@ export const BizCode = {
   OLD_PASSWORD_ERROR: 20005,         // 原密码错误（改密码）
   PASSWORD_POLICY_VIOLATION: 20006,  // 新密码不符合安全策略
   PASSWORD_EXPIRED: 20007,           // ⚠️ 预留：密码过期功能未实现，后端不会返回这个码
+  MAIL_NOT_CONFIGURED: 20008,        // 未配置 SMTP，邮箱登录不可用
+  MAIL_SEND_FAILED: 20009,           // 邮件发送失败（真实原因只进后端日志）
+  EMAIL_AMBIGUOUS: 20010,            // 该邮箱绑定了多个账号，无法据此定位身份
 
   // ---------------------------------------------------------------- 管理后台 · 用户（201xx）
   ACCOUNT_EXISTS: 20101,          // 账号已存在
@@ -46,6 +49,7 @@ export const BizCode = {
   DATA_HANDOVER_REQUIRED: 20104,  // 停用前先完成数据交接
   CANNOT_OPERATE_SELF: 20105,     // 不能删除/停用自己的账号
   PHONE_TAKEN: 20106,             // 手机号已被其他账号使用
+  EMAIL_TAKEN: 20107,             // 邮箱已被其他账号使用
 
   // ---------------------------------------------------------------- 管理后台 · 部门（202xx）
   DEPT_CYCLE: 20202,         // 上级部门不能是自己或其子部门

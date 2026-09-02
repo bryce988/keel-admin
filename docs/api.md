@@ -241,10 +241,14 @@ instance.interceptors.response.use(undefined, (err) => {
 | 400 | `20004` | 验证码错误或已过期 | ⚠️ 当前实现实际返回 422 + `10422`，此码暂未使用，待定 |
 | 400 | `20005` | 原密码错误 | 修改密码、换绑手机等一切需要验证当前密码的操作 |
 | 422 | `20006` | 新密码不符合安全策略 | 长度、复杂度 |
+| 400 | `20008` | 系统未配置邮件服务 | 未配 `MAIL_HOST` / `MAIL_FROM`，邮箱登录整条不可用 |
+| 400 | `20009` | 邮件发送失败 | SMTP 连不上或认证失败；真实原因只进后端日志，不回给调用方 |
+| 400 | `20010` | 该邮箱绑定了多个账号 | 存量数据里有重复邮箱，无法据此定位身份，改用账号登录 |
 | 409 | `20101` | 账号已存在 | 新建用户 |
 | 400 | `20104` | 请先完成数据交接 | 停用有归属数据的账号 |
 | 400 | `20105` | 不能删除/停用自己的账号 | 用户管理里对自己动手 |
 | 409 | `20106` | 手机号已被其他账号使用 | 个人中心换绑手机 |
+| 409 | `20107` | 邮箱已被其他账号使用 | 新建/编辑用户、个人中心改邮箱；邮箱是登录凭证，不能重复 |
 | 403 | `20103` | 不允许操作超级管理员 | 改角色、停用、删除 |
 | 400 | `20202` | 上级部门不能是自己或其子部门 | 移动部门 |
 | 409 | `20203` | 部门下存在用户或子部门，无法删除 | |
@@ -294,7 +298,9 @@ instance.interceptors.response.use(undefined, (err) => {
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
 | GET | `/admin/auth/captcha` | 公开 | 获取图形验证码 |
-| POST | `/admin/auth/login` | 公开 | 登录 |
+| POST | `/admin/auth/login` | 公开 | 账号密码登录 |
+| POST | `/admin/auth/email/code` | 公开 | 发送邮箱登录验证码（先验邮箱 + 密码） |
+| POST | `/admin/auth/login/email` | 公开 | 邮箱登录（邮箱 + 密码 + 邮箱验证码） |
 | POST | `/admin/auth/refresh` | 公开 | 刷新 token |
 | POST | `/admin/auth/logout` | 登录态 | 登出 |
 | GET | `/admin/auth/profile` | 登录态 | 当前用户信息 + 权限 + 菜单 |
@@ -319,6 +325,58 @@ POST /admin/auth/login
 - token 内**只放 `uid`、`type`、签发时间**，权限从 Redis 读取，不塞进 token
 - `must_change_password` 为 true 时前端强制跳转改密页，不允许进入系统
 
+### 邮箱登录
+
+两步。第一步发码，第二步才登录——两步都要密码。
+
+```http
+POST /admin/auth/email/code
+{ "email": "a@x.com", "password": "******", "captcha_key": "xxx", "captcha_code": "1234" }
+```
+
+```json
+{ "expires_in": 300, "resend_in": 60 }
+```
+
+```http
+POST /admin/auth/login/email
+{ "email": "a@x.com", "password": "******", "email_code": "123456" }
+```
+
+响应与账号密码登录完全一致（`access_token` / `refresh_token` / `must_change_password`）。
+
+**为什么发码之前要先验密码**：否则任何人填个邮箱就能让别人收信，而且能靠
+「目标邮箱有没有收到」枚举出谁是系统用户——接口即使恒回 200 也拦不住这条。
+先验密码之后，这两件事都要求攻击者已经掌握密码，此时验证码正好发挥它该发挥的作用：
+拿到密码也登不进去，第二因子在受害者的邮箱里。
+
+**为什么登录那步还要再验一次密码**：只信「手里有验证码」的话，能读到收件人邮箱的人
+（转发规则、共用邮箱、泄露的邮箱口令）就能不带密码登进来。
+
+**几道闸**（`.env` 可调）：
+
+| 闸 | 变量 | 默认 | 挡什么 |
+|---|---|---|---|
+| 图形验证码 | `CAPTCHA_TTL` | 120s | 脚本批量调发码接口 |
+| 重发间隔 | `EMAIL_CODE_RESEND_SECONDS` | 60s | 连点 |
+| 每日上限 | `EMAIL_CODE_DAILY_LIMIT` | 10 次/邮箱 | 拿到密码后把对方邮箱当轰炸目标 |
+| 验证次数 | `EMAIL_CODE_MAX_ATTEMPTS` | 5 次 | 爆破六位码；超限连码一起作废 |
+| 失败锁定 | `LOGIN_FAIL_LIMIT` 等 | 5 次 / 30 分钟 | 与账号密码登录**共用**同一套「凭证 + IP」计数 |
+
+验证码错误**不计入**登录锁定：它自己有 5 次上限，再叠一层的效果是输错两次验证码
+就把账号锁 30 分钟，而这一步已经证明请求方掌握正确密码，不是撞库。
+
+发码动作会写一条 `type=3` 的登录日志（成功），所以「有人拿着我的密码在申请验证码」
+这件事在后台查得到。
+
+**邮箱必须是绑定的**：登录按 `sys_users.email` 定位账号，未绑定与密码错误返回同一个
+`20001`。这一列没有唯一索引（`NOT NULL DEFAULT ''`，空串没法进唯一索引），
+查重在应用层做（`20107`）；存量库里若已有重复邮箱，登录时返回 `20010` 让人改用账号登录。
+
+**没配 SMTP 时**：`/admin/params/public` 的 `sys.login.emailEnabled` 为 false，
+登录页「其他登录方式」里不出现邮箱入口，接口直接返回 `20008`。
+「配没配」看的是 `sys.mail.host` 与 `sys.mail.from`（参数表优先，`.env` 的 `MAIL_*` 兜底）。
+
 ### 当前用户信息
 
 登录后第一个请求，前端据此渲染菜单与按钮权限。
@@ -334,7 +392,7 @@ POST /admin/auth/login
   "data_scope": 1,
   "menus": [
     {
-      "id": 1, "name": "概览", "path": "/dashboard",
+      "id": 1, "name": "仪表盘", "path": "/home/dashboard",
       "component": "views/dashboard/index.vue", "icon": "Odometer",
       "perm_code": "sys:dashboard:view", "visible": true, "keep_alive": true
     },
@@ -682,7 +740,9 @@ GET /admin/exports → 200 OK
 | POST/PUT/DELETE | `/admin/params/{id}` | `sys:param:create` / `update` / `delete` | 自定义参数增改删（删内置 403 + `20601`，键重复 409 + `20602`） |
 | GET | `/admin/params/public` | 公开 | 登录页需要的少量参数（系统名、Logo、页脚） |
 
-分组固定四个：`basic` 基础设置 · `security` 安全策略 · `integration` 第三方集成 · `advanced` 高级选项。
+分组固定五个：`basic` 基础设置 · `security` 安全策略 · `integration` 第三方集成 · `advanced` 高级选项 · `system` 系统配置。
+
+`system` 组放的是邮件（`sys.mail.host` / `port` / `encryption` / `username` / `password` / `from` / `fromName`），邮箱登录靠它。**参数表优先、`.env` 的 `MAIL_*` 兜底**，两边都空才算没配；口令是 `is_secret`，读接口只回掩码、且未配置时回空串。
 
 批量保存整组提交，一个事务：同组参数彼此相关（失败次数与锁定时长），
 逐条保存会留下半新半旧的中间态。

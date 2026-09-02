@@ -84,6 +84,7 @@ CREATE TABLE `sys_users` (
   `deleted_at`     DATETIME        NULL COMMENT '删除时间，NULL 表示未删除',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_username` (`username`),
+  KEY `idx_email` (`email`),
   KEY `idx_dept` (`dept_id`),
   KEY `idx_phone` (`phone`),
   KEY `idx_status` (`status`)
@@ -99,6 +100,9 @@ CREATE TABLE `sys_users` (
   参与时间比较毫无意义
 - `is_super = 1` 的账号跳过一切权限校验，**不允许通过界面授予**，只能在数据库或初始化脚本中设置
 - 账号只停用（`status = 0`）不物理删除，`deleted_at` 仅用于极端情况的软删
+- `email` 是**登录凭证之一**（邮箱登录按它定位账号），所以建了 `idx_email`，
+  并在应用层查重（`BizCode 20107`）。不做唯一索引：这一列允许留空，
+  而空串在唯一索引下会互相冲突，等于强制所有人都填邮箱
 
 ### 3.2 sys_depts 部门
 
@@ -389,7 +393,7 @@ CREATE TABLE `sys_login_logs` (
   `location`   VARCHAR(64)     NOT NULL DEFAULT ''  COMMENT 'IP 归属地（ip2region 离线库）',
   `browser`    VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '浏览器',
   `os`         VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '操作系统',
-  `type`       TINYINT         NOT NULL DEFAULT 1   COMMENT '1登录 2登出',
+  `type`       TINYINT         NOT NULL DEFAULT 1   COMMENT '1登录 2登出 3发送邮箱验证码',
   `status`     TINYINT(1)      NOT NULL DEFAULT 1   COMMENT '1成功 0失败',
   `msg`        VARCHAR(255)    NOT NULL DEFAULT ''  COMMENT '失败原因',
   `created_at` DATETIME        NOT NULL COMMENT '创建时间',

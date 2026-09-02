@@ -160,6 +160,10 @@ $indexPatches = [
     // 上一条加完之后，原来的单列 idx_dept 就是它的最左前缀，纯属重复。
     // 登录日志是只增表，每多一个索引就多一份写入开销，该删。
     ['sys_login_logs', 'idx_dept', null],
+
+    // 邮箱登录：发码与登录各按 email 查一次账号，没索引就是每次全表扫。
+    // 非唯一——这一列允许留空，空串进不了唯一索引（见 schema.sql 的注释）
+    ['sys_users', 'idx_email', '(`email`)'],
 ];
 
 $indexed = 0;

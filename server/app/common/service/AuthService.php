@@ -106,6 +106,177 @@ class AuthService
 
     public static function login(string $username, string $password, string $ip, string $ua): array
     {
+        $gate = self::gate($username, $ip, $ua);
+
+        // withoutDataScope()：登录时 Ctx 里还没有用户，DataScope 本来就会放行，
+        // 但写出来才是把「这一步不依赖登录态」钉死在代码里——
+        // 将来 DataScope 若改成 fail-closed，这里不会跟着一起登不上去。
+        // 软删除条件由 SoftDeletes 自动带上，不再手写 whereNull('deleted_at')
+        $user = SysUserModel::withoutDataScope()->where('username', $username)->first();
+
+        if (!$user || !password_verify($password, $user->password)) {
+            self::penalize($gate, (int) ($user->id ?? 0), $username, $ip, $ua, '账号或密码错误');
+
+            throw new UnauthorizedException('账号或密码错误', BizCode::ACCOUNT_OR_PASSWORD_ERROR);
+        }
+
+        self::ensureActive($user, $username, $ip, $ua);
+
+        // 只清「这个账号从这个 IP」的计数。IP 总闸不清——
+        // 否则攻击者只要手上有一个有效账号，登一次就能把闸门重置，
+        // 接着继续横扫其他用户名
+        Cache::del($gate['failKey']);
+
+        return self::issueSession($user, $ip, $ua);
+    }
+
+    // ---------------------------------------------------------------- 邮箱登录
+
+    /**
+     * 发登录验证码到已绑定的邮箱
+     *
+     * ## 为什么发码之前先验邮箱 + 密码
+     *
+     * 「填个邮箱就发码」有两个直接后果：任何人都能拿这个接口把别人的邮箱刷满
+     * （每日上限只是把伤害封顶，不是消除），以及**用「收没收到信」枚举账号**——
+     * 接口即使恒回 200，攻击者去看目标邮箱有没有收到就知道它绑没绑。
+     *
+     * 先验密码之后，这两件事都要求攻击者已经掌握了密码，那时验证码正好发挥
+     * 它该发挥的作用：拿到密码也登不进去，因为第二因子在受害者的邮箱里。
+     *
+     * 图形验证码在控制器里先过一道，防的是拿这个接口批量试密码——
+     * 它与账号密码登录共用同一套失败计数与锁定（`gate()`/`penalize()`），
+     * 所以走邮箱这条路撞库并不比走账号那条路划算。
+     *
+     * @return array{expires_in:int,resend_in:int}
+     */
+    public static function sendLoginEmailCode(string $email, string $password, string $ip, string $ua): array
+    {
+        // 没配 SMTP 时前端本来就不显示这个入口，但接口不能靠前端不调来保证
+        if (!MailService::configured()) {
+            throw new BusinessException('系统未配置邮件服务，请联系管理员', BizCode::MAIL_NOT_CONFIGURED);
+        }
+
+        $gate = self::gate($email, $ip, $ua);
+        $user = self::userByEmail($email, $password, $gate, $ip, $ua);
+
+        self::ensureActive($user, $email, $ip, $ua);
+        Cache::del($gate['failKey']);
+
+        $code = EmailCodeService::start($email, EmailCodeService::SCENE_LOGIN);
+
+        try {
+            // 收件人用库里的地址而不是请求里那个：两者只在大小写上可能不同
+            // （MySQL 的比较是大小写不敏感的），发给库里存的那个才是「绑定的邮箱」
+            MailService::send(
+                (string) $user->email,
+                self::codeSubject(),
+                self::codeHtml($code, $ip),
+                self::codeText($code)
+            );
+        } catch (\Throwable $e) {
+            // 信没发出去就把码和重发间隔一起撤掉，否则用户要干等 60 秒
+            // 才能重试一件本来就没发生的事
+            EmailCodeService::rollback($email, EmailCodeService::SCENE_LOGIN);
+
+            throw $e;
+        }
+
+        self::writeLoginLog((int) $user->id, $user->username, $ip, $ua, true, '已发送邮箱验证码', 3);
+
+        return [
+            'expires_in' => EmailCodeService::ttl(),
+            'resend_in'  => Env::int('EMAIL_CODE_RESEND_SECONDS', 60),
+        ];
+    }
+
+    /**
+     * 邮箱 + 密码 + 邮箱验证码登录
+     *
+     * 密码在这里**再验一次**：发码那步的通过状态没有被记在任何地方，
+     * 只信「手里有验证码」的话，攻击者只要能读到收件人的邮箱（转发规则、
+     * 共用邮箱、泄露的邮箱口令）就能不带密码登进来。两个因子都要当场成立。
+     */
+    public static function loginByEmail(string $email, string $password, string $code, string $ip, string $ua): array
+    {
+        $gate = self::gate($email, $ip, $ua);
+        $user = self::userByEmail($email, $password, $gate, $ip, $ua);
+
+        self::ensureActive($user, $email, $ip, $ua);
+
+        // 验证码错**不**计入登录失败锁定：它自己有 5 次上限（超了就作废重发），
+        // 再叠一层的效果是输错两次验证码就把账号锁 30 分钟，
+        // 而这一步已经证明了请求方掌握正确密码，不是撞库
+        if (!EmailCodeService::verify($email, EmailCodeService::SCENE_LOGIN, $code)) {
+            self::writeLoginLog((int) $user->id, $user->username, $ip, $ua, false, '邮箱验证码错误或已过期');
+
+            throw new ValidationException(['email_code' => ['邮箱验证码错误或已过期']]);
+        }
+
+        Cache::del($gate['failKey']);
+
+        return self::issueSession($user, $ip, $ua);
+    }
+
+    /**
+     * 按邮箱定位账号并校验密码
+     *
+     * 「邮箱没绑过」与「密码错」返回同一个错误码，理由和账号登录那边一样：
+     * 区分开就等于给了一个查询「某人是不是这个系统的用户」的接口。
+     *
+     * 一个邮箱命中多个账号时不猜：`sys_users.email` 上没有唯一索引
+     * （空串没法进唯一索引，而这一列允许为空），应用层的查重是后加的，
+     * 存量库里完全可能有两个人填了同一个邮箱。此时报明确的错误让人改用账号登录，
+     * 而不是挑「第一个匹配到的」——那会变成一件随 id 顺序而定的事。
+     */
+    private static function userByEmail(string $email, string $password, array $gate, string $ip, string $ua): SysUserModel
+    {
+        $candidates = $email === ''
+            ? collect()
+            : SysUserModel::withoutDataScope()->where('email', $email)->get();
+
+        $matched = $candidates->filter(
+            static fn (SysUserModel $u) => password_verify($password, (string) $u->password)
+        )->values();
+
+        if ($matched->isEmpty()) {
+            self::penalize($gate, (int) ($candidates->first()?->id ?? 0), $email, $ip, $ua, '邮箱或密码错误');
+
+            throw new UnauthorizedException('邮箱或密码错误', BizCode::ACCOUNT_OR_PASSWORD_ERROR);
+        }
+
+        if ($matched->count() > 1) {
+            throw new BusinessException('该邮箱绑定了多个账号，请改用账号登录', BizCode::EMAIL_AMBIGUOUS);
+        }
+
+        return $matched->first();
+    }
+
+    // ---------------------------------------------------------------- 登录闸门（两条路径共用）
+
+    /**
+     * 登录前的两道闸：IP 总闸与「凭证 + IP」锁定
+     *
+     * `$identifier` 是这次登录用的凭证串（账号名或邮箱）。计数与锁定都以它
+     * 加 IP 为维度：
+     *
+     * - 带 IP，是因为只按账号锁会变成 DoS——任何人拿 5 次错密码就能把指定账号
+     *   锁死 30 分钟，而 `admin` 这个账号名在本项目里公开且必然存在，
+     *   且全仓没有解锁入口，管理员坐在后台里束手无策
+     * - 另有一道纯 IP 的总闸，是因为只带 IP 维度会把 DoS 换成撞库：换个 IP
+     *   计数归零，代理池一挂等于无限次尝试。而后台端 `config/middleware.php` 里
+     *   `'admin' => []` 是空的，一道限流都没有
+     *
+     * 两个计数器都是固定窗口（`Cache::incr` 只在首次设 TTL），窗口一到自动清零——
+     * 滑动窗口会让持续攻击把整个办公室的出口 IP 永久堵死。
+     *
+     * 阈值走 `threshold()`：**参数表优先，`.env` 兜底**。IP 总闸仍然只读 `.env`，
+     * 种子里没有对应参数，不凭空造一个界面上看不见的键。
+     *
+     * @return array{failKey:string,ipFailKey:string,lockKey:string,limit:int,window:int}
+     */
+    private static function gate(string $identifier, string $ip, string $ua): array
+    {
         $limit       = self::threshold('sys.login.failLimit', 'LOGIN_FAIL_LIMIT', 5, 1, 100);
         $lockMinutes = self::threshold('sys.login.lockMinutes', 'LOGIN_LOCK_MINUTES', 30, 1, 1440);
         $ipLimit     = Env::int('LOGIN_IP_FAIL_LIMIT', 20);
@@ -114,62 +285,70 @@ class AuthService
         // 同一 IP 的失败次数按 IP 归集，与具体账号无关
         $ipFailKey = 'login:fail:ip:' . md5($ip);
 
-        // 锁定与计数都带 IP：锁的是「这个人从这个地方登」，不是「这个账号」
-        $scope   = $username . ':' . md5($ip);
+        // 锁定与计数都带 IP：锁的是「这个人从这个地方登」，不是「这个账号」。
+        // 凭证串一起哈希：邮箱最长 128 字符，直接拼进键名会让 Redis 的键
+        // 变得又长又带个人信息（键会出现在 KEYS、慢日志、监控面板里）
+        $scope   = md5(strtolower($identifier) . '|' . $ip);
         $lockKey = "login:lock:{$scope}";
         $failKey = "login:fail:{$scope}";
 
+        // 写日志用的凭证串要截断：sys_login_logs.username 是 VARCHAR(64)，
+        // 而邮箱可以到 128，不截会在写日志时抛 SQL 错误——
+        // 那会把一次「密码错」变成一次 500
+        $logName = mb_substr($identifier, 0, 64);
+
         // IP 总闸放在最前：横扫用户名的请求根本不该走到查库
         if ($ipLimit > 0 && (int) (Cache::get($ipFailKey) ?? 0) >= $ipLimit) {
-            self::writeLoginLog(0, $username, $ip, $ua, false, '来源 IP 失败次数超限');
+            self::writeLoginLog(0, $logName, $ip, $ua, false, '来源 IP 失败次数超限');
+
             throw new RateLimitException('该来源失败次数过多，请稍后再试', max(Cache::ttl($ipFailKey), 1));
         }
 
         if (Cache::exists($lockKey)) {
             $minutes = (int) ceil(Cache::ttl($lockKey) / 60);
-            self::writeLoginLog(0, $username, $ip, $ua, false, '账号已锁定');
+            self::writeLoginLog(0, $logName, $ip, $ua, false, '账号已锁定');
+
             throw new UnauthorizedException("账号已锁定，请 {$minutes} 分钟后重试", BizCode::ACCOUNT_LOCKED);
         }
 
-        // withoutDataScope()：登录时 Ctx 里还没有用户，DataScope 本来就会放行，
-        // 但写出来才是把「这一步不依赖登录态」钉死在代码里——
-        // 将来 DataScope 若改成 fail-closed，这里不会跟着一起登不上去。
-        // 软删除条件由 SoftDeletes 自动带上，不再手写 whereNull('deleted_at')
-        $user = SysUserModel::withoutDataScope()->where('username', $username)->first();
+        return compact('failKey', 'ipFailKey', 'lockKey', 'limit', 'window');
+    }
 
-        $ok = $user && password_verify($password, $user->password);
+    /** 记一次失败：两个计数器一起涨，到阈值就锁，并留下日志 */
+    private static function penalize(
+        array $gate, int $userId, string $identifier, string $ip, string $ua, string $msg
+    ): void {
+        // 一个决定「这个凭证从这个 IP」要不要锁，一个决定「这个 IP」要不要被整体挡住
+        Cache::incr($gate['ipFailKey'], $gate['window']);
+        $fails = Cache::incr($gate['failKey'], $gate['window']);
 
-        if (!$ok) {
-            // 两个计数器一起涨：一个决定「这个账号从这个 IP」要不要锁，
-            // 一个决定「这个 IP」要不要被整体挡住
-            Cache::incr($ipFailKey, $window);
-            $fails = Cache::incr($failKey, $window);
-
-            if ($fails >= $limit) {
-                Cache::set($lockKey, 1, $window);
-                Cache::del($failKey);
-            }
-
-            self::writeLoginLog((int) ($user->id ?? 0), $username, $ip, $ua, false, '账号或密码错误');
-            throw new UnauthorizedException('账号或密码错误', BizCode::ACCOUNT_OR_PASSWORD_ERROR);
+        if ($fails >= $gate['limit']) {
+            Cache::set($gate['lockKey'], 1, $gate['window']);
+            Cache::del($gate['failKey']);
         }
 
+        self::writeLoginLog($userId, mb_substr($identifier, 0, 64), $ip, $ua, false, $msg);
+    }
+
+    /** 停用的账号到此为止（密码对不对已经问过了，所以这里可以说实话） */
+    private static function ensureActive(SysUserModel $user, string $identifier, string $ip, string $ua): void
+    {
         if ((int) $user->status === SysUserModel::STATUS_DISABLED) {
-            self::writeLoginLog((int) $user->id, $username, $ip, $ua, false, '账号已停用');
+            self::writeLoginLog((int) $user->id, $user->username, $ip, $ua, false, '账号已停用');
+
             throw new UnauthorizedException('账号已被停用，请联系管理员', BizCode::ACCOUNT_DISABLED);
         }
+    }
 
-        // 只清「这个账号从这个 IP」的计数。IP 总闸不清——
-        // 否则攻击者只要手上有一个有效账号，登一次就能把闸门重置，
-        // 接着继续横扫其他用户名
-        Cache::del($failKey);
-
+    /** 校验全过之后的收尾：记登录时间、写日志、签发令牌 */
+    private static function issueSession(SysUserModel $user, string $ip, string $ua): array
+    {
         SysUserModel::withoutDataScope()->where('id', $user->id)->update([
             'last_login_at' => date('Y-m-d H:i:s'),
             'last_login_ip' => $ip,
         ]);
 
-        self::writeLoginLog((int) $user->id, $username, $ip, $ua, true, '');
+        self::writeLoginLog((int) $user->id, $user->username, $ip, $ua, true, '');
 
         $tokens = JwtService::issue((int) $user->id, (int) $user->perm_version, (int) $user->token_version);
 
@@ -177,6 +356,49 @@ class AuthService
         $tokens['must_change_password'] = $user->pwd_updated_at === null;
 
         return $tokens;
+    }
+
+    // ---------------------------------------------------------------- 验证码邮件正文
+
+    private static function codeSubject(): string
+    {
+        return sprintf('【%s】登录验证码', ParamService::value('sys.name', 'Keel'));
+    }
+
+    /**
+     * HTML 正文
+     *
+     * 邮件客户端对 CSS 的支持停留在十几年前（Outlook 用 Word 的排版引擎），
+     * 所以是行内样式 + table 布局，不是这个项目其他地方的写法。
+     * 验证码本身也给一份纯文本（见 `codeText`）：不少客户端默认不渲染 HTML。
+     *
+     * 收件人 IP 一起带上，让本人能看出「这不是我点的」。
+     */
+    private static function codeHtml(string $code, string $ip): string
+    {
+        $site    = htmlspecialchars((string) ParamService::value('sys.name', 'Keel'), ENT_QUOTES, 'UTF-8');
+        $minutes = (int) ceil(EmailCodeService::ttl() / 60);
+        $safeIp  = htmlspecialchars($ip, ENT_QUOTES, 'UTF-8');
+
+        return <<<HTML
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+                        font-size:14px;line-height:1.7;color:#303133;max-width:520px">
+              <p>您正在登录 <strong>{$site}</strong>，验证码：</p>
+              <p style="font-size:30px;font-weight:700;letter-spacing:8px;color:#409eff;margin:20px 0">{$code}</p>
+              <p>验证码 {$minutes} 分钟内有效，请勿转发给他人。</p>
+              <p style="color:#909399;font-size:12px">
+                本次请求来自 IP {$safeIp}。若不是您本人操作，说明您的密码可能已泄露，请尽快修改。
+              </p>
+            </div>
+            HTML;
+    }
+
+    private static function codeText(string $code): string
+    {
+        $site    = (string) ParamService::value('sys.name', 'Keel');
+        $minutes = (int) ceil(EmailCodeService::ttl() / 60);
+
+        return "您正在登录 {$site}，验证码：{$code}（{$minutes} 分钟内有效，请勿转发给他人）。";
     }
 
     /** 加载用户，供鉴权中间件使用 */

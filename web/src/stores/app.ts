@@ -69,7 +69,12 @@ export const useAppStore = defineStore('app', {
       name: 'Keel',
       /** 登录页 Logo 图片地址；空串表示用内置的矢量标记 */
       logo: '',
-      footer: ''
+      footer: '',
+      /**
+       * 后端配了 SMTP 才为 true，登录页据此决定「其他登录方式」里出不出现邮箱入口。
+       * 兜底 false：接口没回来时宁可少一个入口，也不要给一个点了必然报错的入口
+       */
+      emailLogin: false
     }
   }),
 
@@ -92,7 +97,8 @@ export const useAppStore = defineStore('app', {
         this.site = {
           name: data['sys.name'] || this.site.name,
           logo: data['sys.logo'] || '',
-          footer: data['sys.footer'] || ''
+          footer: data['sys.footer'] || '',
+          emailLogin: data['sys.login.emailEnabled'] === true
         }
       } catch {
         // 保持兜底值

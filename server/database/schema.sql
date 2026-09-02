@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS `sys_users` (
   `deleted_at`     DATETIME        NULL                    COMMENT '删除时间，NULL 表示未删除',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_username` (`username`),
+  -- 邮箱登录按它定位账号（每次发码、每次登录各查一次）。
+  -- 不是唯一索引：这一列允许留空，而空串在唯一索引下会互相冲突，
+  -- 等于强制所有人都必须填邮箱。查重在应用层做（BizCode 20107）
+  KEY `idx_email` (`email`),
   KEY `idx_dept` (`dept_id`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户（员工账号）';
@@ -120,7 +124,7 @@ CREATE TABLE IF NOT EXISTS `sys_login_logs` (
   `location`   VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT 'IP 归属地',
   `browser`    VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '浏览器',
   `os`         VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '操作系统',
-  `type`       TINYINT         NOT NULL DEFAULT 1      COMMENT '1登录 2登出',
+  `type`       TINYINT         NOT NULL DEFAULT 1      COMMENT '1登录 2登出 3发送邮箱验证码',
   `status`     TINYINT(1)      NOT NULL DEFAULT 1      COMMENT '1成功 0失败',
   `msg`        VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '失败原因',
   `created_at` DATETIME        NOT NULL                COMMENT '创建时间',

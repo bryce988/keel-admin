@@ -84,6 +84,82 @@ class AuthController
     }
 
     /**
+     * 发送邮箱登录验证码
+     * @url POST /admin/auth/email/code
+     * @perm -
+     * @description 免登录。邮箱登录的第一步：校验图形验证码 → 校验「邮箱 + 密码」→ 发码。
+     * **先验密码再发信**是刻意的：否则任何人填个邮箱就能让别人收信（轰炸），
+     * 而且能靠「目标邮箱有没有收到」枚举出谁是系统用户——接口即使恒回 200 也拦不住这条。
+     * 邮箱没绑过与密码错误返回同一个错误（`20001`），与账号登录一致。
+     * 返回 `{expires_in, resend_in}`，前端拿 `resend_in` 跑倒计时（真正的间隔限制在后端）。
+     * @error 400 `20008` 未配置邮件服务 · 400 `20009` 邮件发送失败 · 400 `20010` 该邮箱绑定了多个账号
+     *   · 401 `20001` 邮箱或密码错误 · 429 `10429` 发送过于频繁 / 今日次数已达上限
+     */
+    public function emailCode(Request $request): Response
+    {
+        $email       = trim((string) $request->post('email', ''));
+        $password    = (string) $request->post('password', '');
+        $captchaKey  = (string) $request->post('captcha_key', '');
+        $captchaCode = (string) $request->post('captcha_code', '');
+
+        $errors = [];
+        if ($email === '')       { $errors['email'] = ['请输入邮箱']; }
+        if ($password === '')    { $errors['password'] = ['请输入密码']; }
+        if ($captchaCode === '') { $errors['captcha_code'] = ['请输入验证码']; }
+        if ($errors) {
+            throw new ValidationException($errors);
+        }
+
+        // 图形验证码先过：这个接口会查库、验密码、连 SMTP，是三条路径里最贵的一条，
+        // 不能让它对着脚本敞开
+        if (!CaptchaService::verify($captchaKey, $captchaCode)) {
+            throw new ValidationException(['captcha_code' => ['验证码错误或已过期']]);
+        }
+
+        return Result::ok(AuthService::sendLoginEmailCode(
+            $email,
+            $password,
+            ClientIp::of($request),
+            (string) $request->header('user-agent', '')
+        ));
+    }
+
+    /**
+     * 邮箱登录
+     * @url POST /admin/auth/login/email
+     * @perm -
+     * @description 免登录。邮箱登录的第二步：邮箱 + 密码 + 邮箱验证码，三样都要当场成立。
+     * 密码在这一步**再验一次**——只信「手里有验证码」的话，能读到收件人邮箱的人
+     * （转发规则、共用邮箱、泄露的邮箱口令）就能不带密码登进来。
+     * 这里不再要图形验证码：它已经在发码那步消费过一次，而这一步的爆破面
+     * 由验证码自身的 5 次上限挡着。
+     * @error 401 `20001` 邮箱或密码错误 · 401 `20002` 账号已停用 · 401 `20003` 账号已锁定
+     *   · 422 邮箱验证码错误或已过期（`details.email_code`） · 429 `10429` 验证码错误次数过多
+     */
+    public function loginByEmail(Request $request): Response
+    {
+        $email    = trim((string) $request->post('email', ''));
+        $password = (string) $request->post('password', '');
+        $code     = trim((string) $request->post('email_code', ''));
+
+        $errors = [];
+        if ($email === '')    { $errors['email'] = ['请输入邮箱']; }
+        if ($password === '') { $errors['password'] = ['请输入密码']; }
+        if ($code === '')     { $errors['email_code'] = ['请输入邮箱验证码']; }
+        if ($errors) {
+            throw new ValidationException($errors);
+        }
+
+        return Result::ok(AuthService::loginByEmail(
+            $email,
+            $password,
+            $code,
+            ClientIp::of($request),
+            (string) $request->header('user-agent', '')
+        ));
+    }
+
+    /**
      * 当前用户的身份、权限与菜单
      * @url GET /admin/auth/profile
      * @perm -

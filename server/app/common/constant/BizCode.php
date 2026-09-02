@@ -44,7 +44,7 @@ final class BizCode
     public const RATE_LIMITED = 10429;          // 操作过于频繁（响应头带 Retry-After）
     public const INTERNAL_ERROR = 10500;        // 服务暂时不可用（仅返回 trace_id）
 
-    // ---------------------------------------------------------------- 管理后台 · 认证（20000-20007）
+    // ---------------------------------------------------------------- 管理后台 · 认证（20000-20010）
     public const ACCOUNT_OR_PASSWORD_ERROR = 20001;  // 不区分账号不存在与密码错误
     public const ACCOUNT_DISABLED = 20002;           // 账号已被停用
     public const ACCOUNT_LOCKED = 20003;             // 账号已锁定，请 N 分钟后重试
@@ -54,6 +54,9 @@ final class BizCode
     // ⚠️ 预留，暂无抛出点：密码过期功能没做。pwd_updated_at 目前只兼作「必须改密」标志
     // （置 null = 强制下次登录改密），既没有过期天数参数也没有判定点
     public const PASSWORD_EXPIRED = 20007;           // 密码已过期，请修改后登录
+    public const MAIL_NOT_CONFIGURED = 20008;        // 未配置 SMTP，邮箱登录不可用
+    public const MAIL_SEND_FAILED = 20009;           // 邮件发送失败（真实原因只进日志）
+    public const EMAIL_AMBIGUOUS = 20010;            // 该邮箱绑定了多个账号，无法据此定位身份
 
     // ---------------------------------------------------------------- 管理后台 · 用户（201xx）
     public const ACCOUNT_EXISTS = 20101;          // 账号已存在
@@ -61,6 +64,7 @@ final class BizCode
     public const DATA_HANDOVER_REQUIRED = 20104;  // 停用前先完成数据交接
     public const CANNOT_OPERATE_SELF = 20105;     // 不能删除/停用自己的账号
     public const PHONE_TAKEN = 20106;             // 手机号已被其他账号使用
+    public const EMAIL_TAKEN = 20107;             // 邮箱已被其他账号使用
 
     // ---------------------------------------------------------------- 管理后台 · 部门（202xx）
     // 20201 已退役：部门编码改由程序按主键生成，不存在「重复」这回事了（同岗位的 20801）。

@@ -60,6 +60,23 @@ export const useUserStore = defineStore('user', {
       captcha_key: string
       captcha_code: string
     }) {
+      return this.acceptTokens('/admin/auth/login', payload)
+    },
+
+    /**
+     * 邮箱登录（第二步）
+     *
+     * 第一步是发验证码（`sendEmailCode`），不产生登录态，所以不在 store 里。
+     * 两条登录路径拿到的令牌完全一样，后续流程（fetchProfile、动态路由）也一样，
+     * 差别只在提交了什么——所以共用 `acceptTokens`，别让「登录成功后要做什么」
+     * 出现第二份实现。
+     */
+    async loginByEmail(payload: { email: string; password: string; email_code: string }) {
+      return this.acceptTokens('/admin/auth/login/email', payload)
+    },
+
+    /** 提交凭证、收下令牌并落盘 */
+    async acceptTokens(url: string, payload: object) {
       const data = await request.post<
         unknown,
         {
@@ -68,7 +85,7 @@ export const useUserStore = defineStore('user', {
           expires_in: number
           must_change_password: boolean
         }
-      >('/admin/auth/login', payload)
+      >(url, payload)
 
       this.token = data.access_token
       localStorage.setItem(TOKEN_KEY, data.access_token)

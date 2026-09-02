@@ -138,6 +138,7 @@ class UserService
     public static function create(array $data, array $roleIds = []): array
     {
         Guard::unique(SysUserModel::class, 'username', $data['username'], null, '账号已存在', BizCode::ACCOUNT_EXISTS);
+        self::assertEmailAvailable((string) ($data['email'] ?? ''), null);
         Guard::inDeptScope((int) ($data['dept_id'] ?? 0));
 
         $plain = (string) ($data['password'] ?? '');
@@ -168,11 +169,35 @@ class UserService
         });
     }
 
+    /**
+     * 邮箱不能与别人重复
+     *
+     * 从「邮箱登录」上线那天起，`email` 就不只是一个联系方式了，它是一条登录凭证——
+     * 两个人填同一个邮箱的话，那个邮箱收到的验证码该开谁的门就没有答案
+     * （`AuthService::userByEmail()` 到那一步只能报错让人改用账号登录）。
+     *
+     * 为什么不是数据库唯一索引：这一列 `NOT NULL DEFAULT ''` 且允许留空，
+     * 而唯一索引下多个空串会互相冲突，等于强制所有人都必须填邮箱。
+     * 校验放在应用层，空串直接跳过。
+     *
+     * 存量库里可能已经有重复（这条校验是后加的），所以登录那侧仍然要自己兜住。
+     */
+    private static function assertEmailAvailable(string $email, ?int $exceptId): void
+    {
+        $email = trim($email);
+        if ($email === '') {
+            return;
+        }
+
+        Guard::unique(SysUserModel::class, 'email', $email, $exceptId, '邮箱已被其他账号使用', BizCode::EMAIL_TAKEN);
+    }
+
     public static function update(int $id, array $data, ?array $roleIds = null): SysUserModel
     {
         $user = self::findEditable($id);
 
         Guard::unique(SysUserModel::class, 'username', $data['username'], $id, '账号已存在', BizCode::ACCOUNT_EXISTS);
+        self::assertEmailAvailable((string) ($data['email'] ?? $user->email), $id);
 
         // 踢出范围外由新值那一判拦住；旧值这一判防的是读写范围哪天不再相等
         Guard::inDeptScope((int) ($data['dept_id'] ?? $user->dept_id), (int) $user->dept_id);

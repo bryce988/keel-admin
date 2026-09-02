@@ -83,6 +83,12 @@ class ProfileService
             throw new ValidationException(['email' => ['邮箱格式不正确']]);
         }
 
+        // 邮箱是登录凭证之一（邮箱登录），不能与别人重复——理由见
+        // UserService::assertEmailAvailable()。留空的人不参与查重
+        if ($email !== '') {
+            Guard::unique(SysUserModel::class, 'email', $email, $userId, '邮箱已被其他账号使用', BizCode::EMAIL_TAKEN);
+        }
+
         $realName = trim((string) ($data['real_name'] ?? ''));
         if ($realName === '') {
             throw new ValidationException(['real_name' => ['请输入姓名']]);

@@ -418,6 +418,13 @@ export interface PublicParams {
   'sys.name'?: string
   'sys.logo'?: string
   'sys.footer'?: string
+  /**
+   * 邮箱登录是否可用
+   *
+   * 不是参数表里的键，是后端「.env 里 SMTP 配没配」的投影（见 ParamService::publicParams）。
+   * 部署方没配 SMTP 还把入口摆出来，用户点了发码只会拿到一个错误。
+   */
+  'sys.login.emailEnabled'?: boolean
 }
 
 export function fetchPublicParams() {

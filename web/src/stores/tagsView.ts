@@ -18,7 +18,7 @@ export interface TagItem {
 }
 
 const STORAGE_KEY = 'keel_tags_view'
-const HOME_PATH = '/dashboard'
+const HOME_PATH = '/home/dashboard'
 
 /*
  * 这里没有页签数量上限
@@ -30,11 +30,13 @@ const HOME_PATH = '/dashboard'
  */
 
 /*
- * 首页签在菜单下发之前就要显示，所以标题只能写死一份。
- * 它必须与 seed.php 里 `sys:dashboard:view` 的菜单名一致——
- * 不一致的结果是页签写着一个名字、侧边栏和面包屑写着另一个
+ * 首页签在菜单下发之前就要显示，所以标题与路径只能写死一份。
+ * 两者都必须与 seed.php 里 `sys:dashboard:view` 那个菜单对上——
+ * 名字不一致的结果是页签写着一个名字、侧边栏和面包屑写着另一个；
+ * **路径不一致更糟**：固定页签指向一条不存在的路由，点了就是 404，
+ * 而且它关不掉（affix）。菜单挪窝时这一行必须跟着改
  */
-const HOME_TAG: TagItem = { path: HOME_PATH, fullPath: HOME_PATH, title: '概览', affix: true }
+const HOME_TAG: TagItem = { path: HOME_PATH, fullPath: HOME_PATH, title: '仪表盘', affix: true }
 
 function load(): { tags: TagItem[]; active: string } {
   try {
@@ -73,6 +75,26 @@ export const useTagsViewStore = defineStore('tagsView', {
   actions: {
     persist() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ tags: this.tags, active: this.active }))
+    },
+
+    /**
+     * 剔除路由里已经不存在的页签
+     *
+     * 页签存在 localStorage 里，而路由由后端菜单下发——菜单改了路径
+     * （或某个页面被收回权限），存量页签就指向一条不存在的路由，点了是 404。
+     * 只有整页刷新才复现，本地开发时几乎撞不上，正因如此更要在代码里兜住。
+     *
+     * 在动态路由注册之后调用（`router/index.ts`），那时才知道有哪些路径。
+     * 首页签例外，永远保留：它在菜单下发之前就要显示，
+     * 而且没有它的话页签条会空一格，用户连个回得去的地方都没有。
+     */
+    prune(validPaths: Set<string>) {
+      const kept = this.tags.filter((t) => t.path === HOME_PATH || validPaths.has(t.path))
+      if (kept.length === this.tags.length) return
+
+      this.tags = kept
+      if (!kept.some((t) => t.path === this.active)) this.active = HOME_PATH
+      this.persist()
     },
 
     /** 打开页面时调用；已存在则仅激活并更新 fullPath */

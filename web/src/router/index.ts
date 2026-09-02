@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useTagsViewStore } from '@/stores/tagsView'
 import { setUnauthorizedHandler } from '@/utils/request'
 import { buildRoutes, firstMenuPath } from './dynamic'
 
@@ -112,7 +113,19 @@ let removers: Array<() => void> = []
 function registerDynamicRoutes(): void {
   const userStore = useUserStore()
 
-  removers = buildRoutes(userStore.menus).map((route) => router.addRoute('layout', route))
+  const routes = buildRoutes(userStore.menus)
+  removers = routes.map((route) => router.addRoute('layout', route))
+
+  /*
+   * 顺手把存量页签里已经不存在的路径剔掉
+   *
+   * 页签存在 localStorage、路由由后端菜单下发，两者会漂移：菜单换了路径、
+   * 或者某个页面被收回权限之后，旧页签就是一条死链，点了 404。
+   * 这里是唯一知道「有哪些路径」的时刻，所以校验放在注册之后。
+   *
+   * 路由 path 注册时去掉了前导斜杠（见 dynamic.ts），补回来才能和页签比。
+   */
+  useTagsViewStore().prune(new Set(routes.map((r) => `/${String(r.path)}`)))
 
   userStore.routesLoaded = true
 }

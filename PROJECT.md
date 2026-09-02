@@ -188,8 +188,8 @@ start.php                 # 启动入口
 
 | 路由 | 页面 | 权限标识 | 说明 |
 |---|---|---|---|
-| `/login` | 登录 | — | 账号密码 + 图形验证码，支持三方登录预留 |
-| `/dashboard` | 概览 | `sys:dashboard:view` | 指标卡、趋势、系统状态、待办。一级菜单，不套目录 |
+| `/login` | 登录 | — | 账号密码 + 图形验证码；配了 SMTP 时「其他登录方式」多一个邮箱入口（绑定邮箱 + 密码 + 邮箱验证码，见 docs/api.md §3） |
+| `/home/dashboard` | 仪表盘 | `sys:dashboard:view` | 指标卡、趋势、系统状态、待办。挂在「首页」目录下，是登录后的落地页 |
 | `/template/list` | 模板·标准列表页 | — | **仅开发环境**，五种页型见 §9 |
 | `/template/tree-list` | 模板·树表联动页 | — | 同上 |
 | `/template/master-detail` | 模板·主从页 | — | 同上 |
@@ -199,7 +199,7 @@ start.php                 # 启动入口
 | `/system/dept` | 部门管理 | `sys:dept:list` | 组织树、岗位 |
 | `/system/role` | 角色管理 | `sys:role:list` | 功能权限、数据权限、字段权限 |
 | `/system/menu` | 菜单与权限 | `sys:menu:list` | 权限点字典（目录/菜单/按钮/接口/字段五类） |
-| `/system/param` | 参数配置 | `sys:param:edit` | 基础、安全、集成、高级参数 |
+| `/config/param` | 参数配置 | `sys:param:edit` | 基础、安全、集成、高级、系统配置（含邮件）五组参数 |
 | `/data/dict` | 数据字典 | `sys:dict:list` | 字典类型与字典项。挂在「数据管理」下，不在「系统管理」里 |
 | `/data/notice` | 系统公告 | `sys:notice:list` | 公告的草稿、发布、撤回；发布后所有登录用户在顶栏铃铛收到 |
 | `/data/export` | 数据导出 | `sys:export:list` | 异步导出任务的进度与下载；发起导出在各业务模块自己的页面上 |
@@ -617,7 +617,7 @@ return [
 | | 员工 | C 端用户 |
 |---|---|---|
 | 表 | `sys_users` | `app_users` |
-| 登录 | 账号密码 + 验证码 | 手机号验证码 / 微信授权 / Apple ID |
+| 登录 | 账号密码 + 验证码；或绑定邮箱 + 密码 + 邮箱验证码 | 手机号验证码 / 微信授权 / Apple ID |
 | Token | `type=admin`，2 小时 | `type=client`，7 天 + 刷新 |
 | 权限 | RBAC 三层 | 只能操作自己的数据 + 功能开关 |
 | 数据范围 | 部门维度 | 仅本人，无部门概念 |
