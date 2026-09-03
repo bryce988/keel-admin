@@ -103,14 +103,106 @@ docker compose down -v                               # 停止并清空数据，�
 
 改 PHP 代码调试模式会自动 reload；改了 `config/` 或自定义进程要 `docker compose restart server`。
 
-### 不用 Docker
+### 不用 Docker（本机直跑）
 
-需自备 PHP 8.4+（含 ext-zip）、Node 18+、MySQL 8、Redis。
+**需要自备**
+
+| 组件 | 版本 | 说明 |
+|---|---|---|
+| PHP | **8.4+** | 扩展：`pcntl` `posix` `pdo_mysql` `sockets` `zip` `redis` `mbstring` `curl` `openssl` `dom`（HTML 净化用）|
+| Composer | 2.x | |
+| MySQL | 8.0+ | 排序规则用 `utf8mb4_0900_ai_ci`，5.7 不支持 |
+| Redis | 6+ | 缓存、限流、队列都要，**不是可选项** |
+| Node | 20+ | 只有管理后台前端需要 |
+
+⚠️ **`ext-redis`（phpredis）是硬依赖**，不是性能优化：队列插件的
+`RedisConnection extends \Redis`，没有这个扩展连投递任务都会致命错误。
+装法：`pecl install redis && docker-php-ext-enable redis`（或发行版的 `php8.4-redis` 包）。
+缓存走的是纯 PHP 的 predis，两者并存。
+
+装完用 `php -m` 对一遍：官方镜像里跑通的那份是
+`pcntl pdo_mysql posix redis sockets zip mbstring curl dom openssl`（其余为 PHP 自带）。
+
+Windows 上 workerman 无法多进程，只能单进程调试（`server/windows.bat`），生产请用 Linux。
+
+**第一步：环境变量**
+
+⚠️ 这一步最容易踩空：**项目不解析 `.env` 文件**。`app\common\support\Env` 只读
+`getenv()`——容器里由 docker compose 注入，本机直跑就得自己 export。
+也**不要** `source .env`：那个文件里有行内注释（`APP_ENV=dev  # dev / test / prod`），
+source 进去会把注释一起当成值。
 
 ```bash
-cd server && composer install && php start.php start
-cd web && npm install && VITE_PROXY_TARGET=http://127.0.0.1:8787 npm run dev
+export APP_ENV=dev APP_DEBUG=true
+export APP_URL=http://127.0.0.1:8787          # App 端头像要绝对地址，见 staff/README.md
+export DB_HOST=127.0.0.1 DB_PORT=3306 DB_DATABASE=keel DB_USERNAME=root DB_PASSWORD=你的密码
+export REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_PASSWORD=
+export JWT_SECRET=$(openssl rand -hex 32)     # 必填，见下
 ```
+
+`JWT_SECRET` 是**唯一必填项**：HS256 要求至少 32 字节，不设或太短会直接抛异常
+（这是刻意的——默认密钥等于没有密钥）。生产上务必固定下来，重启换一次值
+等于把所有人踢下线。其余变量都有默认值（见上表与 `.env.example`），
+默认连 `127.0.0.1:3306` 的 `keel` 库、`root` 空密码、本机 Redis。
+
+**第二步：建库**
+
+```sql
+CREATE DATABASE keel DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+```
+
+表结构不用手动导入——下一步的 `migrate.php` 会按 `server/database/schema.sql` 幂等对齐。
+
+**第三步：后端**
+
+```bash
+cd server
+composer install
+
+php scripts/migrate.php     # 建表 / 补列，幂等，可重复执行
+php scripts/install.php     # 建管理员（默认 admin / admin123，可用 ADMIN_USERNAME、ADMIN_PASSWORD 覆盖）
+php scripts/seed.php --demo # 权限点、字典、参数；--demo 另播三个演示账号
+
+php start.php start         # 前台运行，Ctrl+C 停止
+# php start.php start -d    # 守护进程
+```
+
+跑起来后 `curl http://127.0.0.1:8787/admin/ping` 应返回 `{"pong":true,"app":"admin"}`。
+
+进程管理：
+
+```bash
+php start.php reload     # 平滑重载（改 PHP 业务代码用它，0 秒停机）
+php start.php restart    # 重启（改 config/、自定义进程、装了新依赖必须用它）
+php start.php stop
+php start.php status
+```
+
+确保 `server/runtime/` 与 `server/public/uploads/` 可写（日志、PID、上传的头像都在里面）。
+
+**第四步：管理后台前端**
+
+```bash
+cd web
+npm install
+VITE_PROXY_TARGET=http://127.0.0.1:8787 npm run dev
+```
+
+`VITE_PROXY_TARGET` 必须给：默认值是 `http://server:8787`（Docker 里的服务名），
+本机直跑解析不到。开发服务器在 http://localhost:5173 ，接口由 vite 代理转发，
+所以**不需要**后端开跨域。
+
+**第五步（可选）：员工移动端**
+
+`staff/` 是 HBuilderX 工程，不参与上面的流程，也不需要 Node 环境——
+用 HBuilderX 打开该目录运行即可，详见 [staff/README.md](staff/README.md)。
+
+**原生部署到服务器**
+
+进程守护用 systemd 或 supervisor 拉起 `php start.php start -d`；前端 `npm run build`
+后把 `web/dist` 交给 nginx，并按 `docker/nginx/default.conf` 配好转发——
+那份配置里注释了四条必须守住的规则（按端前缀转发、XFF 覆盖式、`/internal/` 拒绝、
+`/uploads/` 用 `^~`），照抄即可。
 
 ### 部署到服务器
 
