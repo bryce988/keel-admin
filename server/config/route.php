@@ -432,6 +432,16 @@ Route::group('/internal', function () {
     Route::get('/ping', [InternalPingController::class, 'index']);
 });
 
+// ---------------------------------------------------------------- 跨域预检
+// 浏览器对带自定义头（X-Channel、Authorization）的请求会先发一次 OPTIONS，
+// 而上面的路由只登记了 GET/POST/PUT。不显式登记 OPTIONS 的话它会落到 fallback，
+// 而 **fallback 拿不到全局中间件**（实测：Route::fallback 的响应上没有任何中间件加的头），
+// CorsMiddleware 就没机会应答，浏览器只看到一句「跨域失败」。
+//
+// 这里只负责让请求能进到中间件管道，响应头由 CorsMiddleware 按白名单决定加不加——
+// 所以登记这条路由本身不等于「对所有人开放跨域」。
+Route::options('/[{path:.*}]', fn () => response('', 204));
+
 // 关闭默认路由：只有显式声明的路由可访问，避免控制器方法被意外暴露
 Route::disableDefaultRoute();
 

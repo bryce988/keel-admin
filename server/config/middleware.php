@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use app\common\middleware\ChannelMiddleware;
+use app\common\middleware\CorsMiddleware;
 use app\common\middleware\InternalTokenMiddleware;
 use app\common\middleware\IpWhitelistMiddleware;
 use app\common\middleware\RateLimitMiddleware;
@@ -23,7 +24,11 @@ use app\common\middleware\TraceMiddleware;
  */
 return [
     '' => [
-        TraceMiddleware::class,       // 最外层：traceId 生成与上下文清理
+        // 比 Trace 还外层：预检请求（OPTIONS）在这里就答掉，不进路由也不进业务中间件。
+        // 排在 ChannelMiddleware 后面是不行的——预检不带 X-Channel，会被它 400 掉。
+        // 默认关闭（CORS_ALLOW_ORIGINS 留空），要开是部署方的显式决定
+        CorsMiddleware::class,
+        TraceMiddleware::class,       // traceId 生成与上下文清理
     ],
 
     // 后台的鉴权/审计挂在路由分组上（见 route.php），此处留空

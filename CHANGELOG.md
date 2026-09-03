@@ -7,6 +7,16 @@
 ## [未发布]
 
 ### 新增
+- **跨域（CORS）支持**，默认关闭。`.env` 的 `CORS_ALLOW_ORIGINS` 填了才生效，
+  逗号分隔、支持 `*` 通配（如 `http://localhost:*`——H5 开发服务器端口每次可能不一样）。
+  - 谁需要：**浏览器里跑的 C 端**，H5 版本以及 HBuilderX「运行到浏览器」预览 App 时。
+    原生 App 与小程序没有同源策略；管理后台走 vite proxy 与同域 nginx，两者都用不到
+  - 返回具体的 Origin 而不是 `*`：`*` 与 `Allow-Credentials` 不能共存，
+    将来要带 cookie 就得推倒重来；白名单写在 `.env` 里，review 时不用翻代码
+  - 中间件挂在**全局最外层**，且 `route.php` 显式登记了一条 `OPTIONS` 兜底路由。
+    两处缺一都不行：预检请求不带 `X-Channel`，排在 `ChannelMiddleware` 后面会被 400 掉；
+    而 **`Route::fallback` 拿不到全局中间件**（实测响应上没有任何中间件加的头），
+    不登记 OPTIONS 路由的话预检落到 fallback，CorsMiddleware 根本没机会应答
 - **C 端账号体系落地**（原先只有一个返回假数据的空壳）。新增 `app_users` 表与四个接口：
   登录、退出、个人资料（读/改昵称）、换头像。与员工账号**是两套东西**：
   表不同、令牌 `type` 不同、失败计数与锁定各算各的，互调一律 401。
