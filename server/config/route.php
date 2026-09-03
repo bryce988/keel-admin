@@ -16,7 +16,9 @@ use app\admin\controller\ProfileController;
 use app\admin\controller\RoleController;
 use app\admin\controller\UserController;
 use app\client\controller\PingController as ClientPingController;
-use app\client\controller\v1\AuthController as ClientAuthController;
+use app\staff\controller\v1\AuthController as StaffAuthController;
+use app\staff\controller\v1\ProfileController as StaffProfileController;
+use app\staff\controller\v1\WorkbenchController as StaffWorkbenchController;
 use app\client\controller\v1\ProfileController as ClientProfileController;
 use app\common\constant\BizCode;
 use app\common\constant\HttpStatus;
@@ -398,24 +400,56 @@ Route::group('/admin', function () {
 // 审计包住鉴权而不是反过来：越权尝试同样要留痕，
 // 「谁试图做什么但被拒了」和「谁做成了什么」在审计上一样重要。
 
-// ---------------------------------------------------------------- C 端（App / 小程序）
-// 这里的路由必须指向 app\client 下的控制器，否则拿不到 client 的应用中间件与异常处理器。
+// ---------------------------------------------------------------- 员工移动端
+// 身份与后台**同一套**（同一张 sys_users、同一个令牌、同一份权限点），
+// 但接口另开一套——理由见 PROJECT.md §8.1：移动端要聚合与瘦身，
+// 且迟早要长出强制更新、推送注册这类后台没有的东西。
 //
-// 没有 `perm`：C 端不做 RBAC（PROJECT.md §8.1），能不能调这个接口由「登没登录」决定，
-// 能不能碰这条数据由归属校验决定——而归属在 C 端是「只能操作自己的」，
-// 由 service 只从令牌取 id 来保证，不靠权限点。
-// 也没有 `log`：操作日志是员工审计，C 端用户的行为属于业务埋点，两回事。
+// 鉴权中间件与后台完全一样：AdminAuthMiddleware 认的是 type=admin 的令牌，
+// PermissionMiddleware 依旧 fail-closed（不写 perm 就是 403）。
+Route::group('/staff/v1', function () {
+    // 公开：渠道头仍然必填，但不需要登录
+    Route::get('/auth/captcha', [StaffAuthController::class, 'captcha']);
+    Route::post('/auth/login', [StaffAuthController::class, 'login']);
+});
+
+Route::group('/staff/v1', function () {
+    Route::post('/auth/logout', [StaffAuthController::class, 'logout'])->setParams(['perm' => '']);
+
+    // 工作台：概览要 sys:dashboard:view，但这里声明 '' —— 没权限的人也该看到首页，
+    // 只是概览那一块返回 visible=false（判断在 WorkbenchController 里）
+    Route::get('/workbench', [StaffWorkbenchController::class, 'index'])->setParams(['perm' => '']);
+
+    Route::get('/profile', [StaffProfileController::class, 'index'])->setParams(['perm' => '']);
+    Route::put('/profile', [StaffProfileController::class, 'update'])->setParams([
+        'perm' => '',
+        'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '修改资料（移动端）'],
+    ]);
+    Route::post('/profile/avatar', [StaffProfileController::class, 'avatar'])->setParams([
+        'perm' => '',
+        'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '更换头像（移动端）'],
+    ]);
+})->middleware([
+    AdminAuthMiddleware::class,       // 认证：与后台同一个令牌体系
+    OperationLogMiddleware::class,    // 审计：手机上改的资料同样要留痕
+    PermissionMiddleware::class,      // 鉴权：fail-closed，不写 perm 就是 403
+]);
+
+// ---------------------------------------------------------------- C 端（App / 小程序）
+// 一期只有空壳（PROJECT.md §8.8）。这里的路由必须指向 app\client 下的控制器，
+// 否则拿不到 client 的应用中间件与异常处理器。
+//
+// 曾经在这里落过一套 app_users 的登录闭环，后来删了：员工移动端走的是
+// /staff/v1/*（管理端身份），那套 C 端账号没有任何消费方，而脚手架里一张没人用的
+// 用户表只会让 fork 的人困惑——真接 C 端时登录方式几乎必然是短信或微信授权，
+// 手机号加密码那套照样要重写。
 Route::group('/client', function () {
     // 公开：渠道头仍然必填，但不需要登录
     Route::get('/ping', [ClientPingController::class, 'index']);
-    Route::post('/v1/auth/login', [ClientAuthController::class, 'login']);
 
+    // 需登录：验证「员工 token 调 C 端接口一律 401」
     Route::group('/v1', function () {
-        Route::post('/auth/logout', [ClientAuthController::class, 'logout']);
-
         Route::get('/profile', [ClientProfileController::class, 'index']);
-        Route::put('/profile', [ClientProfileController::class, 'update']);
-        Route::post('/profile/avatar', [ClientProfileController::class, 'avatar']);
     })->middleware([ClientAuthMiddleware::class]);
 });
 

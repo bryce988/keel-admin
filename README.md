@@ -164,15 +164,19 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 keel-admin/
 ├── web/        管理后台前端（Vue 3 + Vite）
-├── client/     App / 小程序前端（uni-app + Vue 3，见 client/README.md）
+├── staff/      员工移动端（uni-app + Vue 3，对应 server/app/staff，见 staff/README.md）
 ├── server/     后端（app/admin · app/client · app/open · app/common）
 ├── docs/       文档
 ├── docker/     一键启动
 └── PROJECT.md  完整项目文档
 ```
 
-> `client/` 不在 `docker compose` 与 CI 里：它是 HBuilderX 工程，运行与云打包都在 HBuilderX 里做。
+> `staff/` 不在 `docker compose` 与 CI 里：它是 HBuilderX 工程，运行与云打包都在 HBuilderX 里做。
 > 其余部分都能在容器里构建。
+>
+> 命名：`staff/` 跟着**端名**走（对应 `server/app/staff`、`/staff/v1/*`）；
+> `web/` 是历史命名，指管理后台前端（`server/app/admin`）。两者不一致但都不产生歧义，
+> 改 `web/` 要动 CI、compose、部署脚本，不值当。
 
 ## 进度
 

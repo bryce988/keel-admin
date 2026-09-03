@@ -321,28 +321,6 @@ CREATE TABLE IF NOT EXISTS `sys_export_tasks` (
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据导出任务';
 
--- ---------------------------------------------------------------- C 端用户（App / 小程序）
--- 与 sys_users 是**两套身份体系**，永不混用（PROJECT.md §8.4）：
--- 表不同、令牌 type 不同、中间件不同，员工不会因为装了 App 就变成 C 端用户。
--- 没有 RBAC：C 端只做归属校验与功能开关，所以这里没有角色、部门、权限版本号。
--- 也没有 deleted_at：注销要做的是数据清理与匿名化，不是留一行查不到的软删记录，
--- 真要做时按 BaseModel 顶部那段说明三处一起改。
-CREATE TABLE IF NOT EXISTS `app_users` (
-  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `phone`         VARCHAR(20)     NOT NULL                COMMENT '手机号，登录账号',
-  `password`      VARCHAR(255)    NOT NULL                COMMENT 'password_hash 加密',
-  `nickname`      VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '昵称',
-  `avatar`        VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '头像地址',
-  `status`        TINYINT         NOT NULL DEFAULT 1      COMMENT '0封禁 1正常',
-  `token_version` INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '会话版本号，改密时递增使该用户全部令牌失效',
-  `last_login_at` DATETIME        NULL                    COMMENT '最后登录时间',
-  `last_login_ip` VARCHAR(45)     NOT NULL DEFAULT ''     COMMENT '兼容 IPv6',
-  `created_at`    DATETIME        NOT NULL                COMMENT '创建时间',
-  `updated_at`    DATETIME        NOT NULL                COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_phone` (`phone`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='C 端用户（App / 小程序）';
-
 -- ---------------------------------------------------------------- 基础数据
 -- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）
 INSERT INTO `sys_depts` (`id`,`parent_id`,`ancestors`,`name`,`code`,`sort`,`created_at`,`updated_at`) VALUES

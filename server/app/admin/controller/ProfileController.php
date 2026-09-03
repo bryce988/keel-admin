@@ -19,7 +19,7 @@ declare(strict_types=1);
 namespace app\admin\controller;
 
 use app\common\exception\BusinessException;
-use app\admin\service\ProfileService;
+use app\common\service\ProfileService;
 use app\common\support\Ctx;
 use app\common\support\Paginator;
 use app\common\support\Result;

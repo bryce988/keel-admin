@@ -609,39 +609,6 @@ if ($withDemo) {
         : "  演示账号已存在，跳过\n";
 }
 
-// ─────────────────────────────────────────── C 端演示账号（App / 小程序）
-// 与员工演示账号分开：两套身份体系，两张表，密码也各是各的。
-// 这几个号是 App 端登录的唯一入口——C 端没有注册接口（要接短信/微信，属业务）。
-if ($withDemo) {
-    $appPassword = 'app123456';
-    $appUsers = [
-        ['phone' => '13900139001', 'nickname' => '演示用户'],
-        ['phone' => '13900139002', 'nickname' => '小明'],
-    ];
-
-    $appCreated = 0;
-    foreach ($appUsers as $demo) {
-        if (Db::table('app_users')->where('phone', $demo['phone'])->exists()) {
-            continue;
-        }
-
-        Db::table('app_users')->insert([
-            'phone'      => $demo['phone'],
-            'password'   => password_hash($appPassword, PASSWORD_DEFAULT),
-            'nickname'   => $demo['nickname'],
-            'avatar'     => '',
-            'status'     => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-        $appCreated++;
-    }
-
-    echo $appCreated > 0
-        ? "  ✓ C 端演示账号 {$appCreated} 个（密码 {$appPassword}）\n"
-        : "  C 端演示账号已存在，跳过\n";
-}
-
 // 授权可能变了，递增权限版本号让 Redis 里的权限缓存失效
 Db::table('sys_users')->increment('perm_version');
 

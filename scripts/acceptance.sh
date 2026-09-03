@@ -73,30 +73,31 @@ A_BODY=$(curl -s $BASE/admin/profile); C_BODY=$(curl -s -H 'X-Channel: h5' $BASE
 echo "$A_BODY" | grep -q trace_id && ok "admin 错误体带 trace_id" || bad "admin 错误体缺 trace_id"
 echo "$C_BODY" | grep -q trace_id && bad "client 错误体不该带 trace_id" || ok "client 错误体结构不同（无 trace_id）"
 
-echo "════ 1b. C 端账号体系（与员工两套，互不相通）════"
-# C 端登录不需要图形验证码（App 上那一格几乎必然拍在小屏幕上看不清），但渠道头一样必填
-applogin() {
-  curl -s -X POST "$BASE/client/v1/auth/login" \
-    -H 'Content-Type: application/json' -H 'X-Channel: app-android' \
-    -H 'X-App-Version: 1.0.0' -H 'X-Device-Id: acc-test' \
-    -d "{\"phone\":\"$1\",\"password\":\"$2\"}"
-}
-appcode() {
-  applogin "$1" "$2" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("code",0))' 2>/dev/null
+echo "════ 1b. 员工移动端（身份同后台，接口另一套）════"
+SH="-H X-Channel:app-android -H X-App-Version:1.0.0 -H X-Device-Id:acc-test"
+stafflogin() {
+  CAP=$(curl -s $SH "$BASE/staff/v1/auth/captcha")
+  SKEY=$(echo "$CAP" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("captcha_key",""))' 2>/dev/null)
+  SCODE=$(cd "$ROOT" && docker compose exec -T redis redis-cli --no-raw GET "$SKEY" 2>/dev/null | tr -d '"\r\n')
+  curl -s $SH -X POST "$BASE/staff/v1/auth/login" -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$1\",\"password\":\"$2\",\"captcha_key\":\"$SKEY\",\"captcha_code\":\"$SCODE\"}"
 }
 
-APP_TOKEN=$(applogin 13900139001 app123456 | python3 -c 'import sys,json;print(json.load(sys.stdin).get("access_token",""))' 2>/dev/null)
-[ -n "$APP_TOKEN" ] && ok "C 端登录" || bad "C 端登录失败（seed --demo 播过 13900139001 吗）"
-chk "C 端密码错 → 30101"          "$(appcode 13900139001 wrong-pass)" 30101
-chk "账号不存在也是 30101（不泄露号码是否注册）" "$(appcode 13900139999 whatever)" 30101
-chk "C 端 token 调后台 → 401"     "$(code -H "Authorization: Bearer $APP_TOKEN" $BASE/admin/users)" 401
-chk "C 端 profile 可读"           "$(code -H 'X-Channel: app-android' -H "Authorization: Bearer $APP_TOKEN" $BASE/client/v1/profile)" 200
-APP_PROFILE=$(curl -s -H 'X-Channel: app-android' -H "Authorization: Bearer $APP_TOKEN" $BASE/client/v1/profile)
-echo "$APP_PROFILE" | grep -q '\*\*\*\*' && ok "手机号已打码" || bad "手机号未打码：$APP_PROFILE"
-echo "$APP_PROFILE" | grep -q 'password' && bad "响应里出现了 password 字段" || ok "响应不含 password"
-# 退出后令牌当场失效（吊销的是 jti，不是等它自然过期）
-curl -s -o /dev/null -X POST -H 'X-Channel: app-android' -H "Authorization: Bearer $APP_TOKEN" $BASE/client/v1/auth/logout
-chk "退出后旧令牌 → 401"          "$(code -H 'X-Channel: app-android' -H "Authorization: Bearer $APP_TOKEN" $BASE/client/v1/profile)" 401
+chk "缺渠道头 → 400"              "$(code $BASE/staff/v1/auth/captcha)" 400
+STAFF_RESP=$(stafflogin admin admin123)
+STAFF=$(echo "$STAFF_RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("access_token",""))' 2>/dev/null)
+[ -n "$STAFF" ] && ok "移动端登录" || bad "移动端登录失败：$(echo $STAFF_RESP | head -c 120)"
+# 登录一次就该拿到身份与权限，不用再补一次请求——这是接口分端的直接收益
+echo "$STAFF_RESP" | grep -q '"permissions"' && ok "登录响应自带身份与权限点" || bad "登录响应缺 permissions"
+# 工作台聚合：一个请求拿回身份 + 概览
+WB=$(curl -s $SH -H "Authorization: Bearer $STAFF" $BASE/staff/v1/workbench)
+echo "$WB" | grep -q '"dashboard"' && ok "工作台一次返回身份 + 概览" || bad "工作台响应异常：$(echo $WB | head -c 120)"
+echo "$WB" | grep -q '"visible":true' && ok "admin 可见概览（visible 由服务端算）" || bad "admin 概览应可见"
+chk "无令牌调员工端 → 401"        "$(code $SH $BASE/staff/v1/workbench)" 401
+# 员工端令牌是管理端令牌，所以它调后台也应该通——同一套身份，两套接口
+chk "员工端令牌可调后台接口"      "$(code -H "Authorization: Bearer $STAFF" $BASE/admin/profile)" 200
+# 错误体与后台一致（同事在用，要 traceId），与 C 端刻意不同
+curl -s $SH $BASE/staff/v1/profile | grep -q trace_id && ok "员工端错误体带 trace_id（同 admin）" || bad "员工端错误体应带 trace_id"
 
 echo "════ 2. 越权拦截（前端隐藏≠安全边界）════"
 DEV=$(login dev01 demo123456)

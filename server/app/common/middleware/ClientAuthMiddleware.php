@@ -6,7 +6,6 @@ namespace app\common\middleware;
 
 use app\common\constant\BizCode;
 use app\common\exception\UnauthorizedException;
-use app\common\model\AppUserModel;
 use app\common\service\JwtService;
 use app\common\support\Ctx;
 use Webman\Http\Request;
@@ -20,8 +19,8 @@ use Webman\MiddlewareInterface;
  * 这里认的是 app_users 而不是 sys_users，token 的 type 必须是 client。
  * 员工 token 调 C 端接口一律 401，反之亦然——两套体系永不混用。
  *
- * 每个请求都查一次 app_users：token 是无状态的，而封禁、改密要**立刻**生效。
- * 缓存这一步之前先想清楚失效路径——「封了号但他还能用两小时」比多一次主键查询贵得多。
+ * ⚠️ 二期落地 app_users 表后，这里要补上「加载用户 + 校验状态」，
+ * 现在只做 token 层面的校验，把 uid 放进上下文。
  */
 class ClientAuthMiddleware implements MiddlewareInterface
 {
@@ -42,25 +41,9 @@ class ClientAuthMiddleware implements MiddlewareInterface
             throw new UnauthorizedException('登录已失效，请重新登录');
         }
 
-        /** @var AppUserModel|null $user */
-        $user = AppUserModel::query()->find((int) ($payload['uid'] ?? 0));
-
-        if ($user === null) {
-            throw new UnauthorizedException('账号不存在，请重新登录');
-        }
-        if ((int) $user->status === AppUserModel::STATUS_DISABLED) {
-            throw new UnauthorizedException('账号已被封禁', BizCode::APP_ACCOUNT_DISABLED);
-        }
-
-        // 改密时 token_version 递增，旧令牌当场失效——「改了密码，别处还登着」是最常见的投诉
-        if ((int) $user->token_version !== (int) ($payload['tv'] ?? 0)) {
-            throw new UnauthorizedException('登录已失效，请重新登录', BizCode::PASSWORD_CHANGED);
-        }
-
-        Ctx::set('client_user', ['id' => (int) $user->id]);
+        // 二期：改为从 app_users 加载并校验状态（封禁、注销）
+        Ctx::set('client_user', ['id' => (int) ($payload['uid'] ?? 0)]);
         Ctx::set('jti', $payload['jti'] ?? '');
-        // logout 要按剩余寿命吊销配对的 refresh，得把整份载荷留下
-        Ctx::set('jwt_payload', $payload);
 
         return $handler($request);
     }

@@ -554,11 +554,27 @@ refresh 的 jti 是另一个值且从不落库，「作废这个人所有会话�
 | 端 | URL 前缀 | 应用目录 | 身份体系 | 鉴权方式 | 权限模型 |
 |---|---|---|---|---|---|
 | 管理后台 | `/admin/*` | `app/admin` | 员工 `sys_users` | JWT（2h）+ 权限点 | 完整 RBAC |
+| 员工移动端 | `/staff/v1/*` | `app/staff` | 员工 `sys_users`（与后台同一套） | JWT + 权限点 + 渠道标识 | 完整 RBAC（与后台同一份授权） |
 | App / 小程序 | `/client/v1/*` | `app/client` | C 端用户 `app_users` | JWT + 渠道标识 | 无 RBAC，只做归属校验 + 功能开关 |
 | 开放 / 回调 | `/open/*` | `app/open` | 第三方应用 AppID | HMAC 签名 + IP 白名单 | 按 AppID 授权 scope |
 | 内部服务 | `/internal/*` | `app/internal` | 服务令牌 | 内网限制 + Token | 不对外暴露 |
 
 App 与小程序**共用 `app/client`**：两者业务接口几乎相同，差异只在登录方式与推送，因此按渠道拆登录入口、共用业务接口，不做两套。
+
+**员工移动端为什么单独一个端，而不是直接调 `/admin/*`**（这是 §8.4 那条「员工走管理端 token」
+的正确落法——共用的是**身份**，不是**接口**）：
+
+- 后台接口是给宽屏、鼠标、完整表单设计的。移动端要的是聚合与瘦身：
+  工作台一次请求拿回身份 + 权限 + 概览，而不是三次往返
+- 移动端会长出后台没有的东西——强制更新、推送注册、按渠道灰度、设备指纹。
+  这些塞进 `/admin/*` 是把后台接口搞脏
+- 反过来也一样：后台给列表加字段、改分页语义，不该波及已经发出去、装在别人手机上的 App
+- 限流、审计口径、网关路由都按端划分，混在一起就没法分开治理
+
+代价是多一层薄 controller。**业务逻辑一律复用 service，不重写**——「一个业务规则只有一份实现」
+是铁律（§8.2）。所以两端都要用的 service 就该在 `common/service`：
+`AuthService`（登录）、`ProfileService`（个人资料）、`DashboardService`（概览）都在那里，
+`app/staff` 与 `app/admin` 各自只写「怎么编排、返回什么形状」。
 
 ### 8.2 目录结构
 
@@ -568,6 +584,9 @@ app/
 │   ├── controller/
 │   ├── service/
 │   └── validate/
+├── staff/                 # 员工移动端（与 admin 同一套身份与授权，接口另开一套）
+│   ├── controller/v1/
+│   └── validation/
 ├── client/                # App + 小程序
 │   ├── controller/
 │   │   ├── auth/          # WechatController / SmsController / AppleController
@@ -601,6 +620,9 @@ app/
 return [
     ''        => [app\common\middleware\TraceMiddleware::class],
     'admin'   => [AdminAuthMiddleware::class, PermissionMiddleware::class, OperationLogMiddleware::class],
+    // 员工移动端：认证与鉴权和后台**是同一套**（同一个令牌、同一份权限点），
+    // 只多一层渠道识别与限流——它跑在别人手机上，网络与调用方式都不受控
+    'staff'   => [ChannelMiddleware::class, RateLimitMiddleware::class],
     'client'  => [ChannelMiddleware::class, ClientAuthMiddleware::class, RateLimitMiddleware::class],
     'open'    => [SignatureMiddleware::class, IpWhitelistMiddleware::class],
     'internal'=> [InternalTokenMiddleware::class],
@@ -612,10 +634,15 @@ return [
 ```php
 return [
     'admin'  => app\common\exception\AdminHandler::class,
+    'staff'  => app\common\exception\StaffHandler::class,   // 结构同 admin：用的人是同事
     'client' => app\common\exception\ClientHandler::class,
     'open'   => app\common\exception\OpenHandler::class,
 ];
 ```
+
+员工移动端的错误体**刻意与后台一致**（`{code, message, trace_id, details?}`）：
+用的人是同事，字段级明细与 traceId 对他们有用。单独成一个类而不是复用 `AdminHandler`，
+是给以后留口子——移动端迟早要在错误里带「是否需要强制更新」这类只有它关心的东西。
 
 ### 8.4 两套身份体系（关键设计）
 
@@ -670,8 +697,10 @@ Nginx 按前缀分流：`/admin/` → 8787，`/client/` → 8788。导出、报�
 
 - ✅ 目录、中间件、异常处理器按四端切好
 - ✅ `app/admin` 完整实现
-- ✅ `app/client` 已落地登录闭环（`app_users` + 手机号密码登录 + 资料 + 头像），
-  前端在仓库根的 `client/`（uni-app + Vue 3，HBuilderX 工程）；`app/open` 仍是空壳 + 一个 `ping` 接口
+- ✅ `app/client`、`app/open` 建空壳 + 一个 `ping` 接口，验证分端中间件与异常处理链路通
+- ✅ 仓库根的 `staff/` 是**员工移动工作台**（uni-app + Vue 3，HBuilderX 工程）：
+  登管理端账号调 `/admin/*`，与 §8.4 一致——员工在手机上办公走管理端 token，
+  不下沉为 C 端用户。它**不用** `app/client` 那套接口
 - ⛔ C 端业务接口、小程序登录、支付回调不在一期范围
 
 **落地情况（M1 已完成）**

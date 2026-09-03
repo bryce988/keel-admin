@@ -34,6 +34,13 @@ return [
     // 后台的鉴权/审计挂在路由分组上（见 route.php），此处留空
     'admin' => [],
 
+    // 员工移动端：认证与鉴权和后台是同一套（同一个令牌、同一份权限点），挂在路由分组上；
+    // 这里只加两条后台不需要的——它跑在别人手机上，网络与调用方式都不受我们控制
+    'staff' => [
+        ChannelMiddleware::class,     // 渠道、版本、设备号：灰度与强制更新的前提
+        RateLimitMiddleware::class,   // 兜底限流
+    ],
+
     'client' => [
         ChannelMiddleware::class,     // 渠道、版本、设备号，缺一不可
         RateLimitMiddleware::class,   // 兜底限流，敏感接口另加更严的

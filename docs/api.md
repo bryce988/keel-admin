@@ -943,60 +943,7 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 | `X-App-Version` | 客户端版本号，用于灰度与强制更新 |
 | `X-Device-Id` | 设备标识，限流按它而不是 IP（移动网络大量共用出口 IP） |
 
-### 12.3 C 端接口（App / 小程序）
-
-身份体系与后台**完全独立**：账号在 `app_users`、令牌 `type=client`、没有 RBAC。
-员工令牌调这里一律 401（`10102`），反之亦然。所有接口都要带 §12.2 的三个渠道头。
-
-错误体只有 `{code, message}`——没有 `details`，没有 `trace_id`（见 §12.1 的取舍）。
-
-| 方法 | 路径 | 需登录 | 说明 |
-|---|---|---|---|
-| POST | `/client/v1/auth/login` | 否 | 手机号 + 密码换令牌 |
-| POST | `/client/v1/auth/logout` | 是 | 吊销当前令牌及配对的 refresh |
-| GET | `/client/v1/profile` | 是 | 个人资料 |
-| PUT | `/client/v1/profile` | 是 | 改昵称 |
-| POST | `/client/v1/profile/avatar` | 是 | 换头像（multipart，字段名 `file`） |
-
-**登录**
-
-```jsonc
-// POST /client/v1/auth/login
-{ "phone": "13900139001", "password": "app123456" }
-
-// 200
-{
-  "access_token": "eyJ…", "refresh_token": "eyJ…", "expires_in": 7200,
-  "user": { "id": 1, "phone": "139****9001", "nickname": "演示用户", "avatar": "" }
-}
-```
-
-失败码：`30101` 手机号或密码错误（**账号不存在与密码错误不区分**——分开说等于提供了一个
-「这个号注册过没有」的查询接口）、`30102` 账号已封禁、`30103` 失败次数过多已临时锁定
-（同一「手机号 + IP」连错 5 次锁 15 分钟）。
-
-**资料**
-
-```jsonc
-// GET /client/v1/profile → 200
-{
-  "id": 1,
-  "phone": "139****9001",          // 中间四位打码，用户自己也不需要看到完整号码
-  "nickname": "演示用户",
-  "avatar": "http://…/uploads/app-avatar/202609/xxx.png",   // 绝对地址，见下
-  "last_login_at": "2026-09-03 10:59:03",
-  "created_at": "2026-09-03 02:57:24"
-}
-```
-
-下发字段由 `AuthService::publicUser()` 的**白名单**决定，不是黑名单：
-给 `app_users` 加内部字段（风控分、渠道来源、运营备注）时，忘了往黑名单补一笔就直接漏出去了。
-
-**头像是绝对地址**：库里存的是 `/uploads/app-avatar/…`，浏览器能靠当前域名补全，
-App 不能——它的「当前域名」是本地文件系统。基址取后端 `.env` 的 `APP_URL`，
-没配则原样下发相对路径。换头像三道校验：扩展名白名单、`getimagesize()` 确认真是图片、2MB 上限。
-
-### 12.4 开放平台验签
+### 12.3 开放平台验签
 
 四个头：`X-App-Key` `X-Timestamp` `X-Nonce` `X-Signature`。
 
@@ -1010,7 +957,69 @@ App 不能——它的「当前域名」是本地文件系统。基址取后端 
 
 ---
 
-## 13. 前后端并行约定
+## 13. 员工移动端（`/staff/v1/*`）
+
+给**系统人员**用的 App。身份与授权和管理后台**完全同一套**：同一张 `sys_users`、
+同一个令牌（`type=admin`）、同一份权限点与数据权限——手机上换的只是界面。
+但**接口是另一套**，理由见 PROJECT.md §8.1：后台接口是给宽屏与完整表单设计的，
+移动端要聚合与瘦身，且迟早要长出强制更新、推送注册这类后台没有的东西。
+
+请求头：与 C 端一样要带 `X-Channel` / `X-App-Version` / `X-Device-Id`（§12.2），
+渠道取 `app-android` / `app-ios` / `h5`。错误体与后台一致：`{code, message, trace_id, details?}`。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/staff/v1/auth/captcha` | 免登录 | 图形验证码，与后台同一套（验过即焚） |
+| POST | `/staff/v1/auth/login` | 免登录 | 账号 + 密码 + 验证码，**一次返回令牌与身份** |
+| POST | `/staff/v1/auth/logout` | 登录即可 | 吊销当前令牌及配对的 refresh |
+| GET | `/staff/v1/workbench` | 登录即可 | 工作台聚合：身份 + 权限点 + 概览 |
+| GET | `/staff/v1/profile` | 登录即可 | 个人资料 |
+| PUT | `/staff/v1/profile` | 登录即可 | 改姓名 / 邮箱 |
+| POST | `/staff/v1/profile/avatar` | 登录即可 | 换头像（multipart，字段名 `file`） |
+
+**登录一次返回身份**（后台是 `login` 与 `auth/profile` 两个接口）：
+
+```jsonc
+// POST /staff/v1/auth/login
+{ "username": "admin", "password": "admin123", "captcha_key": "captcha:…", "captcha_code": "a1b2" }
+
+// 200
+{
+  "access_token": "eyJ…", "refresh_token": "eyJ…", "expires_in": 7200,
+  "user": { "id": 1, "username": "admin", "real_name": "系统管理员",
+            "avatar": "http://…/uploads/avatar/…png", "dept_name": "总公司", "is_super": true },
+  "permissions": ["*"]
+}
+```
+
+移动端合并请求不是图省事：App 启动在弱网下每多一次往返就多一次转圈，
+而这两个接口的结果对客户端来说是**同一件事的两半**——没有身份的令牌它也用不了。
+
+**工作台聚合**：
+
+```jsonc
+// GET /staff/v1/workbench → 200
+{
+  "user": { … },
+  "permissions": ["*"],
+  "dashboard": {
+    "visible": true,              // 没有 sys:dashboard:view 时为 false，stats 为空数组
+    "stats": [ { "key": "user", "label": "用户", "value": 5, "unit": "人",
+                 "hint": "启用 5 · 停用 0", "tone": "primary", "perm": "sys:user:list" } ]
+  }
+}
+```
+
+`visible` 是服务端算的，不让客户端拿权限点自己判断：权限是登录那一刻的快照，
+撤权之后客户端缓存还是旧的，界面会显示一块永远加载失败的区域。
+
+**头像是绝对地址**：管理后台下发相对路径（走 proxy 与同域 nginx 能直接用），
+移动端没有「当前域名」，所以这一端由服务端用 `APP_URL` 拼好再下发。同一份数据、
+两种形状——这正是接口分端的意义。
+
+---
+
+## 14. 前后端并行约定
 
 - **契约先行**：本文定义的路径、权限标识、错误码是双方的共同依据，任何一方要改必须先改本文并同步对方
 - **Mock 数据**：前端按本文结构自造 mock，不等后端；后端接口就绪后切换 baseURL 即可
