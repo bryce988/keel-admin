@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\User;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 新增用户（`POST /admin/users`）

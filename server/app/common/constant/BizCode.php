@@ -112,6 +112,13 @@ final class BizCode
     public const CHANNEL_HEADER_MISSING = 30001;  // 缺少 X-Channel 请求头
     public const CHANNEL_UNSUPPORTED = 30002;     // 不支持的渠道标识
 
+    // ---------------------------------------------------------------- C 端 · 账号（301xx）
+    // 不复用后台的 200xx：同一个「密码错」在两套身份体系里是两件事，
+    // 客户端按码做提示时不该被迫去区分「这个码是给谁的」
+    public const APP_ACCOUNT_OR_PASSWORD_ERROR = 30101;  // 手机号或密码错误（不区分账号不存在）
+    public const APP_ACCOUNT_DISABLED = 30102;           // 账号已被封禁
+    public const APP_LOGIN_LOCKED = 30103;               // 失败次数过多，临时锁定
+
     // ---------------------------------------------------------------- 开放平台（40000-49999）
     public const INVALID_SIGNATURE = 40101;   // 签名校验失败 / 缺少签名参数
     public const SIGNATURE_EXPIRED = 40102;   // 签名已过期

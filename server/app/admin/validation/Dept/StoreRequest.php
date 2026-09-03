@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Dept;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 新增部门（`POST /admin/depts`）

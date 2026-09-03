@@ -943,7 +943,60 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 | `X-App-Version` | 客户端版本号，用于灰度与强制更新 |
 | `X-Device-Id` | 设备标识，限流按它而不是 IP（移动网络大量共用出口 IP） |
 
-### 12.3 开放平台验签
+### 12.3 C 端接口（App / 小程序）
+
+身份体系与后台**完全独立**：账号在 `app_users`、令牌 `type=client`、没有 RBAC。
+员工令牌调这里一律 401（`10102`），反之亦然。所有接口都要带 §12.2 的三个渠道头。
+
+错误体只有 `{code, message}`——没有 `details`，没有 `trace_id`（见 §12.1 的取舍）。
+
+| 方法 | 路径 | 需登录 | 说明 |
+|---|---|---|---|
+| POST | `/client/v1/auth/login` | 否 | 手机号 + 密码换令牌 |
+| POST | `/client/v1/auth/logout` | 是 | 吊销当前令牌及配对的 refresh |
+| GET | `/client/v1/profile` | 是 | 个人资料 |
+| PUT | `/client/v1/profile` | 是 | 改昵称 |
+| POST | `/client/v1/profile/avatar` | 是 | 换头像（multipart，字段名 `file`） |
+
+**登录**
+
+```jsonc
+// POST /client/v1/auth/login
+{ "phone": "13900139001", "password": "app123456" }
+
+// 200
+{
+  "access_token": "eyJ…", "refresh_token": "eyJ…", "expires_in": 7200,
+  "user": { "id": 1, "phone": "139****9001", "nickname": "演示用户", "avatar": "" }
+}
+```
+
+失败码：`30101` 手机号或密码错误（**账号不存在与密码错误不区分**——分开说等于提供了一个
+「这个号注册过没有」的查询接口）、`30102` 账号已封禁、`30103` 失败次数过多已临时锁定
+（同一「手机号 + IP」连错 5 次锁 15 分钟）。
+
+**资料**
+
+```jsonc
+// GET /client/v1/profile → 200
+{
+  "id": 1,
+  "phone": "139****9001",          // 中间四位打码，用户自己也不需要看到完整号码
+  "nickname": "演示用户",
+  "avatar": "http://…/uploads/app-avatar/202609/xxx.png",   // 绝对地址，见下
+  "last_login_at": "2026-09-03 10:59:03",
+  "created_at": "2026-09-03 02:57:24"
+}
+```
+
+下发字段由 `AuthService::publicUser()` 的**白名单**决定，不是黑名单：
+给 `app_users` 加内部字段（风控分、渠道来源、运营备注）时，忘了往黑名单补一笔就直接漏出去了。
+
+**头像是绝对地址**：库里存的是 `/uploads/app-avatar/…`，浏览器能靠当前域名补全，
+App 不能——它的「当前域名」是本地文件系统。基址取后端 `.env` 的 `APP_URL`，
+没配则原样下发相对路径。换头像三道校验：扩展名白名单、`getimagesize()` 确认真是图片、2MB 上限。
+
+### 12.4 开放平台验签
 
 四个头：`X-App-Key` `X-Timestamp` `X-Nonce` `X-Signature`。
 

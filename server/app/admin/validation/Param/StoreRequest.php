@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Param;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 use app\common\service\ParamService;
 
 /**

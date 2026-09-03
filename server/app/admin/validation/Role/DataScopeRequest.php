@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Role;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 设置角色数据范围（`PUT /admin/roles/{id}/data-scope`）

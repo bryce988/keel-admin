@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\User;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 启用 / 停用用户（`PUT /admin/users/{id}/status`）

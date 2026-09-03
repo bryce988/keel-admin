@@ -35,6 +35,11 @@ pnpm-debug.log*
 npm-debug.log*
 yarn-error.log*
 
+# ===== C 端 client/（uni-app）=====
+# 项目自带 .gitignore（unpackage/ 与 .hbuilderx/），这里只补它没写的一条。
+# unpackage/ 里既有中间产物也有打出来的 apk，几十上百 MB，一次都不该进仓库
+client/node_modules/
+
 # ===== 后端 server/（webman）=====
 server/vendor/
 server/runtime/

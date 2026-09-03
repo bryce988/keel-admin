@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Menu;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /** 菜单/权限树的筛选条件（`GET /admin/menus/tree`） */
 final class TreeRequest extends FormRequest

@@ -16,6 +16,7 @@ use app\admin\controller\ProfileController;
 use app\admin\controller\RoleController;
 use app\admin\controller\UserController;
 use app\client\controller\PingController as ClientPingController;
+use app\client\controller\v1\AuthController as ClientAuthController;
 use app\client\controller\v1\ProfileController as ClientProfileController;
 use app\common\constant\BizCode;
 use app\common\constant\HttpStatus;
@@ -398,15 +399,23 @@ Route::group('/admin', function () {
 // 「谁试图做什么但被拒了」和「谁做成了什么」在审计上一样重要。
 
 // ---------------------------------------------------------------- C 端（App / 小程序）
-// 一期只有空壳（PROJECT.md §8.8）。这里的路由必须指向 app\client 下的控制器，
-// 否则拿不到 client 的应用中间件与异常处理器。
+// 这里的路由必须指向 app\client 下的控制器，否则拿不到 client 的应用中间件与异常处理器。
+//
+// 没有 `perm`：C 端不做 RBAC（PROJECT.md §8.1），能不能调这个接口由「登没登录」决定，
+// 能不能碰这条数据由归属校验决定——而归属在 C 端是「只能操作自己的」，
+// 由 service 只从令牌取 id 来保证，不靠权限点。
+// 也没有 `log`：操作日志是员工审计，C 端用户的行为属于业务埋点，两回事。
 Route::group('/client', function () {
     // 公开：渠道头仍然必填，但不需要登录
     Route::get('/ping', [ClientPingController::class, 'index']);
+    Route::post('/v1/auth/login', [ClientAuthController::class, 'login']);
 
-    // 需登录：验证「员工 token 调 C 端接口一律 401」
     Route::group('/v1', function () {
+        Route::post('/auth/logout', [ClientAuthController::class, 'logout']);
+
         Route::get('/profile', [ClientProfileController::class, 'index']);
+        Route::put('/profile', [ClientProfileController::class, 'update']);
+        Route::post('/profile/avatar', [ClientProfileController::class, 'avatar']);
     })->middleware([ClientAuthMiddleware::class]);
 });
 

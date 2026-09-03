@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Dict;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 新增字典项（`POST /admin/dict-items`）

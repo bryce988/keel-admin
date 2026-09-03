@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\User;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 用户列表 / 导出的筛选条件（`GET /admin/users`、`GET /admin/users/export`）

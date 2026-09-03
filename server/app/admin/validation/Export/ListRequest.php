@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Export;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /** 导出任务列表的筛选条件（`GET /admin/exports`） */
 final class ListRequest extends FormRequest

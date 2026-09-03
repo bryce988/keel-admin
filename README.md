@@ -163,12 +163,16 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ```
 keel-admin/
-├── web/        前端
+├── web/        管理后台前端（Vue 3 + Vite）
+├── client/     App / 小程序前端（uni-app + Vue 3，见 client/README.md）
 ├── server/     后端（app/admin · app/client · app/open · app/common）
 ├── docs/       文档
 ├── docker/     一键启动
 └── PROJECT.md  完整项目文档
 ```
+
+> `client/` 不在 `docker compose` 与 CI 里：它是 HBuilderX 工程，运行与云打包都在 HBuilderX 里做。
+> 其余部分都能在容器里构建。
 
 ## 进度
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Notice;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /** 公告列表的筛选条件（`GET /admin/notices`） */
 final class ListRequest extends FormRequest

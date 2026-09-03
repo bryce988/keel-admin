@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Menu;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 新增菜单 / 权限点（`POST /admin/menus`）

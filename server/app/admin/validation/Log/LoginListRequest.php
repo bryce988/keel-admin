@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Log;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 登录日志的查询条件（`GET /admin/logs/login` 与 `/export` 共用）

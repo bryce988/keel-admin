@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\admin\validation;
+namespace app\common\validation;
 
 use app\common\support\Validator;
 use Webman\Http\Request;

@@ -23,6 +23,7 @@ x-server-env: &server-env
   APP_NAME: ${APP_NAME:-Keel}
   APP_ENV: prod
   APP_DEBUG: "false"
+  APP_URL: ${APP_URL:-}
   DB_HOST: mysql
   DB_PORT: 3306
   DB_DATABASE: ${DB_DATABASE:-keel}

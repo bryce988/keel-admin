@@ -670,7 +670,8 @@ Nginx 按前缀分流：`/admin/` → 8787，`/client/` → 8788。导出、报�
 
 - ✅ 目录、中间件、异常处理器按四端切好
 - ✅ `app/admin` 完整实现
-- ✅ `app/client`、`app/open` 建空壳 + 一个 `ping` 接口，验证分端中间件与异常处理链路通
+- ✅ `app/client` 已落地登录闭环（`app_users` + 手机号密码登录 + 资料 + 头像），
+  前端在仓库根的 `client/`（uni-app + Vue 3，HBuilderX 工程）；`app/open` 仍是空壳 + 一个 `ping` 接口
 - ⛔ C 端业务接口、小程序登录、支付回调不在一期范围
 
 **落地情况（M1 已完成）**

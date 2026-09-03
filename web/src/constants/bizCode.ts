@@ -89,6 +89,13 @@ export const BizCode = {
   CHANNEL_HEADER_MISSING: 30001,  // 缺少 X-Channel 请求头
   CHANNEL_UNSUPPORTED: 30002,     // 不支持的渠道标识
 
+  // ---------------------------------------------------------------- C 端 · 账号（301xx）
+  // 后台前端用不到这三个码，但这份表与后端是**严格集合相等**（scripts/check-bizcode.sh），
+  // 少一个 CI 就红。C 端自己的客户端另有一份，不从这里引
+  APP_ACCOUNT_OR_PASSWORD_ERROR: 30101,  // 手机号或密码错误（不区分账号不存在）
+  APP_ACCOUNT_DISABLED: 30102,           // 账号已被封禁
+  APP_LOGIN_LOCKED: 30103,               // 失败次数过多，临时锁定
+
   // ---------------------------------------------------------------- 开放平台（40000-49999）
   INVALID_SIGNATURE: 40101,  // 签名校验失败 / 缺少签名参数
   SIGNATURE_EXPIRED: 40102,  // 签名已过期

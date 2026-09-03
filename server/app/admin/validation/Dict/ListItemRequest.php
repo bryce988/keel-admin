@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\admin\validation\Dict;
 
-use app\admin\validation\FormRequest;
+use app\common\validation\FormRequest;
 
 /**
  * 字典项列表的筛选条件（`GET /admin/dicts/{code}/items/all`）
