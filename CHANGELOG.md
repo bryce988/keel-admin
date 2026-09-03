@@ -55,7 +55,9 @@
   - 底部导航带图标（首页 / 我的），由 `staff/scripts/make-tabbar-icons.py` 生成，
     颜色跟着 `pages.json` 的 `tabBar.color` 走
   - App 图标用 `staff/scripts/make-app-icon.py` 从品牌标记生成 7 个尺寸
-    （48~1024），图形与 `web/public/favicon.svg`、`BrandLogo.vue` 是同一份路径
+    （48~1024），图形与 `web/public/favicon.svg`、`BrandLogo.vue` 是同一份路径，
+    并写进 `manifest.json` 的 `app-plus.distribute.icons.android`——
+    **不配这一段云打包会静默用默认图标**，要装到手机上才发现
   - 权限从默认模板的 15 条收敛到 3 条：模板默认申请相机、通话状态、读日志、
     改系统设置，这个示例一条都用不上，而多声明一条就多一次被应用市场问用途
 

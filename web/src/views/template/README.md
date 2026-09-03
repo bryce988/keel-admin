@@ -16,7 +16,7 @@
 1. 复制整个目录到 `views/你的模块/`
 2. 把 `import ... from '../_demo'` 换成你自己的 `api/你的模块.ts`
 3. 改列定义、筛选字段、表单字段与校验规则
-4. **给每个按钮补 `v-permission`**，权限点要与后端 `config/route.php` 里的
+4. **给每个按钮补 `v-permission`**，权限点要与后端 `config/route/admin.php` 里的
    `perm` 声明逐字一致
 5. 删掉文件顶部的「复制清单」注释块
 

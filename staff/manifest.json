@@ -37,6 +37,19 @@
             "ios" : {
                 "dSYMs" : false
             },
+            /* 应用图标
+               尺寸与键名按官方规定：hdpi 72 · xhdpi 96 · xxhdpi 144 · xxxhdpi 192
+               （ldpi/mdpi 已废弃）。路径相对项目根目录。
+               图标由 scripts/make-app-icon.py 从品牌标记生成，与 web/public/favicon.svg
+               是同一份路径——不配这一段的话云打包出来是 uni-app 的默认图标 */
+            "icons" : {
+                "android" : {
+                    "hdpi" : "static/icons/icon-72.png",
+                    "xhdpi" : "static/icons/icon-96.png",
+                    "xxhdpi" : "static/icons/icon-144.png",
+                    "xxxhdpi" : "static/icons/icon-192.png"
+                }
+            },
             /* SDK配置 */
             "sdkConfigs" : {}
         }

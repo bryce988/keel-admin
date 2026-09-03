@@ -64,13 +64,28 @@ staff/
 船体肋骨的横剖 + 一根贯穿的龙骨主梁——龙骨是全船肋骨唯一的附着点，
 这个脚手架对业务代码就是这个关系。改标记要三处一起改。
 
-**怎么装进包里**：HBuilderX → `manifest.json` 可视化界面 → **App 图标配置** →
-选 `static/icons/icon-1024.png` → 点「自动生成所有图标」。
-它会生成各分辨率并写进 manifest 与 `unpackage/res/icons`。
+**已经配进 `manifest.json` 了**，直接云打包即可：
 
-不手写 manifest 的 icons 配置，是因为官方文档没把 Android 的键名列全，
-而**猜错了是静默不生效**——包打出来还是默认的 uni 图标，你要装到手机上才发现。
-让 HBuilderX 自己写这段最稳。
+```jsonc
+"app-plus": { "distribute": { "icons": { "android": {
+  "hdpi": "static/icons/icon-72.png",     // 72×72
+  "xhdpi": "static/icons/icon-96.png",    // 96×96
+  "xxhdpi": "static/icons/icon-144.png",  // 144×144
+  "xxxhdpi": "static/icons/icon-192.png"  // 192×192，ldpi/mdpi 官方已废弃
+}}}}
+```
+
+⚠️ **不配这一段，云打包出来是 uni-app 的默认图标**，而且不会有任何提示——
+要装到手机上才发现。这个坑踩过一次。
+
+也可以走 HBuilderX 的可视化界面（manifest.json → App 图标配置 → 选
+`static/icons/icon-1024.png` → 自动生成所有图标），它会把图标生成到
+`unpackage/res/icons` 并改写 manifest 里的路径。两种方式二选一即可，
+区别是可视化生成的图标进不了 Git（`unpackage/` 是编译产物，不提交），
+换台机器 clone 下来就没有了——所以这里选的是前一种。
+
+**启动图（splash）还是默认的**：要换的话在同一个界面配，或者告诉我，
+我按同一份标记生成几张。
 
 图标与 tabBar 图标都是纯几何图形，用脚本画而不是丢一堆 png 进来：二进制进了仓库就没人知道它从哪来，
 改颜色或尺寸时只能重新找设计稿。tabBar 图标的颜色与 `pages.json` 的

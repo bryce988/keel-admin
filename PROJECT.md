@@ -381,7 +381,8 @@ TraceMiddleware      生成 traceId，写入上下文与响应
       → LogMiddleware       记录写操作与字段级变更
 ```
 
-**权限点绑定路由**：在 `config/route.php` 分组上声明所需权限，避免散落在控制器里。
+**权限点绑定路由**：在 `config/route/<端>.php` 的分组上声明所需权限，避免散落在控制器里。
+路由按端拆文件（`config/route/{admin,staff,client,open,internal}.php`），由 `config/route.php` 逐个 require——webman 只认这一个入口，没有按应用自动加载。
 
 ```php
 Route::group('/api/system', function () {
@@ -713,7 +714,7 @@ Nginx 按前缀分流：`/admin/` → 8787，`/client/` → 8788。导出、报�
 | internal | `app/internal` | `InternalTokenMiddleware` | `InternalHandler` | `/internal/ping` |
 
 **与 §8.3 示例的一处偏差**：后台的 `AdminAuth` / `Permission` / `OperationLog` 挂在
-`config/route.php` 的分组上，而不是 `config/middleware.php` 的 `'admin'` 键下。
+`config/route/admin.php` 的分组上，而不是 `config/middleware.php` 的 `'admin'` 键下。
 原因是每个端都有公开接口（后台的登录与验证码、C 端的短信登录），
 应用级中间件会把登录接口自己也挡住。同理 `ClientAuthMiddleware` 也挂在路由分组上。
 
