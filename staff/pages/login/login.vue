@@ -44,7 +44,6 @@
 	import { ref } from 'vue'
 	import { onLoad } from '@dcloudio/uni-app'
 	import { fetchCaptcha, login } from '@/common/api.js'
-	import { clearAuth } from '@/common/request.js'
 
 	const username = ref('admin')
 	const password = ref('admin123')
@@ -65,10 +64,17 @@
 		}
 	}
 
+	/*
+	 * ⚠️ 这里**不要**清本地令牌
+	 *
+	 * 冷启动时登录页是 pages.json 的第一项，即使 App.vue 的 onLaunch 已经判断有令牌、
+	 * 切去了首页，登录页照样会被创建并触发 onLoad。原先这里无条件 clearAuth()，
+	 * 结果就是「退出 App 再打开又要重新登录」：读到令牌 → 切首页 →
+	 * 登录页把令牌清了 → 首页请求 401 → 踢回登录页。
+	 *
+	 * 令牌该清的地方只有两处：主动退出登录，以及刷新失败后的 onUnauthorized。
+	 */
 	onLoad(() => {
-		// 能走到登录页就说明当前没有可用身份，把残留清掉，
-		// 免得登录失败后退出应用再进来又被旧令牌带进首页
-		clearAuth()
 		loadCaptcha()
 	})
 

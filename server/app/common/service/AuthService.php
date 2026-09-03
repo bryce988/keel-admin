@@ -401,6 +401,49 @@ class AuthService
         return "您正在登录 {$site}，验证码：{$code}（{$minutes} 分钟内有效，请勿转发给他人）。";
     }
 
+    /**
+     * 用 refresh 换一对新令牌
+     *
+     * 业务逻辑放在 service 而不是控制器：两个端（后台与员工移动端）要走同一套规则，
+     * 而「刷新令牌」的规则里每一条都是安全相关的，抄第二份迟早漂移。
+     *
+     * 四道校验缺一不可：
+     * - scope 必须是 refresh —— 否则 access token 自己就能换出新的，等于永不过期
+     * - jti 未被拉黑 —— 登出时 revokePair 拉黑了它，少这一步「登出」就形同虚设
+     * - 账号仍可用 —— loadUser 里判停用与删除
+     * - token_version 一致 —— 改密或管理员重置后旧 refresh 立即作废
+     *
+     * 换完**轮换**：旧 refresh 用过即废，按它自己的剩余寿命拉黑。
+     * 除了限制泄露窗口，还顺带得到重放检测——同一个 refresh 用第二次直接 401。
+     *
+     * @return array{access_token:string, refresh_token:string, expires_in:int}
+     */
+    public static function refresh(string $refreshToken): array
+    {
+        $payload = JwtService::decode($refreshToken);
+
+        if (($payload['scope'] ?? '') !== 'refresh') {
+            throw new UnauthorizedException('凭证类型错误', BizCode::UNAUTHORIZED);
+        }
+        if (JwtService::isRevoked((string) ($payload['jti'] ?? ''))) {
+            throw new UnauthorizedException('登录已失效，请重新登录');
+        }
+
+        $user = self::loadUser((int) ($payload['uid'] ?? 0));
+
+        if ((int) ($payload['tv'] ?? 0) !== (int) ($user['token_version'] ?? 0)) {
+            throw new UnauthorizedException('密码已变更，请重新登录', BizCode::PASSWORD_CHANGED);
+        }
+
+        JwtService::revokePayload($payload);
+
+        return JwtService::issue(
+            (int) $user['id'],
+            (int) $user['perm_version'],
+            (int) $user['token_version']
+        );
+    }
+
     /** 加载用户，供鉴权中间件使用 */
     public static function loadUser(int $uid): array
     {

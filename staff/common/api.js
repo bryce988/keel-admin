@@ -7,7 +7,7 @@
  * 不是后台的 `/admin/*`：身份共用，接口不共用。两个直接好处在这里就能看到——
  * 登录一次拿回令牌与身份、工作台一次拿回身份与概览，后台那边分别是两次和三次请求。
  */
-import { request, upload, setToken, cacheUser, cachePermissions, clearAuth } from './request.js'
+import { request, upload, setToken, setRefreshToken, cacheUser, cachePermissions, clearAuth } from './request.js'
 
 /** 图形验证码：返回 { captcha_key, captcha_image }，image 是 svg 的 data URI */
 export function fetchCaptcha() {
@@ -29,6 +29,8 @@ export async function login(username, password, captchaKey, captchaCode) {
 	}, false)
 
 	setToken(res.access_token)
+	// 存下 refresh：access 只有 2 小时，靠它才能在 7 天内免登录续期
+	setRefreshToken(res.refresh_token)
 	cacheUser(res.user)
 	cachePermissions(res.permissions)
 	return res

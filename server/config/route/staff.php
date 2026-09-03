@@ -29,6 +29,9 @@ Route::group('/staff/v1', function () {
     // 公开：渠道头仍然必填，但不需要登录
     Route::get('/auth/captcha', [StaffAuthController::class, 'captcha']);
     Route::post('/auth/login', [StaffAuthController::class, 'login']);
+    // 刷新必须免登录：access 过期后调不动需要鉴权的接口，
+    // 刷新接口自己再要求登录就成了死锁
+    Route::post('/auth/refresh', [StaffAuthController::class, 'refresh']);
 });
 
 Route::group('/staff/v1', function () {

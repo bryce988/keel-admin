@@ -9,6 +9,7 @@
 import { BASE_URL, CHANNEL, APP_VERSION } from './config.js'
 
 const TOKEN_KEY = 'keel_admin_token'
+const REFRESH_KEY = 'keel_admin_refresh'
 const USER_KEY = 'keel_admin_user'
 const PERM_KEY = 'keel_admin_perms'
 
@@ -20,8 +21,17 @@ export function setToken(token) {
 	uni.setStorageSync(TOKEN_KEY, token)
 }
 
+export function getRefreshToken() {
+	return uni.getStorageSync(REFRESH_KEY) || ''
+}
+
+export function setRefreshToken(token) {
+	uni.setStorageSync(REFRESH_KEY, token)
+}
+
 export function clearAuth() {
 	uni.removeStorageSync(TOKEN_KEY)
+	uni.removeStorageSync(REFRESH_KEY)
 	uni.removeStorageSync(USER_KEY)
 	uni.removeStorageSync(PERM_KEY)
 }
@@ -109,16 +119,62 @@ function onUnauthorized(message) {
 }
 
 /**
+ * 令牌刷新
+ *
+ * access 只有 2 小时，refresh 有 7 天。手机上没人愿意每两小时重输一次账号密码加验证码，
+ * 所以收到 401 就自动换一次令牌再重试原请求，换不动才回登录页。
+ *
+ * **单飞**（single-flight）：首页一进来会并发打好几个接口，令牌过期时它们会同时拿到 401。
+ * 不加这道锁的话每个都去刷新一次，而后端的 refresh 是**用过即废的轮换**——
+ * 第一个换成功，其余几个拿着已作废的旧 refresh 去换，全部 401，用户照样被踢出去。
+ * 这里让后来的请求共用第一个刷新的 Promise。
+ */
+let refreshing = null
+
+function doRefresh() {
+	if (refreshing) return refreshing
+
+	const token = getRefreshToken()
+	if (!token) return Promise.reject(new Error('no refresh token'))
+
+	refreshing = new Promise((resolve, reject) => {
+		uni.request({
+			url: BASE_URL + '/staff/v1/auth/refresh',
+			method: 'POST',
+			data: { refresh_token: token },
+			header: headers(false),
+			success: (res) => {
+				if (res.statusCode >= 200 && res.statusCode < 300 && res.data && res.data.access_token) {
+					setToken(res.data.access_token)
+					// 轮换：后端每次都发一把新的 refresh，旧的当场作废，必须存下来
+					setRefreshToken(res.data.refresh_token)
+					resolve(res.data)
+				} else {
+					reject(new Error((res.data && res.data.message) || '刷新失败'))
+				}
+			},
+			fail: (e) => reject(new Error(e.errMsg || '刷新失败'))
+		})
+	}).finally(() => {
+		refreshing = null
+	})
+
+	return refreshing
+}
+
+/**
  * 发一个请求
  *
  * **成功回调里也要判状态码**：uni.request 的 fail 只在网络层出错时触发，
  * 后端返回 400/401/403/500 一律走 success，statusCode 才是真正的成败依据。
  * 这与 web 端「先按 HTTP 状态码分派，再按业务码细化」是同一条约定。
  *
- * reject 出去的永远是 `{ code, message }`，与后端管理端错误体同构
- * （那边还有个 trace_id，排查时能对上服务端日志，这里按需再取）。
+ * 401 的处理分两步：先尝试用 refresh 换一次令牌重试；换不动才清本地、回登录页。
+ * `retry` 参数防止无限循环——重试那一次即使再 401 也不会继续刷新。
+ *
+ * reject 出去的永远是 `{ code, message }`，与后端管理端错误体同构。
  */
-export function request(path, method = 'GET', data = null, withToken = true) {
+export function request(path, method = 'GET', data = null, withToken = true, retry = true) {
 	return new Promise((resolve, reject) => {
 		uni.request({
 			url: BASE_URL + path,
@@ -138,6 +194,16 @@ export function request(path, method = 'GET', data = null, withToken = true) {
 					message: body.message || `请求失败（${status}）`,
 					trace_id: body.trace_id || '',
 					details: body.details || null
+				}
+
+				if (status === 401 && withToken && retry && getRefreshToken()) {
+					doRefresh()
+						.then(() => resolve(request(path, method, data, withToken, false)))
+						.catch(() => {
+							onUnauthorized(err.message)
+							reject(err)
+						})
+					return
 				}
 
 				if (status === 401) {
@@ -160,7 +226,7 @@ export function request(path, method = 'GET', data = null, withToken = true) {
  * 手写 Content-Type 会漏掉它，后端解析不出文件。
  * 另一个坑：uploadFile 回来的 data 是**字符串**，要自己 JSON.parse。
  */
-export function upload(path, filePath, name = 'file') {
+export function upload(path, filePath, name = 'file', retry = true) {
 	return new Promise((resolve, reject) => {
 		uni.uploadFile({
 			url: BASE_URL + path,
@@ -184,6 +250,15 @@ export function upload(path, filePath, name = 'file') {
 
 				if (res.statusCode >= 200 && res.statusCode < 300) {
 					resolve(body)
+					return
+				}
+				if (res.statusCode === 401 && retry && getRefreshToken()) {
+					doRefresh()
+						.then(() => resolve(upload(path, filePath, name, false)))
+						.catch(() => {
+							onUnauthorized(body.message)
+							reject({ code: 401, message: body.message || '登录已失效' })
+						})
 					return
 				}
 				if (res.statusCode === 401) {

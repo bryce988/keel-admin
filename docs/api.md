@@ -971,6 +971,7 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 |---|---|---|---|
 | GET | `/staff/v1/auth/captcha` | 免登录 | 图形验证码，与后台同一套（验过即焚） |
 | POST | `/staff/v1/auth/login` | 免登录 | 账号 + 密码 + 验证码，**一次返回令牌与身份** |
+| POST | `/staff/v1/auth/refresh` | 免登录 | 用 refresh 换一对新令牌（轮换，旧的用过即废） |
 | POST | `/staff/v1/auth/logout` | 登录即可 | 吊销当前令牌及配对的 refresh |
 | GET | `/staff/v1/workbench` | 登录即可 | 工作台聚合：身份 + 权限点 + 概览 |
 | GET | `/staff/v1/profile` | 登录即可 | 个人资料 |
@@ -994,6 +995,14 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 
 移动端合并请求不是图省事：App 启动在弱网下每多一次往返就多一次转圈，
 而这两个接口的结果对客户端来说是**同一件事的两半**——没有身份的令牌它也用不了。
+
+**access 2 小时、refresh 7 天**（`JWT_ACCESS_TTL` / `JWT_REFRESH_TTL`）。客户端务必存下
+`refresh_token`：手机上没人愿意每两小时重输一次账号密码加验证码，收到 401 应当先用
+`/staff/v1/auth/refresh` 自动换一次再重试原请求，换不动才回登录页。
+
+刷新接口**免登录**——access 都过期了，刷新接口自己再要求登录就成了死锁。
+旧 refresh 用过即废（轮换），所以客户端要做**单飞**：多个请求同时 401 时只发一次刷新，
+否则后到的那个拿着已作废的 refresh 去换，用户照样被踢出去。
 
 **工作台聚合**：
 

@@ -75,6 +75,30 @@ class AuthController
     }
 
     /**
+     * 刷新令牌
+     * @url POST /staff/v1/auth/refresh
+     * @perm -
+     * @description 用 refresh 换一对新令牌。**免登录**——access 过期后调不动需要鉴权的接口，
+     * 刷新接口自己再要求登录就成了死锁。
+     *
+     * App 上这个接口比后台更重要：手机上没人愿意每两小时重新输一次账号密码 + 验证码，
+     * 而 access 只有 2 小时、refresh 有 7 天。客户端在收到 401 时自动换一次，
+     * 换不动才回登录页。
+     *
+     * 旧 refresh 用过即废（轮换），同一个换第二次直接 401。
+     * @error 401 `10101` 凭证无效/已过期/已登出 · `10103` 密码已变更
+     */
+    public function refresh(Request $request): Response
+    {
+        $refreshToken = (string) $request->post('refresh_token', '');
+        if ($refreshToken === '') {
+            throw new ValidationException(['refresh_token' => ['缺少刷新凭证']]);
+        }
+
+        return Result::ok(AuthService::refresh($refreshToken));
+    }
+
+    /**
      * 退出登录
      * @url POST /staff/v1/auth/logout
      * @perm 登录即可

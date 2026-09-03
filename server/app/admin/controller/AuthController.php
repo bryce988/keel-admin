@@ -223,33 +223,7 @@ class AuthController
             throw new ValidationException(['refresh_token' => ['缺少刷新凭证']]);
         }
 
-        $payload = JwtService::decode($refreshToken);
-        if (($payload['scope'] ?? '') !== 'refresh') {
-            throw new UnauthorizedException('凭证类型错误', BizCode::UNAUTHORIZED);
-        }
-
-        // 登出时这个 jti 已经被拉黑（见 logout 里的 revokePair）。
-        // 少了这一步，登出之后拿旧 refresh 照样能换出可用的 access token
-        if (JwtService::isRevoked((string) ($payload['jti'] ?? ''))) {
-            throw new UnauthorizedException('登录已失效，请重新登录');
-        }
-
-        $user = AuthService::loadUser((int) ($payload['uid'] ?? 0));
-
-        // 改密或管理员重置密码后 token_version 会递增，此处比对使旧 refresh 立即作废
-        if ((int) ($payload['tv'] ?? 0) !== (int) ($user['token_version'] ?? 0)) {
-            throw new UnauthorizedException('密码已变更，请重新登录', BizCode::PASSWORD_CHANGED);
-        }
-
-        // 轮换：旧的 refresh 用过即废，按它自己的剩余寿命拉黑。
-        // 除了限制泄露窗口，还顺带得到重放检测——同一个 refresh 用第二次直接 401
-        JwtService::revokePayload($payload);
-
-        return Result::ok(JwtService::issue(
-            (int) $user['id'],
-            (int) $user['perm_version'],
-            (int) $user['token_version']
-        ));
+        return Result::ok(AuthService::refresh($refreshToken));
     }
 
     /**

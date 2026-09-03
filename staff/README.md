@@ -111,7 +111,13 @@ App 图标用距离场算覆盖率抗锯齿，tabBar 图标用超采样。
    客户端不拿缓存的权限点自己判断——权限是登录那一刻的快照，撤权之后本地还以为有，
    界面上就是一块永远加载失败的区域。本地的 `can()` 只用于纯展示性的收敛，
    和 web 端的 `v-permission` 一样**不是安全边界**，真正的拦截在后端路由的 `perm` 声明上。
-4. **上传不要手写 `Content-Type`**。`uni.uploadFile` 要自己拼 multipart 的 boundary，
+4. **令牌会自动续期，不要在登录页清本地令牌**。access 2 小时、refresh 7 天，
+   `request.js` 收到 401 会先用 refresh 换一次再重试原请求，换不动才回登录页；
+   刷新做了单飞（多个请求同时 401 只发一次刷新），因为后端的 refresh 是用过即废的轮换。
+   ⚠️ 登录页的 `onLoad` 里**不能** `clearAuth()`——冷启动时登录页是入口页，
+   即使 `App.vue` 已经判断有令牌切去了首页，它照样会触发 `onLoad`，
+   清掉令牌的结果就是「退出 App 再打开还要重新登录」。
+5. **上传不要手写 `Content-Type`**。`uni.uploadFile` 要自己拼 multipart 的 boundary，
    手写会漏掉它，后端解析不出文件；另外它回来的 `data` 是**字符串**，要自己 `JSON.parse`。
 
 ## 与后端的契约
@@ -121,6 +127,7 @@ App 图标用距离场算覆盖率抗锯齿，tabBar 图标用超采样。
 | 用途 | 接口 | 权限 |
 |---|---|---|
 | 图形验证码 | `GET /staff/v1/auth/captcha` | 免登录 |
+| 刷新令牌（自动，7 天内免登录） | `POST /staff/v1/auth/refresh` | 免登录 |
 | 登录（**一次返回令牌 + 身份 + 权限**） | `POST /staff/v1/auth/login` | 免登录 |
 | 工作台（**一次返回身份 + 概览**） | `GET /staff/v1/workbench` | 登录即可 |
 | 个人资料 | `GET` / `PUT /staff/v1/profile` | 登录即可 |
