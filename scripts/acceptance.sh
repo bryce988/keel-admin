@@ -99,6 +99,17 @@ chk "员工端令牌可调后台接口"      "$(code -H "Authorization: Bearer $
 # 错误体与后台一致（同事在用，要 traceId），与 C 端刻意不同
 curl -s $SH $BASE/staff/v1/profile | grep -q trace_id && ok "员工端错误体带 trace_id（同 admin）" || bad "员工端错误体应带 trace_id"
 
+# 消息（系统公告）：接收端复用后台的公告数据，草稿对它不存在
+NOTICES=$(curl -s $SH -H "Authorization: Bearer $STAFF" "$BASE/staff/v1/notices?page_size=5")
+echo "$NOTICES" | grep -q '"unread_count"' && ok "消息列表带未读数（列表与角标同源）" || bad "消息列表缺 unread_count"
+DRAFT_ID=$(sql "SELECT id FROM sys_notices WHERE status=0 ORDER BY id DESC LIMIT 1")
+if [ -n "$DRAFT_ID" ]; then
+  chk "草稿公告对 App 不可见 → 404"  "$(code $SH -H "Authorization: Bearer $STAFF" $BASE/staff/v1/notices/$DRAFT_ID)" 404
+else
+  ok "（库里没有草稿公告，跳过草稿可见性断言）"
+fi
+chk "读一条公告 → 200（顺带落已读回执）" "$(code $SH -H "Authorization: Bearer $STAFF" $BASE/staff/v1/notices/$(sql "SELECT id FROM sys_notices WHERE status=1 ORDER BY id DESC LIMIT 1"))" 200
+
 echo "════ 2. 越权拦截（前端隐藏≠安全边界）════"
 DEV=$(login dev01 demo123456)
 chk "dev01 调日志接口 → 403"      "$(code -H "Authorization: Bearer $DEV" $BASE/admin/logs/login)" 403

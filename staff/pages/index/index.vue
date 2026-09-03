@@ -44,7 +44,7 @@
 <script setup>
 	import { ref } from 'vue'
 	import { onShow } from '@dcloudio/uni-app'
-	import { fetchWorkbench } from '@/common/api.js'
+	import { fetchWorkbench, setNoticeBadge } from '@/common/api.js'
 	import { getCachedUser } from '@/common/request.js'
 
 	const greeting = ref('你好')
@@ -70,6 +70,9 @@
 			// 能不能看概览由服务端说了算，不看本地缓存的权限点
 			canDashboard.value = !!(res.dashboard && res.dashboard.visible)
 			stats.value = (res.dashboard && res.dashboard.stats) || []
+
+			// 工作台顺带把未读数带回来了，省掉一次单独的角标请求
+			setNoticeBadge(res.unread_notice || 0)
 		} catch (e) {
 			// 401 已经在 request 层踢回登录页了，这里只处理别的错
 			if (e.code !== 401) {

@@ -27,7 +27,7 @@ namespace app\admin\controller;
 use app\admin\validation\Notice\ListRequest;
 use app\admin\validation\Notice\StoreRequest;
 use app\admin\validation\Notice\UpdateRequest;
-use app\admin\service\NoticeService;
+use app\common\service\NoticeService;
 use app\common\support\BatchResult;
 use app\common\support\Ctx;
 use app\common\support\OpLog;

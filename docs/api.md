@@ -974,6 +974,9 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 | POST | `/staff/v1/auth/refresh` | 免登录 | 用 refresh 换一对新令牌（轮换，旧的用过即废） |
 | POST | `/staff/v1/auth/logout` | 登录即可 | 吊销当前令牌及配对的 refresh |
 | GET | `/staff/v1/workbench` | 登录即可 | 工作台聚合：身份 + 权限点 + 概览 |
+| GET | `/staff/v1/notices` | 登录即可 | 消息列表（分页 + `unread_count`） |
+| GET | `/staff/v1/notices/{id}` | 登录即可 | 读一条，返回正文并落已读回执 |
+| POST | `/staff/v1/notices/read-all` | 登录即可 | 全部标为已读 |
 | GET | `/staff/v1/profile` | 登录即可 | 个人资料 |
 | PUT | `/staff/v1/profile` | 登录即可 | 改姓名 / 邮箱 |
 | POST | `/staff/v1/profile/avatar` | 登录即可 | 换头像（multipart，字段名 `file`） |
@@ -1021,6 +1024,19 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 
 `visible` 是服务端算的，不让客户端拿权限点自己判断：权限是登录那一刻的快照，
 撤权之后客户端缓存还是旧的，界面会显示一块永远加载失败的区域。
+
+**消息（系统公告）**：接收端与后台铃铛是同一份数据、同一份已读判定
+（`NoticeService` 在 `common/service`）。三点值得注意：
+
+- 列表的分页体里**额外带 `unread_count`**：列表与角标在界面上是同一件事的两面，
+  拆成两个接口会出现「角标 3、点进去只有 2 条未读」的错位，轮询请求数也翻倍
+- 工作台聚合里也带 `unread_notice`，App 回到首页刷角标不用再单发一次请求
+- **读一条 = 标已读**：`GET /staff/v1/notices/{id}` 返回正文的同时落回执。
+  拆成两个接口的话，第二个失败时界面显示已读、库里还是未读
+- 草稿与已撤回的公告一律 404：它们对接收端不存在，链接还在手上也打不开
+
+正文是后台富文本编辑器存的 HTML，客户端用 `rich-text` 渲染（小程序端没有 `v-html`，
+而 `rich-text` 只认白名单标签，顺带把 XSS 面收窄了）。
 
 **头像是绝对地址**：管理后台下发相对路径（走 proxy 与同域 nginx 能直接用），
 移动端没有「当前域名」，所以这一端由服务端用 `APP_URL` 拼好再下发。同一份数据、

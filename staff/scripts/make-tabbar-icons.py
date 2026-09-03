@@ -43,6 +43,29 @@ def home(x, y):
     return tri(x, y, (40.5, 12), (8, 42), (73, 42)) or rect(x, y, 17, 40, 64, 68)
 
 
+def message(x, y):
+    """信封：外框 + 上沿两道斜线（信封盖）。
+    不画铃铛：铃铛在小尺寸下那颗铃舌会糊成一坨，信封的轮廓更好认"""
+    left, right, top, bottom = 12.0, 69.0, 22.0, 59.0
+    border = 5.0
+
+    inside = rect(x, y, left, top, right, bottom)
+    hollow = rect(x, y, left + border, top + border, right - border, bottom - border)
+    frame = inside and not hollow
+
+    # 信封盖：从左上、右上各斜向中点，用「点到线段距离」画出带圆头的粗线
+    def near(ax, ay, bx, by, w):
+        dx, dy = bx - ax, by - ay
+        t = ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)
+        t = 0.0 if t < 0 else (1.0 if t > 1 else t)
+        return (x - (ax + t * dx)) ** 2 + (y - (ay + t * dy)) ** 2 <= (w / 2) ** 2
+
+    mid_x, mid_y = (left + right) / 2, top + 20.0
+    flap = inside and (near(left, top, mid_x, mid_y, border) or near(right, top, mid_x, mid_y, border))
+
+    return frame or flap
+
+
 def mine(x, y):
     """人：头 + 肩（半椭圆，底部截平）"""
     head = circle(x, y, 40.5, 26, 13.5)
@@ -78,7 +101,7 @@ def render(shape, rgb, path):
 
 
 if __name__ == '__main__':
-    for name, shape in (('home', home), ('mine', mine)):
+    for name, shape in (('home', home), ('message', message), ('mine', mine)):
         for suffix, color in (('', NORMAL), ('-active', ACTIVE)):
             p = f'static/tabbar/{name}{suffix}.png'
             print(p, render(shape, color, p), 'bytes')

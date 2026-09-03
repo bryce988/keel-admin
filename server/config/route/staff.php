@@ -7,6 +7,7 @@ use app\common\middleware\AdminAuthMiddleware;
 use app\common\middleware\OperationLogMiddleware;
 use app\common\middleware\PermissionMiddleware;
 use app\staff\controller\v1\AuthController as StaffAuthController;
+use app\staff\controller\v1\NoticeController as StaffNoticeController;
 use app\staff\controller\v1\ProfileController as StaffProfileController;
 use app\staff\controller\v1\WorkbenchController as StaffWorkbenchController;
 
@@ -40,6 +41,13 @@ Route::group('/staff/v1', function () {
     // 工作台：概览要 sys:dashboard:view，但这里声明 '' —— 没权限的人也该看到首页，
     // 只是概览那一块返回 visible=false（判断在 WorkbenchController 里）
     Route::get('/workbench', [StaffWorkbenchController::class, 'index'])->setParams(['perm' => '']);
+
+    // 消息（系统公告）：接收端不需要权限点——公告是发给所有员工的，
+    // 「谁能发」才要 sys:notice:*，那在后台
+    Route::get('/notices', [StaffNoticeController::class, 'index'])->setParams(['perm' => '']);
+    Route::post('/notices/read-all', [StaffNoticeController::class, 'readAll'])->setParams(['perm' => '']);
+    // {id} 放在 read-all 之后：否则 read-all 会被当成 id 匹配掉
+    Route::get('/notices/{id:\d+}', [StaffNoticeController::class, 'show'])->setParams(['perm' => '']);
 
     Route::get('/profile', [StaffProfileController::class, 'index'])->setParams(['perm' => '']);
     Route::put('/profile', [StaffProfileController::class, 'update'])->setParams([

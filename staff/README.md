@@ -1,7 +1,7 @@
 # Keel 移动工作台（uni-app）
 
 给**系统人员**用的 App：登的是后台**同一套账号**（`sys_users`）、同一套权限点、
-同一份数据权限。三个页面：登录、首页（工作台）、我的。
+同一份数据权限。四个页面：登录、首页（工作台）、消息（系统公告）、我的。
 
 **身份共用，接口不共用**：调的是员工移动端自己的一套 `/staff/v1/*`（后端 `app/staff`），
 不是后台的 `/admin/*`。理由见 PROJECT.md §8.1——后台接口是给宽屏与完整表单设计的，
@@ -48,6 +48,7 @@ staff/
 ├── pages/
 │   ├── login/         登录（账号 + 密码 + 图形验证码）
 │   ├── index/         首页：工作台概览
+│   ├── notice/        消息：list 列表（下拉刷新 + 触底加载）· detail 详情
 │   └── mine/          我的：资料、换头像、退出
 ├── static/
 │   ├── icons/         App 图标 48/72/96/144/192/512/1024（脚本生成，见下）
@@ -130,6 +131,9 @@ App 图标用距离场算覆盖率抗锯齿，tabBar 图标用超采样。
 | 刷新令牌（自动，7 天内免登录） | `POST /staff/v1/auth/refresh` | 免登录 |
 | 登录（**一次返回令牌 + 身份 + 权限**） | `POST /staff/v1/auth/login` | 免登录 |
 | 工作台（**一次返回身份 + 概览**） | `GET /staff/v1/workbench` | 登录即可 |
+| 消息列表（含未读数） | `GET /staff/v1/notices` | 登录即可 |
+| 读一条（顺带标已读） | `GET /staff/v1/notices/{id}` | 登录即可 |
+| 全部已读 | `POST /staff/v1/notices/read-all` | 登录即可 |
 | 个人资料 | `GET` / `PUT /staff/v1/profile` | 登录即可 |
 | 换头像 | `POST /staff/v1/profile/avatar` | 登录即可 |
 | 退出 | `POST /staff/v1/auth/logout` | 登录即可 |

@@ -14,6 +14,19 @@
 			}
 		},
 		{
+			"path": "pages/notice/list",
+			"style": {
+				"navigationBarTitleText": "消息",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
+			"path": "pages/notice/detail",
+			"style": {
+				"navigationBarTitleText": "公告详情"
+			}
+		},
+		{
 			"path": "pages/mine/mine",
 			"style": {
 				"navigationBarTitleText": "我的"
@@ -36,6 +49,12 @@
 				"text": "首页",
 				"iconPath": "static/tabbar/home.png",
 				"selectedIconPath": "static/tabbar/home-active.png"
+			},
+			{
+				"pagePath": "pages/notice/list",
+				"text": "消息",
+				"iconPath": "static/tabbar/message.png",
+				"selectedIconPath": "static/tabbar/message-active.png"
 			},
 			{
 				"pagePath": "pages/mine/mine",

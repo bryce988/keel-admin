@@ -11,7 +11,7 @@ use app\common\validation\FormRequest;
  *
  * `published_at` / `publisher_id` / `publisher_name` 不在规则里，所以请求体里
  * 带上也进不了 `validated()`：发布时间与发布人由服务端在状态跨过发布线时盖章
- * （{@see \app\admin\service\NoticeService::stampPublish()}），
+ * （{@see \app\common\service\NoticeService::stampPublish()}），
  * 允许前端传等于允许伪造「谁在什么时候发的」，而这正是公告唯一要审计的两件事。
  */
 class StoreRequest extends FormRequest

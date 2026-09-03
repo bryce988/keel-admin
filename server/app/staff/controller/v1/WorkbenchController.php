@@ -16,6 +16,7 @@ declare(strict_types=1);
 namespace app\staff\controller\v1;
 
 use app\common\service\DashboardService;
+use app\common\service\NoticeService;
 use app\common\service\PermissionService;
 use app\common\support\Ctx;
 use app\common\support\Result;
@@ -29,7 +30,7 @@ class WorkbenchController
      * 工作台聚合
      * @url GET /staff/v1/workbench
      * @perm 登录即可
-     * @description 返回 `{user, permissions, dashboard:{visible, stats}}`。
+     * @description 返回 `{user, permissions, unread_notice, dashboard:{visible, stats}}`。
      * 概览需要 `sys:dashboard:view`，**没有这个权限点时返回 `visible=false` 而不是 403**：
      * 整个首页不该因为其中一块没权限就整体失败。
      *
@@ -42,6 +43,8 @@ class WorkbenchController
         $canDashboard = PermissionService::has($user, 'sys:dashboard:view');
 
         return Result::ok(StaffPresenter::identity($user) + [
+            // 未读数一起给：App 每次回到首页都要刷角标，单独一个接口就是每次多一次往返
+            'unread_notice' => NoticeService::unreadCount((int) ($user['id'] ?? 0)),
             'dashboard' => [
                 'visible' => $canDashboard,
                 'stats'   => $canDashboard ? (DashboardService::overview()['stats'] ?? []) : [],

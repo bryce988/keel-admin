@@ -58,6 +58,40 @@ export async function fetchWorkbench() {
 	return res
 }
 
+/**
+ * 消息列表
+ *
+ * 分页体里额外带 `unread_count`——列表与角标在界面上是同一件事的两面，
+ * 拆成两个接口会出现「角标 3、点进去只有 2 条未读」的错位。
+ */
+export function fetchNotices(pageNum = 1, pageSize = 20) {
+	return request(`/staff/v1/notices?page_num=${pageNum}&page_size=${pageSize}`)
+}
+
+/** 读一条：返回正文，**同时**在服务端落已读回执，不需要再调一次标记已读 */
+export function readNotice(id) {
+	return request('/staff/v1/notices/' + id)
+}
+
+export function readAllNotices() {
+	return request('/staff/v1/notices/read-all', 'POST')
+}
+
+/**
+ * 未读角标
+ *
+ * tabBar 的下标：0 首页 · 1 消息 · 2 我的。
+ * 0 要用 removeTabBarBadge 而不是 setTabBarBadge('0')——后者会显示一个「0」，
+ * 看起来像是有一条编号为 0 的消息。
+ */
+export function setNoticeBadge(count) {
+	if (count > 0) {
+		uni.setTabBarBadge({ index: 1, text: count > 99 ? '99+' : String(count) })
+	} else {
+		uni.removeTabBarBadge({ index: 1 })
+	}
+}
+
 export function fetchProfile() {
 	return request('/staff/v1/profile')
 }

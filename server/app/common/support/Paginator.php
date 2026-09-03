@@ -42,6 +42,29 @@ final class Paginator
         ?callable $map = null,
         ?callable $mapPage = null,
     ): Response {
+        $page = self::make($query, $request, $sortable, $defaultField, $defaultOrder, $map, $mapPage);
+
+        return Result::page($page['list'], $page['total'], $page['page_num'], $page['page_size']);
+    }
+
+    /**
+     * 同 {@see self::response()}，但返回数组而不是 Response
+     *
+     * 给「分页体之外还要带点别的」的场合用，比如消息列表要同时返回未读数——
+     * 列表与角标在界面上是同一件事的两面，拆成两个接口会出现
+     * 「角标 3、点进去只有 2 条未读」的错位。
+     *
+     * @return array{list: array, total: int, page_num: int, page_size: int}
+     */
+    public static function make(
+        Builder $query,
+        Request $request,
+        array $sortable = ['id'],
+        string $defaultField = 'id',
+        string $defaultOrder = 'desc',
+        ?callable $map = null,
+        ?callable $mapPage = null,
+    ): array {
         $pageNum  = max(1, (int) $request->get('page_num', 1));
         $pageSize = (int) $request->get('page_size', self::DEFAULT_SIZE);
         $pageSize = min(self::MAX_SIZE, max(1, $pageSize));
@@ -68,6 +91,11 @@ final class Paginator
                 : $rows->map($map ?? fn ($row) => $row->toArray())->all();
         }
 
-        return Result::page($list, $total, $pageNum, $pageSize);
+        return [
+            'list'      => $list,
+            'total'     => $total,
+            'page_num'  => $pageNum,
+            'page_size' => $pageSize,
+        ];
     }
 }

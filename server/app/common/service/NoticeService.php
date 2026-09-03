@@ -33,7 +33,7 @@
  */
 declare(strict_types=1);
 
-namespace app\admin\service;
+namespace app\common\service;
 
 use app\common\model\SysNoticeModel;
 use app\common\model\SysNoticeReadModel;
@@ -243,6 +243,60 @@ class NoticeService
     }
 
     // ---------------------------------------------------------------- 接收端
+
+    /**
+     * 收件箱：分页列出已发布的公告，带每条的已读状态
+     *
+     * 与 {@see self::bell()} 的分工：铃铛是「最近 10 条」的下拉，看完就走；
+     * 收件箱是能一直往下翻的列表，手机上的「消息」页用它。
+     * 两者共用同一份已读判定，不各写一套。
+     *
+     * 已读状态用一次 `pluck` 拿全量 id 再在内存里比对，而不是给每行发一次
+     * `EXISTS` 子查询：回执表是「用户 × 公告」，单个用户的回执数最多等于公告总数，
+     * 一次取回来比 20 行各查一次便宜得多。真到十万级公告再换 join。
+     *
+     * @return Builder 交给 Paginator 分页
+     */
+    public static function inboxQuery(): Builder
+    {
+        // 不在这里排序：排序交给 Paginator 统一处理（它有白名单与默认值），
+        // 两处都排会让 SQL 里出现两段 ORDER BY，谁生效要靠读代码才知道
+        return SysNoticeModel::query()->published();
+    }
+
+    /** 收件箱的行映射，闭包里带上「我」的已读集合 */
+    public static function inboxMapper(int $userId): callable
+    {
+        $readIds = SysNoticeReadModel::query()->where('user_id', $userId)->pluck('notice_id')->all();
+        $readSet = array_flip(array_map('intval', $readIds));
+
+        return fn (SysNoticeModel $row): array => [
+            'id'             => $row->id,
+            'title'          => $row->title,
+            'summary'        => self::summarize((string) $row->content),
+            'type'           => $row->type,
+            'published_at'   => $row->published_at?->format('Y-m-d H:i:s'),
+            'publisher_name' => $row->publisher_name,
+            'is_read'        => isset($readSet[(int) $row->id]),
+        ];
+    }
+
+    /**
+     * 未读数
+     *
+     * 单独一个方法给「角标」用：工作台聚合与消息页都要它，而它们不需要列表。
+     */
+    public static function unreadCount(int $userId): int
+    {
+        $readIds = SysNoticeReadModel::query()->where('user_id', $userId)->pluck('notice_id')->all();
+
+        $query = SysNoticeModel::query()->published();
+        if ($readIds) {
+            $query->whereNotIn('id', $readIds);
+        }
+
+        return $query->count();
+    }
 
     /**
      * 铃铛要的全部数据：未读数 + 最近若干条
