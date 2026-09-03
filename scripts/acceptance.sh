@@ -100,15 +100,26 @@ chk "员工端令牌可调后台接口"      "$(code -H "Authorization: Bearer $
 curl -s $SH $BASE/staff/v1/profile | grep -q trace_id && ok "员工端错误体带 trace_id（同 admin）" || bad "员工端错误体应带 trace_id"
 
 # 消息（系统公告）：接收端复用后台的公告数据，草稿对它不存在
+#
+# 自己造前置数据：种子不播公告，**全新的库里一条都没有**。
+# 依赖「库里恰好有一条已发布公告」的写法在 CI 上必然挂——URL 里的 {id} 取空，
+# 变成 /staff/v1/notices/ 直接 404。造完即清，与本文件其他探针数据一样。
+ADMIN_UID=$(sql "SELECT id FROM sys_users WHERE username='admin'")
+sql "INSERT INTO sys_notices (title,content,type,status,published_at,publisher_id,publisher_name,created_at,updated_at)
+     VALUES ('验收探针·已发布','<p>acceptance</p>','notice',1,NOW(),$ADMIN_UID,'系统管理员',NOW(),NOW()),
+            ('验收探针·草稿','<p>draft</p>','notice',0,NULL,0,'',NOW(),NOW());"
+PUB_ID=$(sql "SELECT id FROM sys_notices WHERE title='验收探针·已发布' ORDER BY id DESC LIMIT 1")
+DRAFT_ID=$(sql "SELECT id FROM sys_notices WHERE title='验收探针·草稿' ORDER BY id DESC LIMIT 1")
+
 NOTICES=$(curl -s $SH -H "Authorization: Bearer $STAFF" "$BASE/staff/v1/notices?page_size=5")
 echo "$NOTICES" | grep -q '"unread_count"' && ok "消息列表带未读数（列表与角标同源）" || bad "消息列表缺 unread_count"
-DRAFT_ID=$(sql "SELECT id FROM sys_notices WHERE status=0 ORDER BY id DESC LIMIT 1")
-if [ -n "$DRAFT_ID" ]; then
-  chk "草稿公告对 App 不可见 → 404"  "$(code $SH -H "Authorization: Bearer $STAFF" $BASE/staff/v1/notices/$DRAFT_ID)" 404
-else
-  ok "（库里没有草稿公告，跳过草稿可见性断言）"
-fi
-chk "读一条公告 → 200（顺带落已读回执）" "$(code $SH -H "Authorization: Bearer $STAFF" $BASE/staff/v1/notices/$(sql "SELECT id FROM sys_notices WHERE status=1 ORDER BY id DESC LIMIT 1"))" 200
+echo "$NOTICES" | grep -q '验收探针·已发布' && ok "已发布公告出现在 App 的消息列表里" || bad "新发布的公告没出现在列表里"
+chk "草稿公告对 App 不可见 → 404"       "$(code $SH -H "Authorization: Bearer $STAFF" $BASE/staff/v1/notices/$DRAFT_ID)" 404
+chk "读一条公告 → 200"                  "$(code $SH -H "Authorization: Bearer $STAFF" $BASE/staff/v1/notices/$PUB_ID)" 200
+# 读 = 标已读：回执必须真的落库，光看接口 200 说明不了
+chk "  且已读回执已落库"                "$(sql "SELECT COUNT(*) FROM sys_notice_reads WHERE notice_id=$PUB_ID AND user_id=$ADMIN_UID")" 1
+sql "DELETE FROM sys_notice_reads WHERE notice_id IN ($PUB_ID,$DRAFT_ID); DELETE FROM sys_notices WHERE id IN ($PUB_ID,$DRAFT_ID);"
+ok "已清理验收探针公告"
 
 echo "════ 2. 越权拦截（前端隐藏≠安全边界）════"
 DEV=$(login dev01 demo123456)
@@ -290,7 +301,10 @@ avatar $TMPIMG/ok.png > /dev/null
 [ -f "$ROOT/server/public$NEW_AV" ] && bad "换头像后旧文件仍在" || ok "换头像后旧文件已删除"
 # 还原：删掉本轮产生的文件与库里的值
 LAST_AV=$(sql "SELECT avatar FROM sys_users WHERE username='admin'")
-rm -f "$ROOT/server/public$LAST_AV"
+# 在容器里删：文件是容器内的 PHP 进程（root）写的，CI runner 在宿主机上是普通用户，
+# 直接 rm 会 Permission denied（断言不受影响，但日志里那行报错很像出了事）
+(cd "$ROOT" && docker compose exec -T server rm -f "/app/public$LAST_AV" 2>/dev/null) \
+  || rm -f "$ROOT/server/public$LAST_AV"
 sql "UPDATE sys_users SET avatar='$OLD_AV' WHERE username='admin';"
 rm -rf "$TMPIMG"
 ok "已还原 admin 头像与上传文件"

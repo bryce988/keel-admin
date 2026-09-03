@@ -50,7 +50,8 @@ Keel 是船体最底层的那根主梁，整艘船的结构都搭在它上面。
 | 请求 | Axios | 统一封装，见 §7 |
 | 样式 | SCSS + CSS 变量 | 令牌见 §10，不写死颜色 |
 | 校验 | Element Plus 内置 + 自定义规则集 | 手机号、身份证等规则统一维护 |
-| 代码规范 | ESLint + Prettier + Stylelint | 提交前钩子强制执行 |
+| 移动端 | uni-app + Vue 3（`staff/`） | 员工移动端，HBuilderX 工程，见 §8.1 与 `staff/README.md` |
+| 代码规范 | 暂无 lint | ⚠️ 现状：**没有** ESLint / Prettier / Stylelint。原因见 §3.0——现在直接开会产生一次覆盖全仓的格式化提交，把真实改动淹掉 |
 
 ### 2.2 后端
 
@@ -67,7 +68,7 @@ Keel 是船体最底层的那根主梁，整艘船的结构都搭在它上面。
 | 鉴权 | `firebase/php-jwt` | 无状态 JWT，见 §7.5 |
 | 定时任务 | `workerman/crontab` ^1.0 | `app/process/TaskProcess`，**count 必须为 1**，见 §14.7 |
 | 队列 | `webman/redis-queue` ^2.1 | 耗时任务异步化；消费进程见 `app/queue/`，配置在 `config/plugin/` |
-| 接口文档 | OpenAPI 3.0（注解生成） | 与前端联调的唯一依据 |
+| 接口文档 | `docs/api.md`（手写契约）+ 控制器 docblock 的 `@url` / `@perm` / `@error` | 与前端联调的唯一依据。⚠️ **没有**接了 OpenAPI 生成器，注解只给人看 |
 
 **为什么选 webman**：常驻内存带来的性能收益（相比 FPM 提升数倍），且天然适合长连接与定时任务。代价是编程模型与 FPM 不同，全局状态会跨请求存活，**所有开发人员上手前必须先读 §14**。
 
@@ -81,15 +82,25 @@ Keel 是船体最底层的那根主梁，整艘船的结构都搭在它上面。
 
 ```
 keel-admin/
-├── web/                  # 前端 · Vue 3 + Element Plus
+├── web/                  # 管理后台前端 · Vue 3 + Element Plus（对应 server/app/admin）
+├── staff/                # 员工移动端 · uni-app + Vue 3（对应 server/app/staff）
 ├── server/               # 后端 · webman 多应用
 ├── docs/                 # 文档站源文件（本文件亦在此）
 ├── docker/               # 一键启动：nginx + php + mysql + redis
+├── scripts/              # 仓库级脚本：deploy / acceptance / check-bizcode / bench-workers
+├── .github/workflows/    # CI
 ├── README.md             # 英文 + 中文双语说明
 ├── CONTRIBUTING.md       # 贡献指南与提交规范
 ├── CHANGELOG.md          # 按语义化版本记录
 └── LICENSE               # MIT
 ```
+
+**命名**：`staff/` 跟着端名走（对应 `app/staff`、`/staff/v1/*`）；`web/` 是历史命名，
+指管理后台前端（对应 `app/admin`）。两者不一致但都不产生歧义，改 `web/` 要动 CI、
+compose、部署脚本，不值当。
+
+⚠️ **`staff/` 不在 `docker compose` 与 CI 里**：它是 HBuilderX 工程，
+运行与云打包都在 HBuilderX 里做（uni-app 的 App 打包能力只在那个 IDE 里）。
 
 **发版策略**：`web/` 与 `server/` 共用同一个 tag（如 `v1.2.0`），保证前后端接口对得上；单端修复用 patch 版本。
 
@@ -110,22 +121,25 @@ src/
 ├── api/                  # 接口定义，按模块分文件，只放请求不放逻辑
 │   ├── system/           # user.ts / dept.ts / post.ts / role.ts / menu.ts / dict.ts / param.ts
 │   │                     # index.ts 只做 re-export，页面照旧从 `@/api/system` 引
-│   └── biz/              # 业务模块接口
-├── assets/               # 静态资源
-├── components/           # 全局通用组件
-│   ├── ProTable/         # 列表页表格（含列设置、URL 同步）
-│   ├── SearchForm/       # 可折叠搜索区
-│   ├── DictSelect/       # 字典下拉
-│   ├── DictTag/          # 字典状态标签
-│   ├── PermButton/       # 带权限校验的按钮
-│   └── UploadFile/       # 统一上传
-├── directives/           # v-permission / v-debounce
-├── hooks/                # useTable / useForm / useDict / usePermission
+│   ├── dashboard.ts · log.ts · notice.ts · export.ts · profile.ts
+├── components/           # 全局通用组件（扁平的 .vue，不分子目录）
+│   ├── ProTable.vue      # 列表页表格：分页、排序、列设置、筛选与页码同步 URL
+│   ├── SearchForm.vue    # 可折叠搜索区
+│   ├── FormDrawer.vue    # 新增/编辑/详情抽屉（FormDialog 是轻量确认类的兄弟）
+│   ├── DictSelect.vue · DictTag.vue      # 字典下拉与状态标签
+│   ├── EmptyState.vue · PageSkeleton.vue # 空态四场景 / 首屏骨架
+│   ├── ImportDialog.vue · RichEditor.vue · IconPicker.vue · BrandLogo.vue
+│   └── index.ts          # **只导出类型**，不导出组件本体（组件由 unplugin 按页注入；
+│                         # 从这里按值 import 会把 el-table 等钉进首屏 chunk）
+├── composables/          # useFormShell / useMenuNav / useFullscreen / useSignOut
+├── constants/            # bizCode.ts —— 与后端 BizCode.php 严格集合相等（CI 校验）
+├── directives/           # permission.ts（v-permission）
 ├── layout/               # 布局：侧边菜单、顶栏、页签、主区
-├── router/               # 路由定义与守卫
-├── stores/               # Pinia：user / permission / dict / tagsView / app
+├── router/               # 路由定义与守卫（dynamic.ts 由后端菜单树驱动）
+├── stores/               # Pinia：user / dict / notice / tagsView / app
 ├── styles/               # 变量、令牌、Element Plus 主题覆盖
-├── utils/                # request.ts / auth.ts / format.ts / validate.ts
+├── types/                # api.ts（PageResult / TableQuery / BatchOutcome）+ 自动生成的 d.ts
+├── utils/                # request.ts（axios 封装）· icons.ts
 ├── views/
 │   ├── login/
 │   ├── dashboard/
@@ -146,33 +160,44 @@ src/
 
 ```
 app/
-├── admin/                # 管理后台（一期唯一实现的端）
+├── admin/                # 管理后台
 │   ├── controller/       # 只做参数编排与响应，不写业务
-│   ├── service/          # 后台专有逻辑（Dept/Menu/Role/User/Dict/Param/Log…）
+│   ├── service/          # 后台专有逻辑（Dept/Post/Menu/Role/User/Dict/Log）
 │   └── validation/       # FormRequest，一个写/查动作一个类，按业务模块分子目录
-├── client/               # App / 小程序（二期，一期建空壳）
-├── open/                 # 开放平台与第三方回调（二期）
-├── internal/             # 内部服务调用（预留）
-├── common/               # ★ 各端共享
+├── staff/                # 员工移动端（身份同 admin，接口另一套，见 §8.1）
+│   ├── controller/v1/    # Auth / Workbench / Notice / Profile
+│   ├── support/          # StaffPresenter：这一端的响应形状（字段裁剪、头像补绝对地址）
+│   └── validation/
+├── client/               # C 端（App / 小程序）：ping + 假数据 profile 的空壳
+├── open/                 # 开放平台与第三方回调：ping + echo 的空壳
+├── internal/             # 内部服务调用：ping 的空壳，nginx 层拒绝公网访问
+├── common/               # ★ 各端共享（被依赖方，禁止反向 use 任何 app/<端>/）
 │   ├── model/            # Eloquent 模型，含全局数据权限 Scope
-│   ├── service/          # 跨端复用的业务与基础设施（Auth/Jwt/Permission/Export…）
-│   ├── middleware/       # Trace / Auth / Permission / Log
-│   ├── exception/        # BusinessException 等
-│   ├── enum/             # 状态枚举，与数据字典同名同值
-│   └── support/          # 助手与基础设施
-├── process/              # 自定义进程：定时任务、队列消费
+│   ├── service/          # 跨端复用的业务与基础设施（Auth/Jwt/Permission/Profile/
+│   │                     # Dashboard/Notice/Export/Param/Mail…）
+│   ├── middleware/       # Cors / Trace / Auth / Channel / Permission / Log / RateLimit…
+│   ├── validation/       # FormRequest 基类（各端的校验器都继承它）
+│   ├── exception/        # BusinessException 等 + 分端 Handler
+│   ├── constant/         # BizCode / HttpStatus
+│   └── support/          # 助手与基础设施（Ctx / Db / Cache / Result / Paginator…）
+├── process/              # 自定义进程：定时任务
+├── queue/                # 队列消费者（按目录扫描，无需注册）
 └── functions.php         # 全局助手函数（谨慎添加）
 config/
 ├── app.php               # 应用配置
-├── route.php             # 路由（分组 + 中间件）
-├── database.php          # 数据库连接
-├── redis.php             # Redis 连接
-├── middleware.php        # 中间件管道（可按应用分别配置）
-├── exception.php         # 异常处理器（可按应用分别配置）
-├── log.php               # 日志通道
+├── route.php             # 路由入口：存活探测 + require 分端文件 + 预检兜底 + fallback
+├── route/                # 分端路由：admin / staff / client / open / internal
+├── middleware.php        # 中间件管道（按应用分别配置）
+├── exception.php         # 异常处理器（按应用分别配置）
+├── export.php            # 导出业务登记表（common 不反向依赖 admin 的接线点）
+├── log.php               # 日志通道：app / error / sql
 ├── server.php            # 监听端口、进程数
 ├── process.php           # 自定义进程注册
-└── plugin/               # 插件配置
+└── plugin/               # 插件配置（webman/redis-queue 等）
+
+⚠️ **没有 `config/database.php` 与 `config/redis.php`**：数据库连接在
+`app/common/bootstrap/Database.php` 里用 Capsule 装配（要 `setEventDispatcher()`，
+否则模型事件静默不触发），Redis 连接在 `app\common\support\Cache`，两者都读 `.env`。
 public/                   # 静态资源（前端构建产物可托管于此，或独立 Nginx）
 runtime/                  # 日志、缓存、PID，需可写
 start.php                 # 启动入口
@@ -187,7 +212,7 @@ start.php                 # 启动入口
   需要 `common` 调到某端实现时（如导出任务的 handler 登记表），用配置接线：见 `config/export.php`
 - 端与端之间不得互相引用
 - 模型只放字段定义、关联、访问器与全局 Scope，不放业务判断
-- 枚举值必须在 `app/enum/` 定义，并与数据字典同名同值，不允许两边各写一套
+- 开关型状态用 `model/concern/HasStatus`（0 停用 1 启用），业务枚举一律走**数据字典**（`<DictTag>` / `<DictSelect>` 直接渲染）。⚠️ 早期规划过 `app/enum/` 目录，**没有落地**，也不打算落地：枚举同时存在于代码与字典表就是两份事实，字典是可运营的那一份
 
 ---
 
@@ -540,9 +565,11 @@ public function store(StoreRequest $request): Response
 refresh 的 jti 是另一个值且从不落库，「作废这个人所有会话」用黑名单表达不了，
 必须靠 `token_version`。
 
-**幂等与限流**：写接口支持 `Idempotency-Key` 头（Redis SETNX，10 分钟窗口）；登录、短信等接口按 IP + 账号双维度限流。
+**限流**：登录按「凭证 + IP」双维度计失败次数并锁定；C 端与员工移动端另有兜底限流中间件（按设备号）。
 
-**接口文档**：注解生成 OpenAPI，CI 中校验注解与实际路由一致，不一致则构建失败。
+⚠️ **幂等键未实现**：原计划的 `Idempotency-Key`（Redis SETNX）没有落地，写接口目前靠唯一索引与 `Guard::unique()` 防重。要做重试安全的写接口时再补。
+
+**接口文档**：`docs/api.md` 是唯一契约，控制器 docblock 里的 `@url` / `@perm` / `@error` 给人读。⚠️ **没有** OpenAPI 生成器，也没有「注解与路由一致性」的 CI 校验——真正兜底的是 `scripts/acceptance.sh` 与路由上的 `perm` 声明（不写就是 403）。
 
 ---
 
@@ -694,34 +721,40 @@ return [
 
 Nginx 按前缀分流：`/admin/` → 8787，`/client/` → 8788。导出、报表等慢接口再单独走一组进程或队列，不与实时接口抢资源。
 
-### 8.8 一期落地范围
+### 8.8 各端落地范围（当前状态）
 
-- ✅ 目录、中间件、异常处理器按四端切好
+- ✅ 目录、中间件、异常处理器按五端切好
 - ✅ `app/admin` 完整实现
-- ✅ `app/client`、`app/open` 建空壳 + 一个 `ping` 接口，验证分端中间件与异常处理链路通
-- ✅ 仓库根的 `staff/` 是**员工移动工作台**（uni-app + Vue 3，HBuilderX 工程）：
-  登管理端账号调 `/admin/*`，与 §8.4 一致——员工在手机上办公走管理端 token，
-  不下沉为 C 端用户。它**不用** `app/client` 那套接口
-- ⛔ C 端业务接口、小程序登录、支付回调不在一期范围
+- ✅ `app/staff` 完整实现：员工移动端，前端在仓库根的 `staff/`（uni-app + Vue 3）。
+  **身份复用管理端**（同一张 `sys_users`、同一个令牌、同一份权限点与数据权限），
+  **接口另开一套** `/staff/v1/*`——理由见 §8.1
+- ✅ `app/client`、`app/open`、`app/internal` 是空壳 + `ping`，验证分端中间件与异常处理链路通
+- ⛔ C 端业务接口、小程序登录、支付回调仍未实现
 
-**落地情况（M1 已完成）**
-
-| 端 | 目录 | 应用中间件 | 异常处理器 | 空壳接口 |
+| 端 | 目录 | 应用中间件 | 异常处理器 | 接口 |
 |---|---|---|---|---|
 | admin | `app/admin` | 挂在路由分组上（见下） | `AdminHandler` | 完整实现 |
-| client | `app/client` | `ChannelMiddleware` `RateLimitMiddleware` | `ClientHandler` | `/client/ping`、`/client/v1/profile` |
-| open | `app/open` | `IpWhitelistMiddleware` `SignatureMiddleware` | `OpenHandler` | `/open/ping`、`/open/echo` |
-| internal | `app/internal` | `InternalTokenMiddleware` | `InternalHandler` | `/internal/ping` |
+| staff | `app/staff` | `ChannelMiddleware` `RateLimitMiddleware` | `StaffHandler` | 完整实现：登录/刷新、工作台、消息、个人资料 |
+| client | `app/client` | `ChannelMiddleware` `RateLimitMiddleware` | `ClientHandler` | 空壳：`/client/ping`、`/client/v1/profile` |
+| open | `app/open` | `IpWhitelistMiddleware` `SignatureMiddleware` | `OpenHandler` | 空壳：`/open/ping`、`/open/echo` |
+| internal | `app/internal` | `InternalTokenMiddleware` | `InternalHandler` | 空壳：`/internal/ping` |
+
+> **C 端为什么只给空壳**：脚手架不预设 C 端的账号体系。真实项目里 C 端登录几乎必然是
+> 短信验证码或微信/Apple 授权，各家的用户表字段也各不相同，预置一套手机号加密码的
+> 实现只会被推翻重写。这里保证的是**接入不用改架构**：中间件、异常处理器、渠道头、
+> 令牌隔离都已就位，接 C 端时在 `app/client` 下加控制器与 service 即可，
+> 用户表按 `docs/database.md` §4 的方向自己建。
 
 **与 §8.3 示例的一处偏差**：后台的 `AdminAuth` / `Permission` / `OperationLog` 挂在
 `config/route/admin.php` 的分组上，而不是 `config/middleware.php` 的 `'admin'` 键下。
 原因是每个端都有公开接口（后台的登录与验证码、C 端的短信登录），
 应用级中间件会把登录接口自己也挡住。同理 `ClientAuthMiddleware` 也挂在路由分组上。
 
-**验证方式**：员工 token 调 `/client/v1/profile` 返回 401 + `10102`，
-C 端 token 调 `/admin/users` 同样 401 + `10102`，两个错误体结构不同即说明分端链路生效。
+**验证方式**（`scripts/acceptance.sh` 第 1 节已自动化）：员工 token 调 `/client/v1/profile`
+返回 401 + `10102`，两个错误体结构不同（admin 带 `trace_id`、client 不带）即说明分端链路生效。
+员工移动端则反过来验证「同一套身份」：`/staff/v1/*` 拿到的令牌调 `/admin/*` 应当是 200。
 
-这样二期接入 App 或小程序时，只需在 `app/client` 下加控制器，不动架构、不改后台。
+加一个端就是加一个目录——`app/staff` 就是这么长出来的，架构与后台一行没改。
 
 ---
 
@@ -865,15 +898,31 @@ Message（轻提示，2 秒）→ Notification（需留存）→ Dialog（需决
 
 ## 11. 框架能力清单
 
-| 能力 | 实现方式 | 业务方用法 |
+**管理后台（`web/`）**
+
+| 能力 | 实现方式 | 说明 |
 |---|---|---|
-| 权限按钮 | `v-permission="'biz:item:edit'"` | 无权限自动置灰 |
-| 字典 | `useDict('common_status')` | 启动加载进 Pinia，5 分钟过期 |
-| 字典标签 | `<DictTag type="common_status" :value="row.status" />` | 颜色由字典配置驱动 |
-| 列表页 | `useTable(api.list)` | 自带分页、URL 同步、列设置 |
-| 表单 | `useForm(rules)` | 自带校验、防重提交、离开确认 |
-| 上传 | `<UploadFile />` | 临时目录 + 提交后关联 |
-| 操作日志 | 后端注解自动记录 | 前端无需处理 |
+| 权限收敛 | `v-permission="'sys:user:create'"` 或 store 的 `can()` | 只是界面收敛，**不是安全边界**——拦截在后端路由的 `perm` 声明上 |
+| 列表页 | `<ProTable>` + `<SearchForm>` | 分页、排序、列设置、筛选条件与页码同步 URL |
+| 表单 | `<FormDrawer>`（抽屉）/ `<FormDialog>`（轻量确认类） | 壳与状态在 `useFormShell`，两者共用 |
+| 字典 | `stores/dict.ts` + `<DictTag>` / `<DictSelect>` | 启动加载进 Pinia，后端缓存 TTL 走 `sys.cache.ttl` |
+| 空态骨架 | `<EmptyState>` / `<PageSkeleton>` | 区分「没数据」与「筛不到」，后者带可用的清空筛选 |
+| 导入 | `<ImportDialog>` | 模板下载、前端预校验、失败明细就地展示 |
+| 富文本 | `<RichEditor>` | 公告正文，输出 HTML |
+| 图标选择 | `<IconPicker>` | 菜单图标 |
+| 操作日志 | 后端路由声明 `log` 自动落库 | 前端无需处理 |
+
+⚠️ 早期规划的 `useTable` / `useForm` / `<UploadFile>` **没有落地**，
+能力由上表的组件承担；不要照旧文档去 import 它们。
+
+**员工移动端（`staff/`）**
+
+| 能力 | 实现方式 |
+|---|---|
+| 请求层 | `common/request.js`：渠道头、令牌、401 自动刷新重试（单飞）、文件上传 |
+| 接口 | `common/api.js`，只放请求不放业务判断 |
+| 未读角标 | `setNoticeBadge()`，数据来自工作台聚合与消息列表（同源） |
+| 图标 | `scripts/make-app-icon.py` / `make-tabbar-icons.py` 从品牌标记生成 |
 
 ---
 
@@ -912,30 +961,37 @@ php start.php status       # 查看进程与连接状态
 倍数由压测定值（拐点在 ×2，×4 多一倍内存而吞吐持平），依据与复现脚本见该文件注释与 `scripts/bench-workers.sh`。
 webman 监听 8787，不直接对外，由 Nginx 反向代理。
 
-```nginx
-upstream webman {
-    server 127.0.0.1:8787 max_fails=2 fail_timeout=10s;
-    keepalive 32;
-}
-server {
-    listen 443 ssl;
-    server_name admin.example.com;
+**真实配置在 `docker/nginx/default.conf`**（生产镜像里用的就是它），下面只列必须守住的四条，
+不再维护第二份会漂移的示例：
 
-    location / {                       # 前端静态资源
-        root /var/www/admin-web/dist;
-        try_files $uri $uri/ /index.html;
-    }
-    location /api/ {                   # 后端接口
-        proxy_pass http://webman;
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+```nginx
+# 1. 按端前缀转发，与 app/ 下的子应用一一对应。**新增一个端就要改这里**
+location ~ ^/(admin|staff|client|open|ping) {
+    proxy_pass         http://server:8787;
+    proxy_http_version 1.1;
+    proxy_set_header   Connection "";
+    proxy_set_header   Host $host;
+
+    # 2. XFF 用覆盖式，不要 $proxy_add_x_forwarded_for（追加式）：
+    #    追加式会保留客户端自带的头，而应用层取最左值 —— 可以直接伪造，
+    #    波及 IP 白名单、限流与登录日志。前面若加 CDN/SLB 要改成从上游头取
+    proxy_set_header   X-Real-IP       $remote_addr;
+    proxy_set_header   X-Forwarded-For $remote_addr;
 }
+
+# 3. 内部服务不对公网暴露。返回 404 而不是 403：403 等于确认路径存在
+location ^~ /internal/ { return 404; }
+
+# 4. 用户上传的文件由后端提供，必须用 ^~ 抢在图片正则规则之前，否则去前端产物里找 .png → 404
+location ^~ /uploads/ { proxy_pass http://server:8787; }
 ```
+
+漏掉第 1 条的症状很难一眼看懂：GET 落到 SPA 兜底返回一张网页（像是「接口通了但返回 HTML」），
+而浏览器的跨域预检（OPTIONS）拿到 nginx 的 **405**，前端只看到一句「CORS 错误」，
+完全指不到 nginx 这一层。
+
+另外 `client_max_body_size` 要大于应用自己的上限（现取 24m 对 20MB）：nginx 默认只有 1m，
+比应用上限还小，请求根本到不了应用，用户看到的是 nginx 的原始 413 HTML 页。
 
 **进程守护**：生产用 systemd 或 supervisor 拉起，避免机器重启后服务不起。
 
@@ -1066,12 +1122,13 @@ worker 回收时内核不再往它派新连接。压测中曾用 `false` 复现�
 
 | 阶段 | 前端 | 后端 |
 |---|---|---|
-| M1 框架搭建 | 登录、布局、菜单、页签、请求封装、权限指令 | webman **多应用骨架（admin/client/open/common）**、分端中间件与异常处理器、统一响应、JWT 鉴权、日志通道 |
+| M1 框架搭建 | 登录、布局、菜单、页签、请求封装、权限指令 | webman **多应用骨架（admin/client/open/internal/common）**、分端中间件与异常处理器、统一响应、JWT 鉴权、日志通道 |
 | M2 系统管理 | 用户、部门、角色、菜单权限、字典、参数、日志七个页面 | 对应七组接口 + RBAC 落库 + 数据权限全局 Scope |
 | | ↳ 执行拆分见 [docs/roadmap-m2.md](docs/roadmap-m2.md) | |
 | M3 页型模板 | 五种页型 + 通用组件（ProTable / SearchForm / DictSelect） | 分页/导出/导入通用能力、队列进程、定时任务进程 |
 | M4 联调加固 | 权限矩阵验证、异常场景、性能优化 | 压测与进程数定值、内存泄漏观察、部署脚本与守护配置、client/open 空壳链路联通验证 |
-| | ↳ 可重复执行：`sh scripts/acceptance.sh`（26 项断言） | |
+| M5 员工移动端 | `staff/`：登录、工作台、消息、我的（uni-app） | 新增 `app/staff` 端：聚合接口、令牌刷新、公告收件箱、`StaffPresenter` 响应裁剪 |
+| | ↳ 可重复执行：`sh scripts/acceptance.sh`（**54 项断言**，覆盖五个端） | |
 
 **M4 曾遗留两项，均已补做（2026-08-27）：**
 

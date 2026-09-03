@@ -3,7 +3,9 @@
 > 版本 v1.0 · 对应 Keel v1.0.0
 > 配套文档：[数据库设计](database.md) · [项目文档](../PROJECT.md)
 >
-> 本文是**前后端并行开发的依据**。正式接口文档由代码注解生成 OpenAPI，本文只定义契约与约定，不重复描述每个字段。
+> 本文是**前后端并行开发的唯一依据**，也是最终的接口文档——没有 OpenAPI 生成器，
+> 控制器 docblock 里的 `@url` / `@perm` / `@error` 是给人读的补充说明。
+> 本文定义契约与约定，不逐字段罗列；字段以 `docs/database.md` 的表结构为准（全链路同名）。
 
 ---
 
@@ -14,11 +16,13 @@
 | 项目 | 值 |
 |---|---|
 | 管理后台前缀 | `/admin` |
-| C 端前缀（二期） | `/client/v1` |
-| 开放平台（二期） | `/open` |
+| 员工移动端前缀 | `/staff/v1`（身份同后台，接口另一套，见 §13） |
+| C 端前缀（未实现，仅空壳） | `/client/v1` |
+| 开放平台（未实现，仅空壳） | `/open` |
+| 内部服务（不对公网） | `/internal` |
 | 内容类型 | `application/json; charset=utf-8` |
 | 鉴权头 | `Authorization: Bearer <access_token>` |
-| 追踪 | 每个响应含 `trace_id`，报障时提供它即可定位日志 |
+| 追踪 | 每个响应含 `trace_id`（C 端刻意不给，见 §12.1），报障时提供它即可定位日志 |
 
 ### 1.2 响应体
 
@@ -917,11 +921,15 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 
 ### 12.1 各端错误结构不同
 
-同一件事（比如未授权）在四个端返回的结构是**刻意不同**的，受众不一样（PROJECT.md §8.3）：
+同一件事（比如未授权）在各端返回的结构是**刻意不同**的，受众不一样（PROJECT.md §8.3）：
 
 ```jsonc
 // admin —— 同事在用，要字段级明细与 traceId
 { "code": 10101, "message": "未登录，请先登录", "trace_id": "TRC-…", "details": {…} }
+
+// staff（员工移动端）—— 用的人也是同事，结构与 admin 刻意一致。
+// 单独一个 StaffHandler 是给以后留口子（强制更新提示这类只有移动端关心的字段）
+{ "code": 10101, "message": "未登录，请先登录", "trace_id": "TRC-…" }
 
 // client —— 终端用户在用，只给一句人话，内部标识不外露（仍有 X-Trace-Id 响应头）
 { "code": 10102, "message": "登录凭证类型不匹配" }
@@ -933,9 +941,11 @@ POST /admin/profile/avatar        // multipart/form-data，字段名 file
 { "code": 10500, "message": "…", "trace_id": "TRC-…", "exception": true }
 ```
 
-### 12.2 C 端请求头
+### 12.2 渠道请求头
 
-`/client/*` 一律要带（缺失直接 400，见 PROJECT.md §8.5）：
+`/client/*` **与 `/staff/v1/*`** 一律要带（缺失直接 400，见 PROJECT.md §8.5）——
+凡是跑在别人设备上的端都要，因为灰度、强制更新、风控、埋点都靠它们，
+缺了以后再补会发现历史数据全是空的：
 
 | 头 | 取值 |
 |---|---|

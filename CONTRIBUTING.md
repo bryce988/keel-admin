@@ -149,7 +149,7 @@ git push git@gitee.com:yewang_top/keel-admin.git main
 docker compose exec web npm run check          # vue-tsc 类型检查 + vite build
 docker compose exec server composer check      # composer validate + php -l 全量
 sh scripts/check-bizcode.sh                    # 业务码与 api.md 一致性（纯静态）
-sh scripts/acceptance.sh                       # 43 项权限与数据隔离断言
+sh scripts/acceptance.sh                       # 54 项断言：权限、数据隔离、五端隔离、移动端
 ```
 
 四条都要跑，各自挡的是不同的东西：
@@ -158,6 +158,8 @@ sh scripts/acceptance.sh                       # 43 项权限与数据隔离断�
   所以 `npm run check` 是两步而不是只跑 type-check
 - `vite build` 又验不到没被 import 的 `.vue`。`views/template/` 靠开发环境专属路由加载，
   改了那边要 `curl http://localhost:5173/src/views/template/xxx/index.vue`，模板写错会返回 500
+- **`staff/`（员工移动端）不在容器与 CI 里**：它是 HBuilderX 工程，运行与云打包只能在那个 IDE 里做。
+  改完至少在 HBuilderX 里跑一次；接口改动仍要用 `acceptance.sh` 覆盖
 - `composer lint` 只是 `php -l` 语法检查，挡不住类型错误——真正的行为验证靠 `acceptance.sh`
 
 目前**没有单元测试**，也没有接 ESLint/Prettier（见 `PROJECT.md` 的技术债一节）。
@@ -200,7 +202,7 @@ sh scripts/acceptance.sh                       # 43 项权限与数据隔离断�
 ## 版本与发版
 
 - 遵循[语义化版本](https://semver.org/lang/zh-CN/)：`主版本.次版本.修订号`
-- `web/` 与 `server/` **共用同一个 tag**，保证前后端接口对得上
+- `web/` / `staff/` 与 `server/` **共用同一个 tag**，保证前后端接口对得上
 - 破坏性变更必须在 CHANGELOG 中以 `BREAKING CHANGE` 标注，并给出迁移说明
 - C 端接口的破坏性变更不改旧版本，升 `/v2` 并保留旧版 6 个月
 
