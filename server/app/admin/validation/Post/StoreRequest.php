@@ -11,7 +11,7 @@ use app\admin\validation\FormRequest;
  *
  * 与编辑共用一份规则，见 {@see UpdateRequest}。
  *
- * 没有 `code`：岗位编码由 {@see \app\common\service\PostService::makeCode()}
+ * 没有 `code`：岗位编码由 {@see \app\admin\service\PostService::makeCode()}
  * 按主键生成。`validated()` 只返回这里声明过的键，所以请求体里带上 `code` 也进不去，
  * 不需要另外再挡一道。
  */

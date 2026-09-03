@@ -19,7 +19,7 @@ namespace app\admin\controller;
 use app\admin\validation\Menu\StoreRequest;
 use app\admin\validation\Menu\TreeRequest;
 use app\admin\validation\Menu\UpdateRequest;
-use app\common\service\MenuService;
+use app\admin\service\MenuService;
 use app\common\support\Result;
 use support\Response;
 use Webman\Http\Request;

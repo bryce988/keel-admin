@@ -10,7 +10,7 @@
  */
 declare(strict_types=1);
 
-namespace app\common\service;
+namespace app\admin\service;
 
 use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
@@ -19,6 +19,9 @@ use app\common\exception\ValidationException;
 use app\common\model\SysDeptModel;
 use app\common\model\SysPostModel;
 use app\common\model\SysUserModel;
+use app\common\service\AuthService;
+use app\common\service\ParamService;
+use app\common\service\PermissionService;
 use app\common\support\Arr;
 use app\common\support\BatchResult;
 use app\common\support\Ctx;

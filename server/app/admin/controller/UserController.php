@@ -24,7 +24,7 @@ use app\admin\validation\User\UpdateRequest;
 use app\admin\validation\User\UpdateStatusRequest;
 use app\common\exception\BusinessException;
 use app\common\service\ExportService;
-use app\common\service\UserService;
+use app\admin\service\UserService;
 use app\common\support\OpLog;
 use app\common\support\Paginator;
 use app\common\support\Result;

@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { PageResult, TableQuery } from '@/components'
+import type { PageResult, TableQuery } from '@/types/api'
 
 /**
  * 系统公告

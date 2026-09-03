@@ -13,7 +13,7 @@ use app\admin\validation\FormRequest;
  * 分开写迟早出现「新建时校验了、编辑时没校验」这种不对称。
  *
  * 只做格式合法性。编码唯一性、上级部门是否存在、成环检测都在
- * {@see \app\common\service\DeptService}，失败是 409/400 而非 422。
+ * {@see \app\admin\service\DeptService}，失败是 409/400 而非 422。
  */
 class StoreRequest extends FormRequest
 {

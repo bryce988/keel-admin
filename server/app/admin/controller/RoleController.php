@@ -25,8 +25,8 @@ use app\admin\validation\Role\DataScopeRequest;
 use app\admin\validation\Role\ListRequest;
 use app\admin\validation\Role\StoreRequest;
 use app\admin\validation\Role\UpdateRequest;
-use app\common\service\RoleService;
-use app\common\service\UserService;
+use app\admin\service\RoleService;
+use app\admin\service\UserService;
 use app\common\support\Paginator;
 use app\common\support\Result;
 use support\Response;
@@ -191,7 +191,7 @@ class RoleController
      * @perm sys:user:grantRole
      * @description 请求体 `user_ids` 数组。权限点用的是 `sys:user:grantRole` 而不是角色自己的——
      * 「谁能给人授角色」是一件事，从角色页进还是从用户页进只是入口不同。
-     * 逐个用户走 {@see \app\common\service\RoleService::assertAssignable()}，
+     * 逐个用户走 {@see \app\admin\service\RoleService::assertAssignable()}，
      * 互斥与角色数上限的校验与用户页共用同一份实现。
      * @error 400 `20304` 角色互斥 · 400 `20305` 超出单账号角色数上限
      */

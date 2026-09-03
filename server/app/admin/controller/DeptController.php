@@ -21,7 +21,7 @@ namespace app\admin\controller;
 use app\admin\validation\Dept\StoreRequest;
 use app\admin\validation\Dept\TreeRequest;
 use app\admin\validation\Dept\UpdateRequest;
-use app\common\service\DeptService;
+use app\admin\service\DeptService;
 use app\common\support\Result;
 use support\Response;
 use Webman\Http\Request;

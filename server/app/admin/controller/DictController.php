@@ -23,7 +23,7 @@ use app\admin\validation\Dict\StoreItemRequest;
 use app\admin\validation\Dict\StoreTypeRequest;
 use app\admin\validation\Dict\UpdateItemRequest;
 use app\admin\validation\Dict\UpdateTypeRequest;
-use app\common\service\DictService;
+use app\admin\service\DictService;
 use app\common\support\BatchResult;
 use app\common\support\OpLog;
 use app\common\support\Paginator;

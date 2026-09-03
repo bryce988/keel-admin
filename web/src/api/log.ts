@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 import type { ExportAccepted } from '@/api/export'
-import type { PageResult, TableQuery } from '@/components'
+import type { PageResult, TableQuery } from '@/types/api'
 
 /**
  * 日志审计接口（只读）

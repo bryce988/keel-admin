@@ -11,7 +11,7 @@ use app\admin\validation\FormRequest;
  *
  * 与编辑共用一份规则，见 {@see UpdateTypeRequest}。
  * 「已有字典项时不许改编码」是编辑独有的业务约束，在
- * {@see \app\common\service\DictService} 里判，失败是 409。
+ * {@see \app\admin\service\DictService} 里判，失败是 409。
  */
 class StoreTypeRequest extends FormRequest
 {

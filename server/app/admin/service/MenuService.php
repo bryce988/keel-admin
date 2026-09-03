@@ -13,12 +13,13 @@
  */
 declare(strict_types=1);
 
-namespace app\common\service;
+namespace app\admin\service;
 
 use app\common\constant\BizCode;
 use app\common\exception\ConflictException;
 use app\common\model\SysPermissionModel;
 use app\common\model\SysUserModel;
+use app\common\service\PermissionService;
 use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;

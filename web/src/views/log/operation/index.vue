@@ -10,7 +10,8 @@ import {
   type OperationLogDetail,
   type OperationLogRow
 } from '@/api/log'
-import type { ProColumn, ProTableInstance, SearchField, TableQuery } from '@/components'
+import type { ProColumn, ProTableInstance, SearchField } from '@/components'
+import type { TableQuery } from '@/types/api'
 import { useDictStore } from '@/stores/dict'
 
 /**

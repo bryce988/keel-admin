@@ -22,7 +22,11 @@
  * 或显式 `import ProTable from '@/components/ProTable.vue'`。
  * `src/layout/` 与 `src/views/` 不在扫描目录里，那边本来就是显式 import。
  */
-export type { ProColumn, PageResult, TableQuery } from './ProTable.vue'
+export type { ProColumn } from './ProTable.vue'
+/*
+ * PageResult / TableQuery 不在这里转出：它们是接口契约，住在 `@/types/api`。
+ * 组件 barrel 转出接口类型会让 `api/*.ts` 反过来依赖组件层。
+ */
 export type { SearchField } from './SearchForm.vue'
 /*
  * 表单壳的类型在 composable 里，两个组件共用。

@@ -138,7 +138,8 @@ git push git@gitee.com:yewang_top/keel-admin.git main
 
 - 控制器不写 SQL / Eloquent 查询，一律经 `service/`
 - 事务只在 `service/` 层开启
-- 各端只写自己的 controller，业务逻辑下沉 `app/common/service`，**端与端之间禁止互相引用**
+- 业务逻辑一律在 service 层：一端专有的放 `app/<端>/service`，跨端复用的才放 `app/common/service`
+  （`common` 不得 use 任何 `app/<端>/`）；**端与端之间禁止互相引用**
 - 数据权限由模型全局 Scope 统一注入，业务代码不得手写归属过滤，也不要随手 `withoutGlobalScope()`
 - **禁止**：静态变量或单例存请求态、`exit`/`die`、运行期改配置、使用 `$_GET`/`$_SESSION` 等超全局
 
@@ -191,7 +192,7 @@ sh scripts/acceptance.sh                       # 43 项权限与数据隔离断�
 
 **涉及多端时**
 
-- [ ] 新增业务逻辑放在 `app/common/service`，不在某个端里私自实现
+- [ ] 新增业务逻辑放在 service 层：一端专有的进该端 `service/`，跨端的才进 `app/common/service`
 - [ ] 端与端的 token 类型校验未被绕过
 
 ---

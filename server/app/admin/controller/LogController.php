@@ -23,7 +23,7 @@ namespace app\admin\controller;
 use app\admin\validation\Log\LoginListRequest;
 use app\admin\validation\Log\OperationListRequest;
 use app\common\service\ExportService;
-use app\common\service\LogService;
+use app\admin\service\LogService;
 use app\common\support\Paginator;
 use app\common\support\Result;
 use support\Response;

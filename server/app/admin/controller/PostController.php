@@ -20,7 +20,7 @@ namespace app\admin\controller;
 use app\admin\validation\Post\ListRequest;
 use app\admin\validation\Post\StoreRequest;
 use app\admin\validation\Post\UpdateRequest;
-use app\common\service\PostService;
+use app\admin\service\PostService;
 use app\common\support\BatchResult;
 use app\common\support\OpLog;
 use app\common\support\Paginator;

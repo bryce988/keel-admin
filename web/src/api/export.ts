@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 import { download } from '@/utils/request'
-import type { PageResult, TableQuery } from '@/components'
+import type { PageResult, TableQuery } from '@/types/api'
 
 /**
  * 数据导出（异步）

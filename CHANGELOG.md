@@ -132,6 +132,22 @@
   （只跑 type-check 验不到模板结构，两步必须都跑）
 
 ### 变更
+- **service 分层归位**：后台专有的 11 个 service（Dept/Post/Menu/Role/User/Dict/Param/Log/Notice/Profile/Dashboard）
+  从 `app/common/service` 挪到 `app/admin/service`，`common` 只留真正跨端的
+  （Auth/Jwt/Permission/Captcha/EmailCode/Mail/Param/Export/LogCleanup）。
+  接口路径、请求响应、权限点**一律未变**，只有二次开发时的 `use` 路径要跟着改。
+  - 之前 19 个 service 全在 common，而实测只有导出与日志清理是跨端的：
+    后台的业务逻辑住在一个 C 端也能 `use` 的目录里，等 C 端要写自己的 `UserService`
+    就会撞名，「端与端不互相引用」的约定到 service 层等于没落地
+  - 导出的业务登记表移到 **`config/export.php`**：handler 指向各端自己的 service，
+    留在 `ExportService` 里就成了 `common` 反向依赖 `admin`。
+    新增一种导出仍是「只改一处」，只是那一处从常量变成配置
+- **前端接口文件按模块拆分**：456 行的 `api/system.ts` 拆成 `api/system/{user,dept,post,menu,role,dict,param}.ts`。
+  页面照旧从 `@/api/system` 引（`index.ts` 只做 re-export），改一个模块不再把另外六个卷进 diff
+- **接口契约类型搬出组件层**：`PageResult` / `TableQuery` / `BatchOutcome` 从
+  `components/ProTable.vue` 挪到 **`types/api.ts`**，`@/components` 不再转出这三个类型。
+  原先 `api/*.ts` 要从组件 barrel 取接口类型，依赖方向是反的——换掉表格组件就得动一遍接口文件。
+  自建页面从 `@/components` 引这三个类型的要改成 `@/types/api`
 - **菜单结构调整**（跑一次 `seed.php` 即生效，前端无需发版）：
   - 新增一级「首页」，原来的一级「概览」变成它下面的「仪表盘」：`/dashboard` → `/home/dashboard`
   - 新增一级「系统配置」（排在最后），「参数配置」从「系统管理」挪进去：

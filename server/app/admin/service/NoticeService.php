@@ -33,7 +33,7 @@
  */
 declare(strict_types=1);
 
-namespace app\common\service;
+namespace app\admin\service;
 
 use app\common\model\SysNoticeModel;
 use app\common\model\SysNoticeReadModel;

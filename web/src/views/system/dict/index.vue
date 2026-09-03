@@ -18,13 +18,8 @@ import {
   type DictTypePayload,
   type DictItemPayload
 } from '@/api/system'
-import type {
-  FormDrawerInstance,
-  ProColumn,
-  ProTableInstance,
-  SearchField,
-  TableQuery
-} from '@/components'
+import type { FormDrawerInstance, ProColumn, ProTableInstance, SearchField } from '@/components'
+import type { TableQuery } from '@/types/api'
 import { useDictStore } from '@/stores/dict'
 import { BizCode } from '@/constants/bizCode'
 

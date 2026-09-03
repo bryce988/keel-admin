@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, UploadFilled } from '@element-plus/icons-vue'
-import type { BatchOutcome } from '@/api/system'
+import type { BatchOutcome } from '@/types/api'
 
 /**
  * Excel 导入弹窗

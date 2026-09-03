@@ -11,7 +11,7 @@
  */
 declare(strict_types=1);
 
-namespace app\common\service;
+namespace app\admin\service;
 
 use app\common\constant\BizCode;
 use app\common\model\SysDeptModel;

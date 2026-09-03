@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { PageResult } from '@/components'
+import type { PageResult } from '@/types/api'
 
 /**
  * 个人中心

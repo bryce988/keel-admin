@@ -14,8 +14,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use app\common\service\DictService;
-use app\common\service\PostService;
+use app\admin\service\DictService;
+use app\admin\service\PostService;
 use app\common\support\Db;
 
 $withDemo = in_array('--demo', $argv, true);

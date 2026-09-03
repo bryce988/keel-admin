@@ -8,7 +8,7 @@
  * 这些函数的签名与真接口一致（分页入参、PageResult 出参），
  * 换成真接口时页面代码一行都不用改。
  */
-import type { PageResult } from '@/components'
+import type { PageResult } from '@/types/api'
 
 export interface DemoRow {
   id: number

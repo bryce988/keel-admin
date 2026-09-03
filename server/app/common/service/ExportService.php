@@ -52,35 +52,16 @@ class ExportService
     /**
      * 可导出的业务
      *
-     * 新增一种导出只改这一处：登记名字、权限点、以及「怎么生成文件」。
-     * handler 是 `fn(array $params): array{path:string, rows:int}`——
-     * 就是各模块原来那个同步导出方法，只把返回值从「路径」扩成「路径 + 行数」
-     * （行数要显示在导出列表里，让人不用下载就知道有没有筛出东西）。
+     * 登记表在 `config/export.php`——handler 指向各端自己的 service，
+     * 写在这里就成了 `app/common` 反向依赖 `app/admin`。
+     * 每次读一次配置：webman 的配置在进程启动时就已解析进内存，这里只是取数组。
      *
-     * ⚠️ `perm` 在这里再判一次，不是重复劳动：路由上的权限点管的是
-     * 「谁能发起导出」（各模块自己的 export 权限），这里管的是消费时那个人
-     * **现在**还有没有这个权限——排队期间被撤了权限，任务就不该再跑完。
+     * @return array<string, array{name:string, perm:string, handler:callable, file:string}>
      */
-    public const BIZ = [
-        'user' => [
-            'name'    => '用户',
-            'perm'    => 'sys:user:export',
-            'handler' => [UserService::class, 'export'],
-            'file'    => '用户列表',
-        ],
-        'log_operation' => [
-            'name'    => '操作日志',
-            'perm'    => 'sys:log:operation:export',
-            'handler' => [LogService::class, 'exportOperation'],
-            'file'    => '操作日志',
-        ],
-        'log_login' => [
-            'name'    => '登录日志',
-            'perm'    => 'sys:log:login:export',
-            'handler' => [LogService::class, 'exportLogin'],
-            'file'    => '登录日志',
-        ],
-    ];
+    public static function biz(): array
+    {
+        return config('export.biz', []);
+    }
 
     // ---------------------------------------------------------------- 发起
 
@@ -92,7 +73,7 @@ class ExportService
      */
     public static function enqueue(string $biz, array $params): SysExportTaskModel
     {
-        $meta = self::BIZ[$biz] ?? throw new BusinessException("未知的导出类型：{$biz}");
+        $meta = self::biz()[$biz] ?? throw new BusinessException("未知的导出类型：{$biz}");
         $user = Ctx::user() ?? [];
 
         $task = new SysExportTaskModel();
@@ -159,7 +140,7 @@ class ExportService
 
         try {
             self::impersonate($task, function () use ($task) {
-                $meta = self::BIZ[$task->biz] ?? throw new BusinessException('导出类型已下线');
+                $meta = self::biz()[$task->biz] ?? throw new BusinessException('导出类型已下线');
 
                 if (!PermissionService::has(Ctx::user() ?? [], (string) $meta['perm'])) {
                     throw new BusinessException('发起人已不具备该导出权限');

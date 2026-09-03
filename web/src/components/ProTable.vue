@@ -14,6 +14,7 @@ import {
 import { useRoute, useRouter } from 'vue-router'
 import { Refresh, Setting, Sort } from '@element-plus/icons-vue'
 import DictTag from './DictTag.vue'
+import type { PageResult, TableQuery } from '@/types/api'
 
 /**
  * 列表表格
@@ -127,22 +128,6 @@ export interface ProColumn<Row = Record<string, unknown>> {
   showOverflowTooltip?: boolean
   /** 默认隐藏，可在「列设置」里打开 */
   hidden?: boolean
-}
-
-/** 接口结构，字段名与后端逐字一致（docs/api.md §1.3） */
-export interface PageResult<Row = Record<string, unknown>> {
-  list: Row[]
-  total: number
-  page_num: number
-  page_size: number
-}
-
-export interface TableQuery {
-  page_num: number
-  page_size: number
-  sort_field?: string
-  sort_order?: 'asc' | 'desc'
-  [key: string]: unknown
 }
 
 const props = withDefaults(

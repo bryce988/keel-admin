@@ -11,7 +11,7 @@ use app\admin\validation\FormRequest;
  *
  * 共用一份是必须的：分开写迟早出现「界面上筛出 20 条，导出来 2000 条」。
  *
- * 不传时间范围会兜底成最近 7 天（在 {@see \app\common\service\LogService} 里做，
+ * 不传时间范围会兜底成最近 7 天（在 {@see \app\admin\service\LogService} 里做，
  * 不在这里）。前端总是会带范围，但接口不能指望调用方——
  * 日志表是全系统最大的表，无界查询能把库拖垮。
  */

@@ -10,7 +10,7 @@ import {
   type RoleRow,
   type UserRow
 } from '@/api/system'
-import type { TableQuery } from '@/components'
+import type { TableQuery } from '@/types/api'
 
 /**
  * 角色成员

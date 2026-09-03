@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
-use app\common\service\DashboardService;
+use app\admin\service\DashboardService;
 use app\common\support\Result;
 use support\Response;
 use Webman\Http\Request;

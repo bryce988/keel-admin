@@ -3,7 +3,8 @@ import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { exportLoginLogs, fetchLoginLogs, splitDateRange, type LoginLogRow } from '@/api/log'
-import type { ProColumn, ProTableInstance, SearchField, TableQuery } from '@/components'
+import type { ProColumn, ProTableInstance, SearchField } from '@/components'
+import type { TableQuery } from '@/types/api'
 import { useDictStore } from '@/stores/dict'
 
 /**

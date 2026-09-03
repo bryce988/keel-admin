@@ -14,7 +14,7 @@
  */
 declare(strict_types=1);
 
-namespace app\common\service;
+namespace app\admin\service;
 
 use app\common\model\SysDeptModel;
 use app\common\model\SysDictTypeModel;
@@ -25,6 +25,7 @@ use app\common\model\SysPermissionModel;
 use app\common\model\SysPostModel;
 use app\common\model\SysRoleModel;
 use app\common\model\SysUserModel;
+use app\common\service\PermissionService;
 use app\common\support\Cache;
 use app\common\support\Ctx;
 use app\common\support\Db;

@@ -108,7 +108,8 @@ GitHub 与 Gitee 都是主仓库，维护者一条 `git push` 同时推两边。
 ```
 src/
 ├── api/                  # 接口定义，按模块分文件，只放请求不放逻辑
-│   ├── system/           # user.ts / dept.ts / role.ts / menu.ts / dict.ts
+│   ├── system/           # user.ts / dept.ts / post.ts / role.ts / menu.ts / dict.ts / param.ts
+│   │                     # index.ts 只做 re-export，页面照旧从 `@/api/system` 引
 │   └── biz/              # 业务模块接口
 ├── assets/               # 静态资源
 ├── components/           # 全局通用组件
@@ -131,10 +132,13 @@ src/
 │   ├── system/           # user / dept / role / menu / dict / param / log
 │   ├── template/         # 五种页型模板，新模块从这里复制
 │   └── error/            # 403 / 404 / 500
-└── types/                # 全局类型定义
+└── types/                # 全局类型定义（api.ts 放接口契约的公共类型：PageResult / TableQuery /
+                          # BatchOutcome；env.d.ts 与自动生成的 d.ts 也在这里）
 ```
 
 **约定**：`views` 下每个模块一个目录，页面组件 `index.vue`，弹窗/抽屉放同级 `components/`，接口类型放 `types.ts`。
+接口契约类型（分页结构、查询参数、批量回执）放 `types/api.ts`，**不从组件 barrel 转出**——
+那会让 `api/*.ts` 反过来依赖组件层，换个表格组件就得动一遍接口文件。
 
 ### 3.2 后端（webman）
 
@@ -144,14 +148,14 @@ src/
 app/
 ├── admin/                # 管理后台（一期唯一实现的端）
 │   ├── controller/       # 只做参数编排与响应，不写业务
-│   ├── service/          # 后台专有逻辑
+│   ├── service/          # 后台专有逻辑（Dept/Menu/Role/User/Dict/Param/Log…）
 │   └── validation/       # FormRequest，一个写/查动作一个类，按业务模块分子目录
 ├── client/               # App / 小程序（二期，一期建空壳）
 ├── open/                 # 开放平台与第三方回调（二期）
 ├── internal/             # 内部服务调用（预留）
 ├── common/               # ★ 各端共享
 │   ├── model/            # Eloquent 模型，含全局数据权限 Scope
-│   ├── service/          # 核心业务逻辑，事务边界在这一层
+│   ├── service/          # 跨端复用的业务与基础设施（Auth/Jwt/Permission/Export…）
 │   ├── middleware/       # Trace / Auth / Permission / Log
 │   ├── exception/        # BusinessException 等
 │   ├── enum/             # 状态枚举，与数据字典同名同值
@@ -178,7 +182,10 @@ start.php                 # 启动入口
 
 - 控制器**不允许**直接写 SQL 或 Eloquent 查询，一律经 `service/`
 - 事务边界只在 `service/` 层开启，控制器与模型内禁止 `DB::beginTransaction()`
-- 各端只写自己的 controller，业务逻辑一律下沉 `common/service`，**端与端之间不得互相引用**
+- 业务逻辑一律在 `service/` 层，事务边界也在这一层。**只有一端用的 service 放该端自己的 `service/`，
+  两端以上要用的才下沉 `common/service`**——`common` 是被依赖方，禁止反向 use 任何 `app/<端>/`。
+  需要 `common` 调到某端实现时（如导出任务的 handler 登记表），用配置接线：见 `config/export.php`
+- 端与端之间不得互相引用
 - 模型只放字段定义、关联、访问器与全局 Scope，不放业务判断
 - 枚举值必须在 `app/enum/` 定义，并与数据字典同名同值，不允许两边各写一套
 
@@ -582,7 +589,7 @@ app/
 
 **铁律**
 
-- 模型与核心业务逻辑一律放 `common/`，各端只写 controller 与该端特有的 service
+- 模型一律放 `common/`；service 按使用面分：一端专有的留在该端，跨端复用的才下沉 `common/service`
 - **端与端之间禁止互相引用 controller**，要复用就下沉到 `common/service`
 - 一个业务规则只有一份实现：不允许后台一套下单逻辑、小程序另写一套
 
