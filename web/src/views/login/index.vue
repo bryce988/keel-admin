@@ -520,9 +520,14 @@ onMounted(loadCaptcha)
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background:
-    radial-gradient(1000px 500px at 50% -10%, var(--el-color-primary-light-9), transparent 70%),
-    var(--el-bg-color-page);
+  /*
+   * 纯 parchment，不铺渐变
+   *
+   * 原来顶部压了一层 1000×500 的主色径向渐变。DESIGN.md 对这件事的态度很明确：
+   * 装饰性渐变一个都不要，氛围由内容（这里是品牌栏那道船身弧线）提供，
+   * 不由背景提供。去掉之后登录卡是这一屏唯一有内容的东西，也就自然成了焦点。
+   */
+  background: var(--el-bg-color-page);
 }
 
 /*
@@ -535,10 +540,15 @@ onMounted(loadCaptcha)
   width: min(800px, 100%);
   overflow: hidden;
   background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--el-border-color-light);
   /* 容器档：登录卡与全站的面板、卡片是同一类东西，圆角必须跟着走 */
   border-radius: var(--keel-radius-lg);
-  box-shadow: var(--el-box-shadow-light);
+  /*
+   * 不投影：DESIGN.md 里全系统只有一个阴影，且只给「放在台面上的产品照」用，
+   * 卡片一律扁平。这张卡靠白底与 parchment 的一档色差 + 发丝线立起来，
+   * 与站内所有面板是同一套表达。
+   */
+  box-shadow: none;
 }
 
 /* ---------------------------------------------------------------- 左：品牌 */

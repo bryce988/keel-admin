@@ -1,0 +1,454 @@
+/* ============================================================
+   Keel 设计层 —— 按 DESIGN.md 落地的一套 Element Plus 令牌
+   加载顺序：base.css → dark/css-vars.css → index.css → **本文件**
+   本文件是全站**唯一**允许出现十六进制色值的地方（页面里照旧禁止写死颜色）
+   ============================================================ */
+
+/* ----------------------------------------------------------------
+ * 先说清楚哪些搬了、哪些没搬
+ *
+ * DESIGN.md 描述的是**营销页**的设计语言：整屏图块、80px 段落留白、17px 正文、
+ * 全幅产品照。后台是密度完全相反的东西——一屏要放三十行表格，
+ * 照搬版式那部分等于把系统做废。所以只搬**可迁移的那一半**：
+ *
+ *   搬：单一强调色（Action Blue）· 中性色阶（ink / parchment / hairline）·
+ *       圆角语法（胶囊主按钮 + 8px 工具控件）· 「阴影只留给内容、chrome 一律扁平」·
+ *       负字距的标题 · 按下 scale(0.95) · 顶栏磨砂（sub-nav-frosted）
+ *
+ *   不搬：17px 正文（后台正文档保持 14px，见 index.css 的字号阶梯）·
+ *       80px 段落留白（面板间距仍是 16px）· 全幅明暗交替图块（后台没有「段落」这个层级）·
+ *       「只有一种强调色」（后台必须有 成功/警告/危险 的语义色，否则字典标签、
+ *        危险操作全部失去含义；这一条按语义需要保留，但色值换成 Apple 的系统色，
+ *        与 Action Blue 同一族）
+ * ---------------------------------------------------------------- */
+
+/* ----------------------------------------------------------------
+ * 主色：Action Blue #0066cc，派生档用 color-mix 现算
+ *
+ * index.css 里曾写明「别在这里贴十六进制、要换主色就去重编 EP 主题」，
+ * 理由是 light-3/5/7/8/9 + dark-2 六档、浅深两套、五个语义色 = 七十个手算色值，
+ * 错一个就是同一屏两种蓝，而且只有肉眼能发现。
+ *
+ * 那个顾虑成立，但前提被 `color-mix()` 拿掉了：EP 那七十个值本来就是同一个公式
+ * 算出来的——浅色 light-N = 主色与白按 N0% 混，dark-2= 与黑混 20%；
+ * 深色 light-N = 主色与页面底色混，dark-2 = 与白混 20%（拿 EP 自己的
+ * #409eff 逐档验算过，完全吻合）。既然是公式，就交给浏览器算，
+ * 手算的那个风险根本不存在。
+ *
+ * 于是这里只声明**五个基色**，其余全是派生。想换主色改一行即可。
+ *
+ * 语义色不用 EP 原色而用 Apple 的系统色（浅色用其 accessible 档）：
+ * index.css 里记过 EP 原色压浅底的文字对比度只有 2.0~2.8，
+ * 并且给出了正确解法是「换一套 base 档本身就够深的主色」——这里就是在做那件事，
+ * 而不是在个别组件上打补丁。
+ * ---------------------------------------------------------------- */
+:root {
+  --keel-blue: #0066cc;         /* colors.primary   —— 唯一的交互色 */
+  --keel-blue-focus: #0071e3;   /* colors.primary-focus —— 只用于焦点环 */
+  --keel-green: #248a3d;
+  --keel-orange: #b25000;
+  --keel-red: #d70015;
+  --keel-gray: #6e6e73;
+
+  /* 派生的混合底：浅色向白靠，深色主题里会被改成向近黑靠 */
+  --keel-tint: #ffffff;
+  --keel-shade: #000000;
+}
+
+/* 五个语义色一视同仁地走同一套公式。
+   `--el-color-*-rgb` 是 EP 拿去拼 rgba() 的，只能给三元组，不能给变量 */
+:root {
+  --el-color-primary: var(--keel-blue);
+  --el-color-primary-rgb: 0, 102, 204;
+  --el-color-primary-light-3: color-mix(in srgb, var(--keel-blue) 70%, var(--keel-tint));
+  --el-color-primary-light-5: color-mix(in srgb, var(--keel-blue) 50%, var(--keel-tint));
+  --el-color-primary-light-7: color-mix(in srgb, var(--keel-blue) 30%, var(--keel-tint));
+  --el-color-primary-light-8: color-mix(in srgb, var(--keel-blue) 20%, var(--keel-tint));
+  --el-color-primary-light-9: color-mix(in srgb, var(--keel-blue) 10%, var(--keel-tint));
+  --el-color-primary-dark-2: color-mix(in srgb, var(--keel-blue) 80%, var(--keel-shade));
+
+  --el-color-success: var(--keel-green);
+  --el-color-success-rgb: 36, 138, 61;
+  --el-color-success-light-3: color-mix(in srgb, var(--keel-green) 70%, var(--keel-tint));
+  --el-color-success-light-5: color-mix(in srgb, var(--keel-green) 50%, var(--keel-tint));
+  --el-color-success-light-7: color-mix(in srgb, var(--keel-green) 30%, var(--keel-tint));
+  --el-color-success-light-8: color-mix(in srgb, var(--keel-green) 20%, var(--keel-tint));
+  --el-color-success-light-9: color-mix(in srgb, var(--keel-green) 10%, var(--keel-tint));
+  --el-color-success-dark-2: color-mix(in srgb, var(--keel-green) 80%, var(--keel-shade));
+
+  --el-color-warning: var(--keel-orange);
+  --el-color-warning-rgb: 178, 80, 0;
+  --el-color-warning-light-3: color-mix(in srgb, var(--keel-orange) 70%, var(--keel-tint));
+  --el-color-warning-light-5: color-mix(in srgb, var(--keel-orange) 50%, var(--keel-tint));
+  --el-color-warning-light-7: color-mix(in srgb, var(--keel-orange) 30%, var(--keel-tint));
+  --el-color-warning-light-8: color-mix(in srgb, var(--keel-orange) 20%, var(--keel-tint));
+  --el-color-warning-light-9: color-mix(in srgb, var(--keel-orange) 10%, var(--keel-tint));
+  --el-color-warning-dark-2: color-mix(in srgb, var(--keel-orange) 80%, var(--keel-shade));
+
+  --el-color-danger: var(--keel-red);
+  --el-color-danger-rgb: 215, 0, 21;
+  --el-color-danger-light-3: color-mix(in srgb, var(--keel-red) 70%, var(--keel-tint));
+  --el-color-danger-light-5: color-mix(in srgb, var(--keel-red) 50%, var(--keel-tint));
+  --el-color-danger-light-7: color-mix(in srgb, var(--keel-red) 30%, var(--keel-tint));
+  --el-color-danger-light-8: color-mix(in srgb, var(--keel-red) 20%, var(--keel-tint));
+  --el-color-danger-light-9: color-mix(in srgb, var(--keel-red) 10%, var(--keel-tint));
+  --el-color-danger-dark-2: color-mix(in srgb, var(--keel-red) 80%, var(--keel-shade));
+
+  /* EP 里 error 是 danger 的别名，两套变量都有组件在读，得一起给 */
+  --el-color-error: var(--keel-red);
+  --el-color-error-rgb: 215, 0, 21;
+  --el-color-error-light-3: var(--el-color-danger-light-3);
+  --el-color-error-light-5: var(--el-color-danger-light-5);
+  --el-color-error-light-7: var(--el-color-danger-light-7);
+  --el-color-error-light-8: var(--el-color-danger-light-8);
+  --el-color-error-light-9: var(--el-color-danger-light-9);
+  --el-color-error-dark-2: var(--el-color-danger-dark-2);
+
+  --el-color-info: var(--keel-gray);
+  --el-color-info-rgb: 110, 110, 115;
+  --el-color-info-light-3: color-mix(in srgb, var(--keel-gray) 70%, var(--keel-tint));
+  --el-color-info-light-5: color-mix(in srgb, var(--keel-gray) 50%, var(--keel-tint));
+  --el-color-info-light-7: color-mix(in srgb, var(--keel-gray) 30%, var(--keel-tint));
+  --el-color-info-light-8: color-mix(in srgb, var(--keel-gray) 20%, var(--keel-tint));
+  --el-color-info-light-9: color-mix(in srgb, var(--keel-gray) 10%, var(--keel-tint));
+  --el-color-info-dark-2: color-mix(in srgb, var(--keel-gray) 80%, var(--keel-shade));
+}
+
+/* ----------------------------------------------------------------
+ * 中性色：ink / parchment / hairline
+ *
+ * DESIGN.md 的中性色只有三样东西：近黑的字（#1d1d1f，刻意不用纯黑，
+ * 让页面看着像照片而不是印刷品）、米白的底（#f5f5f7，与纯白差一档，
+ * 靠这一档而不是靠边框来分块）、发丝线（#e0e0e0）。
+ *
+ * EP 原来那套中性色偏蓝（#303133 / #f2f3f5 / #dcdfe6），与 Action Blue 并排时
+ * 灰里带的蓝会跟主色抢，整屏发冷。换成中性偏暖的这一套之后，
+ * 页面上唯一有色相的东西就只剩交互色本身——这正是 DESIGN.md 要的效果。
+ * ---------------------------------------------------------------- */
+:root {
+  --el-text-color-primary: #1d1d1f;    /* colors.ink */
+  --el-text-color-regular: #333333;    /* colors.ink-muted-80 */
+  --el-text-color-secondary: #7a7a7a;  /* colors.ink-muted-48 */
+  --el-text-color-placeholder: #a1a1a6;
+  --el-text-color-disabled: #c7c7cc;
+
+  --el-bg-color: #ffffff;              /* colors.canvas */
+  --el-bg-color-page: #f5f5f7;         /* colors.canvas-parchment */
+  --el-bg-color-overlay: #ffffff;
+
+  /* 边框四档全部压在 hairline 附近：DESIGN.md 里的「边框」本来就只是一条发丝，
+     不承担分隔以外的任何表达，所以档与档之间只差几个百分点 */
+  --el-border-color-darker: #b0b0b8;
+  --el-border-color-dark: #c7c7cc;
+  --el-border-color: #d2d2d7;          /* colors.surface-chip-translucent 的实色 */
+  --el-border-color-light: #e0e0e0;    /* colors.hairline */
+  --el-border-color-lighter: #ececee;
+  --el-border-color-extra-light: #f0f0f0; /* colors.divider-soft */
+
+  --el-fill-color-darker: #e0e0e5;
+  --el-fill-color-dark: #e8e8ed;
+  --el-fill-color: #ececee;
+  --el-fill-color-light: #f5f5f7;      /* 表头、hover 底 —— 就是 parchment */
+  --el-fill-color-lighter: #fafafc;    /* colors.surface-pearl */
+  --el-fill-color-extra-light: #fafafa;
+  --el-fill-color-blank: #ffffff;
+}
+
+/* ----------------------------------------------------------------
+ * 深色主题
+ *
+ * 两处必须改，别的沿用 EP：
+ *
+ * 1. **交互色换成 Sky Link Blue #2997ff**。Action Blue 压在近黑上只有 2.4:1，
+ *    按钮看着像是禁用的。DESIGN.md 为此专门留了 `colors.primary-on-dark`，
+ *    并且明说这一档**不许用在浅底上**——所以它只出现在 html.dark 里。
+ *    语义色同理换成 Apple 的深色档（浅色那套 accessible 档是为白底调的，
+ *    压在近黑上同样发闷）。
+ *
+ * 2. **light-N 的混合底从白改成页面底色**。深色主题里 light-N 的语义是
+ *    「主色往背景里退」，混白会得到一堆比主色还亮的粉彩，EP 自己也是混 #141414。
+ *
+ * 表面色顺带对齐 DESIGN.md 的近黑图块（#000 / #1d1d1f / #272729）：
+ * 页面底是真黑（surface-black），面板抬到 ink，浮层再抬一档——
+ * 深色下的「浮起」本来就该靠明度差而不是靠阴影。
+ * ---------------------------------------------------------------- */
+html.dark {
+  --keel-blue: #2997ff;   /* colors.primary-on-dark */
+  --keel-blue-focus: #2997ff;
+  --keel-green: #30d158;
+  --keel-orange: #ff9f0a;
+  --keel-red: #ff453a;
+  --keel-gray: #98989d;
+
+  /* 混合方向整体翻面：往底色里退，往白里提 */
+  --keel-tint: #1d1d1f;
+  --keel-shade: #ffffff;
+
+  --el-color-primary-rgb: 41, 151, 255;
+  --el-color-success-rgb: 48, 209, 88;
+  --el-color-warning-rgb: 255, 159, 10;
+  --el-color-danger-rgb: 255, 69, 58;
+  --el-color-error-rgb: 255, 69, 58;
+  --el-color-info-rgb: 152, 152, 157;
+
+  --el-bg-color-page: #000000;         /* colors.surface-black */
+  --el-bg-color: #1d1d1f;
+  --el-bg-color-overlay: #272729;      /* colors.surface-tile-1 */
+
+  --el-text-color-primary: #ffffff;    /* colors.body-on-dark */
+  --el-text-color-regular: #cccccc;    /* colors.body-muted */
+  --el-text-color-secondary: #98989d;
+  --el-text-color-placeholder: #7a7a7e;
+  --el-text-color-disabled: #5a5a5e;
+
+  --el-border-color-darker: #5a5a5e;
+  --el-border-color-dark: #48484c;
+  --el-border-color: #3a3a3d;
+  --el-border-color-light: #2f2f32;
+  --el-border-color-lighter: #2a2a2c;
+  --el-border-color-extra-light: #252527;
+
+  --el-fill-color-darker: #3a3a3d;
+  --el-fill-color-dark: #333336;
+  --el-fill-color: #2a2a2c;            /* colors.surface-tile-2 */
+  --el-fill-color-light: #252527;      /* colors.surface-tile-3 */
+  --el-fill-color-lighter: #202022;
+  --el-fill-color-extra-light: #1a1a1c;
+  --el-fill-color-blank: #1d1d1f;
+}
+
+/* ----------------------------------------------------------------
+ * 圆角：两种语法，中间没有第三种
+ *
+ *   胶囊 pill —— **只给主按钮**。DESIGN.md 里胶囊就是「这是本屏的动作」的信号，
+ *                 一旦所有按钮都胶囊，信号就没了（见下面 .el-button 那段）
+ *   8px  sm   —— 其余一切控件：次级按钮、输入框、下拉、标签、页签、图标按钮
+ *   14px lg   —— 容器：面板、卡片、对话框
+ *
+ * 容器档没有照抄 DESIGN.md 的 18px：那是给 280px 宽的商品卡定的，
+ * 后台的面板动辄铺满 1400px，18px 的角在这个尺度上会显得发胖。
+ * 14px 是在同一语法里往下挪了一档，不是新起一档。
+ *
+ * 覆盖 index.css 里的 4px / 8px 两档（那两档是「EP 默认值附近」的保守取值，
+ * 与本设计语言无关）。
+ * ---------------------------------------------------------------- */
+:root {
+  --keel-radius: 8px;      /* rounded.sm  —— 控件 */
+  --keel-radius-lg: 14px;  /* rounded.lg  —— 容器 */
+  --keel-radius-pill: 9999px;
+
+  /* EP 自己的两档跟着走，否则同一行里按钮 8px、输入框 4px */
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 5px;   /* rounded.xs */
+  --el-border-radius-round: 9999px;
+}
+
+/* ----------------------------------------------------------------
+ * 阴影：chrome 一律扁平
+ *
+ * DESIGN.md 全系统只有一个投影，而且只给「放在台面上的产品照」用，
+ * 卡片、按钮、导航条一概没有——层级靠**换表面色**和发丝线来表达。
+ *
+ * 后台不能一个投影都不留：下拉、气泡、对话框是真的浮在内容之上，
+ * 没有阴影就分不出哪一层在上面。折中是「贴在页面上的东西扁平，
+ * 真正脱离文档流的东西保留一层很轻的影」：
+ *
+ *   lighter  0        贴边小元素（页签条、卡片）—— 直接取消
+ *   light    极轻     下拉、气泡
+ *   base     轻       弹出层
+ *   dark     稍重     对话框
+ *
+ * 颜色改用 ink（#1d1d1f）而不是 index.css 里的 EP 中性色 #303133：
+ * 那一档偏蓝，投在 parchment 上会带出一圈冷灰。
+ * ---------------------------------------------------------------- */
+:root {
+  --el-box-shadow-lighter: none;
+  --el-box-shadow-light: 0 2px 8px rgb(29 29 31 / 6%);
+  --el-box-shadow: 0 6px 20px rgb(29 29 31 / 8%);
+  --el-box-shadow-dark: 0 12px 40px rgb(29 29 31 / 12%);
+}
+
+html.dark {
+  /* 深色下阴影几乎不起作用（页面底本来就是黑的），层级全靠明度差，
+     所以这里比浅色更克制，只在对话框上留一点点把边界压出来 */
+  --el-box-shadow-lighter: none;
+  --el-box-shadow-light: 0 2px 8px rgb(0 0 0 / 40%);
+  --el-box-shadow: 0 6px 20px rgb(0 0 0 / 48%);
+  --el-box-shadow-dark: 0 12px 40px rgb(0 0 0 / 56%);
+}
+
+/* 卡片与面板不再挂阴影：它们贴在页面上，靠 hairline + 白底与 parchment 的
+   一档色差分块，这正是 DESIGN.md 说的「色差本身就是分隔线」 */
+:root .el-card {
+  box-shadow: none;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+/* ----------------------------------------------------------------
+ * 字体与字距
+ *
+ * 字体栈不动（index.css 那套已经是 -apple-system 打头，macOS/iOS 上解析到的
+ * 就是 SF Pro 本尊，Windows/Android 各回退到自己的系统字）。这里只补两件事：
+ *
+ * 1. **抗锯齿**。SF Pro 在 macOS 上默认是次像素渲染，笔画会比设计稿粗一档；
+ *    Apple 自家页面全部开了 antialiased，不开的话字重看着像 500 而不是 400
+ * 2. **负字距**。DESIGN.md 的签名特征：17px 以上一律 -0.374px 左右的收紧，
+ *    12px 及以下不收。后台正文是 14px，按同样的比例（约 -0.016em）折算成
+ *    -0.224px —— 这个值 DESIGN.md 的 caption 档正好给了，直接用
+ * ---------------------------------------------------------------- */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.224px;
+}
+
+/* 12px 及以下不收紧：DESIGN.md 明确写了这条边界，
+   小字再收会糊在一起（辅助说明、表单提示、标签内文字都在这一档） */
+:root .el-form-item__error,
+small,
+.keel-hint {
+  letter-spacing: normal;
+}
+
+/*
+ * 标题档：16px 以上才允许 600，并按 display 档收到 -0.374px
+ * （14px 及以下只有 400/500 两档，规则见 index.css 的字重说明，这里不动它）
+ */
+h1,
+h2,
+h3,
+.keel-display {
+  letter-spacing: -0.374px;
+  font-weight: 600;
+}
+
+:root .el-dialog__title,
+:root .el-drawer__title {
+  font-weight: 600;
+  letter-spacing: -0.374px;
+}
+
+/* ----------------------------------------------------------------
+ * 按钮：统一走 8px 那一档，不做胶囊
+ *
+ * 这里前后改了两版，记一下过程，免得以后又绕回去：
+ *
+ *   v1 只有 primary 是胶囊 —— 错在读漏了 `button-secondary-pill`：
+ *      DESIGN.md 里两个动作并排时，第二个是**幽灵胶囊**而不是方角，
+ *      所以「胶囊 + 方角」在同一行里在原设计中不存在。表现就是工具条
+ *      （新增 / 导入 / 导出）三颗按钮两种圆角，一眼看得出不齐
+ *
+ *   v2 全部胶囊 —— 一行是齐了，但**太圆**。DESIGN.md 的胶囊是给营销页的
+ *      大 CTA 用的（44px 高、11×22 内边距，圆角只占高度的一半略多）；
+ *      后台的按钮只有 32px 高、两个汉字宽，同样的 9999px 下去，
+ *      圆角吃掉的比例大得多，一排看过去是一串药丸
+ *
+ *   v3（现在）8px —— 这不是「放弃了设计语言」，8px 正是 DESIGN.md 自己的
+ *      `button-dark-utility` 那一档（`rounded.sm`），语境是顶部导航条里
+ *      Sign In / Bag 这类**紧凑的工具动作**——后台工具条里的按钮就是这种东西，
+ *      不是落地页正中央那颗「立即购买」。选错的是档位，不是语法
+ *
+ * 于是这里不需要任何圆角规则：`index.css` 里那条 `:root .el-button` 已经把
+ * 按钮、分页按钮统一到 `--keel-radius`，而这个令牌在本文件里已经从 4px 提到 8px。
+ * 分段控件（`el-radio-button`）走 EP 的 `--el-border-radius-base`，同样是 8px。
+ *
+ * 胶囊在全站只剩一处：顶栏的菜单搜索框（`.keel-pill-input`）。它是 44px 高的独立
+ * 搜索框，与 DESIGN.md 的 `search-input` 尺寸对得上——胶囊在那个高度上才成立。
+ * 页签也试过胶囊，同样因为「30px 高、圆角占掉一半」退回了 8px（见 TagsView.vue）。
+ */
+
+/*
+ * 按下缩到 0.95 —— DESIGN.md 里全系统统一的那个微交互
+ *
+ * 只在 :active 上，且不给链接按钮（表格里一行五个链接，各自缩一下像在抖）。
+ * 0.96 而不是 0.95：后台的按钮比营销页的 CTA 小一半，同样的比例在小尺寸上
+ * 看着像卡了一帧，这里按视觉位移对齐而不是按数值对齐。
+ */
+:root .el-button:not(.is-link):not(.is-text):active {
+  transform: scale(0.96);
+}
+
+:root .el-button {
+  transition: transform 0.1s ease, background-color 0.2s, border-color 0.2s, color 0.2s;
+  /* 焦点环用 primary-focus（#0071e3），DESIGN.md 里这一档只干这一件事 */
+  --el-button-outline-color: var(--keel-blue-focus);
+}
+
+/* 关了动效的用户不要位移反馈 */
+@media (prefers-reduced-motion: reduce) {
+  :root .el-button:not(.is-link):not(.is-text):active {
+    transform: none;
+  }
+}
+
+/* ----------------------------------------------------------------
+ * 表格：把「表头是一条灰带」换成「表头是一行更重的字」
+ *
+ * index.css 给表头上了 --el-fill-color-light 的底色，那是为了让表头从表体里
+ * 跳出来。换成本设计语言之后底色只比白多一档（parchment），跳不出来了——
+ * 但这恰恰是想要的：DESIGN.md 里分隔靠的是发丝线和字重，不是色带。
+ * 底色保留（它现在是 parchment，正好与页面底同色，表头看着像是"挖空"的），
+ * 再补一条比表体更实的下边线，表头就立住了。
+ * ---------------------------------------------------------------- */
+:root .el-table th.el-table__cell {
+  border-bottom-color: var(--el-border-color);
+}
+
+/* 行悬停用 parchment 的更浅一档（pearl），避免与表头同色 */
+:root .el-table {
+  --el-table-row-hover-bg-color: var(--el-fill-color-lighter);
+  --el-table-border-color: var(--el-border-color-lighter);
+}
+
+/* ----------------------------------------------------------------
+ * 菜单：选中项从「蓝底块」改成「浅蓝胶囊」
+ *
+ * EP 默认给选中项一条通栏的浅蓝背景，直角、贴着侧栏两边。
+ * DESIGN.md 的语法里，凡是「可点的、当前的」都是胶囊形，
+ * 而且导航属于 chrome，要往后退——所以底色只留一档最浅的，靠文字颜色说话。
+ * ---------------------------------------------------------------- */
+:root .el-menu {
+  /* 44px 是 DESIGN.md 的最小触达尺寸（也是它 global-nav 的高度）。
+     EP 默认 56px 是给「一屏放五六项」的产品设计的，后台的菜单树动辄二十项，
+     56px 一屏放不下十项，天天要滚。高度由 EP 自己按这个变量算，
+     子菜单项跟着 --el-menu-sub-item-height（= 本值 - 6px）走，不用手写 */
+  --el-menu-item-height: 44px;
+  border-right: none;
+}
+
+/* 侧栏是竖排菜单；横排的一级导航是 TopMenu 自己的按钮，不走 el-menu */
+:root .el-menu--vertical .el-menu-item,
+:root .el-menu--vertical .el-sub-menu__title {
+  margin: 2px 8px;
+  width: auto;
+  border-radius: var(--keel-radius);
+}
+
+:root .el-menu--collapse .el-menu-item,
+:root .el-menu--collapse .el-sub-menu__title {
+  /* 折叠态只剩一个图标，8px 的外边距会把图标挤离中线 */
+  margin: 2px 4px;
+}
+
+:root .el-menu--vertical .el-menu-item.is-active {
+  background: var(--el-color-primary-light-9);
+  font-weight: 500;
+}
+
+/* ----------------------------------------------------------------
+ * 输入类控件：DESIGN.md 的 search-input 是胶囊，但那是一个**独立的搜索框**；
+ * 后台的输入框成排成列地待在表单里，胶囊会让每一行都像一颗药丸，
+ * 而且带前后缀（选择器、单位）的输入框在胶囊里没法拼接。
+ * 所以输入类统一走 8px 那一档，只把「独立搜索框」这一种做成胶囊
+ * （用 .keel-pill-input 显式标注，见 SearchForm / MenuSearch）。
+ * ---------------------------------------------------------------- */
+.keel-pill-input .el-input__wrapper {
+  border-radius: var(--keel-radius-pill);
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* 标签：字典标签是「状态」不是「动作」，保持方角，只跟着控件档走 */
+:root .el-tag {
+  border-radius: var(--keel-radius);
+}

@@ -277,6 +277,9 @@ onMounted(() => {
   font-size: 24px;
   font-weight: 600;
   line-height: 1.2;
+  /* display 档的负字距（DESIGN.md 的签名特征）。正文那档在 body 上统一给了，
+     大字号要再收一点才是同一个观感 */
+  letter-spacing: -0.374px;
   color: var(--el-text-color-primary);
 }
 

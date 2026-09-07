@@ -161,9 +161,12 @@ defineExpose({ open })
     append-to-body
     @opened="onOpened"
   >
+    <!-- 胶囊：DESIGN.md 里独立的搜索框是唯一一种做成胶囊的输入（表单里的输入框不是，
+         成排的胶囊会让每一行都像一颗药丸，带前后缀时也拼不上） -->
     <el-input
       ref="inputRef"
       v-model="keyword"
+      class="keel-pill-input"
       size="large"
       placeholder="搜索菜单"
       :prefix-icon="Search"

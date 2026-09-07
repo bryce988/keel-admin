@@ -372,8 +372,15 @@ async function onUserCommand(cmd: string) {
    */
   height: 100%;
   min-height: 0;
-  background: var(--el-bg-color);
-  border-right: 1px solid var(--el-border-color);
+  /*
+   * chrome 用 parchment、内容面板用纯白（DESIGN.md：让 UI 退到后面去）
+   *
+   * 原来是反过来的——侧栏与顶栏纯白、内容区 parchment，于是一屏里最亮的
+   * 两块是导航和标题栏，最该被看的表格反而压在灰底上。
+   * 换过来之后整块 chrome 与页面底同色、只靠发丝线分界，白色只留给内容面板。
+   */
+  background: var(--el-bg-color-page);
+  border-right: 1px solid var(--el-border-color-light);
   overflow: hidden;
 }
 
@@ -434,7 +441,8 @@ async function onUserCommand(cmd: string) {
   height: var(--keel-topbar-height);
   padding: 0 20px;
   flex: none;
-  background: var(--el-bg-color);
+  /* 与侧栏同一块 chrome，同色同发丝线（理由见 .sidebar） */
+  background: var(--el-bg-color-page);
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
@@ -563,7 +571,7 @@ async function onUserCommand(cmd: string) {
   .sidebar {
     height: auto;
     border-right: none;
-    border-bottom: 1px solid var(--el-border-color);
+    border-bottom: 1px solid var(--el-border-color-light);
   }
 
   /* 窄屏顶栏已经在最上面，logo 不必再占侧栏那一列的宽度 */

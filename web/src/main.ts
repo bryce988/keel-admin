@@ -20,6 +20,12 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-message-box.css'
 import './styles/index.css'
+/*
+ * 设计层排在 index.css **之后**：它按 DESIGN.md 重写主色、中性色、圆角与阴影，
+ * 与 index.css 里那几档保守取值是同名令牌，靠源码顺序压过去（选择器权重相同）。
+ * 两个文件的分工：index.css 管结构与组件行为，design.css 管「长什么样」。
+ */
+import './styles/design.css'
 
 import App from './App.vue'
 import router, { applyDocumentTitle } from './router'

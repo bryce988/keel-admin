@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const files = ['src/styles/index.css']
+const files = ['src/styles/index.css', 'src/styles/design.css']
 
 const problems = []
 

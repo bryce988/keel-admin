@@ -62,8 +62,16 @@ function onSelect(node: MenuNode) {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--el-bg-color-page);
-  border-right: 1px solid var(--el-border-color);
+  /*
+   * 一级窄条比它右边的二级侧栏再深一档
+   *
+   * chrome 现在整体是 parchment（见 layout/index.vue 的 .sidebar），
+   * 窄条与侧栏挨着、又同色的话，两栏之间只剩一条发丝线，
+   * 看不出「左边是模块、右边是模块内的页面」这层从属关系。
+   * 深一档（fill-color）就够了——DESIGN.md 里层级本来就靠表面色差表达。
+   */
+  background: var(--el-fill-color);
+  border-right: 1px solid var(--el-border-color-light);
   overflow: hidden;
 }
 
@@ -145,7 +153,7 @@ function onSelect(node: MenuNode) {
   .column-rail {
     height: auto;
     border-right: none;
-    border-bottom: 1px solid var(--el-border-color);
+    border-bottom: 1px solid var(--el-border-color-light);
   }
 
   .rail-brand {
