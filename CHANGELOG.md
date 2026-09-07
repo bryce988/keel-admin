@@ -510,6 +510,16 @@
   登录日志此前按时间范围查询时 `possible_keys` 为 `NULL`（一个候选索引都没有）
 
 ### 修复
+- **收起一级菜单时二级项不再抖一下**。原因是外边距折叠，与菜单逻辑无关：
+  设计层给菜单项加了 `margin: 2px 8px`，而二级容器 `.el-menu--inline` 没有 padding
+  也没有边框，第一个子项的 `margin-top` 会**穿过它折叠出去**、不计入它的高度。
+  EP 的 `collapse-transition` 在 `beforeLeave` 里先读 `scrollHeight` 当 `max-height`
+  的起点，紧接着设 `overflow: hidden` —— 后者创建 BFC，外边距立刻不再折叠。
+  - 实测这一下：内容下移 2px，容器真实高度 258 → 262，而 `max-height` 已按 258 钉死，
+    于是子项既下移又被裁；`afterLeave` 还原 overflow 时再抖回来一次
+  - 改法是竖向留白从子项的 margin 换成容器的 padding：padding 不参与折叠，
+    而且 collapse-transition 本来就会把它一起动画掉，收起反而更顺
+  - 结论不是「别用外边距」，是**别让外边距穿过一个会被动画改 `overflow` 的容器折叠**
 - **登录日志里 iPhone / iPad 不再被记成 macOS**。苹果移动设备的 UA 里都带
   `like Mac OS X`（兼容老网站留的），而 `parseUserAgent()` 把 `Mac OS` 判在
   `iPhone` 前面，于是所有苹果手机、平板的登录都写成了 macOS，`iOS` 那一档是死代码。

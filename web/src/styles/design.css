@@ -417,11 +417,37 @@ h3,
 }
 
 /* 侧栏是竖排菜单；横排的一级导航是 TopMenu 自己的按钮，不走 el-menu */
+/*
+ * ⚠️ 只能有左右外边距，**上下必须是 0**
+ *
+ * 曾经写的是 `margin: 2px 8px`，表现是「点一级菜单收起时，二级项先抖一下再收」。
+ * 成因跟菜单没关系，是外边距折叠：
+ *
+ * `.el-menu--inline`（二级容器）padding 为 0、无边框，于是第一个子项的 margin-top
+ * 与最后一个的 margin-bottom 会**穿过它折叠出去**，不计入它的高度。
+ * 而 EP 的 collapse-transition 在 `beforeLeave` 里干了两件事：先读 `scrollHeight`
+ * 当作 max-height 的起点，紧接着设 `overflow: hidden`——后者创建 BFC，
+ * 外边距立刻不再折叠、变成容器内部高度。实测这一下：
+ *
+ *     内容下移 2px，容器真实高度 258 → 262，而 max-height 已经按 258 钉死
+ *
+ * 于是子项既下移又被裁，收起动画的第一帧就是那个「抖」。`afterLeave` 还原 overflow
+ * 时再抖回来一次。
+ *
+ * 结论不是「别用外边距」，是**别让外边距穿过一个会被动画改 overflow 的容器折叠**。
+ * 竖向留白改由容器的 padding 给（见下一条），padding 不参与折叠，
+ * 而且 collapse-transition 本来就会把它一起动画掉，收起时反而更顺。
+ */
 :root .el-menu--vertical .el-menu-item,
 :root .el-menu--vertical .el-sub-menu__title {
-  margin: 2px 8px;
+  margin: 0 8px;
   width: auto;
   border-radius: var(--keel-radius);
+}
+
+/* 二级菜单组上下留一点气口。用 padding 而不是子项的 margin，理由见上一条 */
+:root .el-menu--inline {
+  padding: 2px 0;
 }
 
 :root .el-menu--collapse .el-menu-item,
