@@ -630,18 +630,54 @@ class AuthService
 
     private static function parseUserAgent(string $ua): array
     {
+        /*
+         * `curl` 单列一档，不让它掉进 Unknown
+         *
+         * 它不是浏览器，但把它认出来是有意义的：`Unknown` 只说明「没认出来」，
+         * 而登录日志是拿来做安全复核的，"这条是脚本跑的"与"这条不知道是什么"
+         * 是两个完全不同的结论。实际占比也不低——验收脚本
+         * （`scripts/acceptance.sh`）每跑一轮就写 4~6 条，开发库里 13 条
+         * Unknown 全是它。
+         *
+         * 只补 curl，没有顺手把 wget / Postman / 各种 SDK 一起列上：
+         * 这类客户端是列不完的，列表越长越像"补全了"，实际上下一个还是 Unknown。
+         * curl 值得单列是因为它是**本仓库自己的脚本**在用的那个，
+         * 属于已知会持续产生日志的来源，不是假想的调用方。
+         *
+         * 系统仍是 Unknown：curl 的 UA 里确实没有系统信息，编不出来。
+         */
         $browser = match (true) {
             str_contains($ua, 'Edg')     => 'Edge',
             str_contains($ua, 'Chrome')  => 'Chrome',
             str_contains($ua, 'Firefox') => 'Firefox',
             str_contains($ua, 'Safari')  => 'Safari',
+            str_contains($ua, 'curl')    => 'curl',
             default                      => 'Unknown',
         };
+        /*
+         * 顺序是这里唯一要紧的东西，改动前先看完这段
+         *
+         * iPhone / iPad 的 UA 里都带 `like Mac OS X`（苹果为了兼容老网站故意留的），
+         * 所以 `Mac OS` 只要排在前面，**所有苹果移动设备都会被记成 macOS**，
+         * `iOS` 那一档等于死代码——曾经就是这样，而且比 Unknown 更难发现：
+         * Unknown 一眼看得出是没认出来，macOS 是错得理直气壮，
+         * 安全复核时会误判成「这人在电脑上登的」。
+         *
+         * 同理 Android 的 UA 里带 `Linux`，必须排在 `Linux` 前面（这条一直是对的）。
+         *
+         * 规则：**范围窄的排前面**。macOS 与 Linux 是各自那一族的兜底，放最后。
+         *
+         * 一个够不着的例外：iPadOS 的 Safari 默认按「桌面版网站」请求，
+         * UA 里既没有 `iPad` 也没有 `iOS`，与 Mac 完全一致（`Macintosh; Intel Mac OS X`）。
+         * 那种情况仍会记成 macOS，靠 UA 分不出来，也没打算分。
+         */
         $os = match (true) {
             str_contains($ua, 'Windows') => 'Windows',
-            str_contains($ua, 'Mac OS')  => 'macOS',
             str_contains($ua, 'Android') => 'Android',
-            str_contains($ua, 'iPhone')  => 'iOS',
+            str_contains($ua, 'iPhone'),
+            str_contains($ua, 'iPad'),
+            str_contains($ua, 'iPod')    => 'iOS',
+            str_contains($ua, 'Mac OS')  => 'macOS',
             str_contains($ua, 'Linux')   => 'Linux',
             default                      => 'Unknown',
         };

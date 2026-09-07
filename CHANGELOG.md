@@ -510,6 +510,24 @@
   登录日志此前按时间范围查询时 `possible_keys` 为 `NULL`（一个候选索引都没有）
 
 ### 修复
+- **登录日志里 iPhone / iPad 不再被记成 macOS**。苹果移动设备的 UA 里都带
+  `like Mac OS X`（兼容老网站留的），而 `parseUserAgent()` 把 `Mac OS` 判在
+  `iPhone` 前面，于是所有苹果手机、平板的登录都写成了 macOS，`iOS` 那一档是死代码。
+  - 比 `Unknown` 更值得修：`Unknown` 一眼看得出是没认出来，`macOS` 是错得理直气壮，
+    安全复核时会把手机登录误判成「这人在电脑上登的」
+  - 规则改成**范围窄的排前面**：Windows → Android → iOS（iPhone/iPad/iPod）→
+    macOS → Linux，后两档是各自那一族的兜底。Android 带 `Linux` 也是同一个道理，
+    它一直排在前面所以没出过问题
+  - 够不着的例外：iPadOS 的 Safari 默认按桌面版请求，UA 与 Mac 完全一致，
+    仍会记成 macOS——靠 UA 分不出来
+  - 影响范围包括员工移动端（`app/staff` 写的是同一张表、同一个解析器）；
+    历史数据不回补
+  - 顺带把 **curl** 单列一档，不再掉进 `Unknown`。登录日志是拿来做安全复核的，
+    「这条是脚本跑的」与「这条不知道是什么」是两个结论；而验收脚本
+    （`scripts/acceptance.sh`）每跑一轮就写 4~6 条，开发库里的 Unknown 全是它。
+    只补 curl 没有顺手列上 wget / Postman / 各种 SDK——那类客户端列不完，
+    curl 值得单列是因为它是本仓库自己的脚本在用的那个。系统仍是 `Unknown`：
+    curl 的 UA 里确实没有系统信息
 - **App 退出后重新打开不再要求重新登录**。两个原因叠在一起：
   - 登录页的 `onLoad` 里无条件清了本地令牌。冷启动时登录页是入口页，即使
     `App.vue` 判断有令牌、已经切去首页，它照样会触发 `onLoad`——读到令牌 →
