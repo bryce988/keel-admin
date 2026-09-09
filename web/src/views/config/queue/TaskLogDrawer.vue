@@ -171,11 +171,12 @@ defineExpose({ open })
   margin-bottom: var(--keel-gap);
 }
 
+/* 13px 是页签专用的一档，这里是辅助说明，走 12px */
 .bar .count {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 

@@ -457,10 +457,18 @@ async function onDiscard(row: FailedJobRow) {
   margin-bottom: 0;
 }
 
+/*
+ * 区块标题走全站的面板标题档：14px / 500
+ *
+ * 原先写的是 15px / 600，两条都出了轨：15px 根本不在字号阶梯里
+ * （正文档只有 12 / 13 / 14，往上直接是 16），而 14px 以下只允许 400 / 500——
+ * 600 是留给 16px 以上的。同一屏里别的面板标题都是 14/500，
+ * 这一页凭空重一档，看着就是"字体不太对"。见 styles/index.css 的字号与字重段。
+ */
 .panel-head h3 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--el-text-color-primary);
 }
 
@@ -513,8 +521,10 @@ async function onDiscard(row: FailedJobRow) {
   color: var(--el-text-color-secondary);
 }
 
+/* 统计数字用仪表盘那一档（24px）：同为"独立表面上的大数字"，
+   22px 是我随手写的，不在阶梯上，与概览页的指标卡并排看会矮一截 */
 .stat .value {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   line-height: 1.2;
   color: var(--el-text-color-primary);
