@@ -17,11 +17,14 @@ namespace app\admin\service;
 use app\common\constant\BizCode;
 use app\common\exception\BusinessException;
 use app\common\exception\ConflictException;
+use app\common\exception\ForbiddenException;
 use app\common\model\SysPermissionModel;
 use app\common\model\SysRoleModel;
 use app\common\model\SysUserModel;
+use app\common\model\scope\DataScope;
 use app\common\service\ParamService;
 use app\common\service\PermissionService;
+use app\common\support\Ctx;
 use app\common\support\Db;
 use app\common\support\Guard;
 use app\common\support\OpLog;
@@ -70,6 +73,7 @@ class RoleService
             'parent_id'    => $row->parent_id,
             'data_scope'   => $row->data_scope,
             'is_builtin'   => $row->is_builtin,
+            'is_super_role' => $row->isSuperAdminRole(),
             'sort'         => $row->sort,
             'status'       => $row->status,
             'remark'       => $row->remark,
@@ -224,6 +228,16 @@ class RoleService
         /** @var SysRoleModel $role */
         $role = Guard::found(SysRoleModel::find($id));
 
+        // 超级管理员不提供可配置的授权集合：无论调用方传什么，都恢复到全部权限。
+        // 这让新建权限点也会自动生效，不依赖种子脚本重新跑一遍。
+        //
+        // 只取**启用**的权限点：停用的节点写进授权表不影响鉴权
+        // （PermissionService 对超管角色直接短路成 '*'），但角色详情页的权限树
+        // 会把它们显示成已勾选，看着像"停用了还授着"。
+        if ($role->isSuperAdminRole()) {
+            $permissionIds = SysPermissionModel::query()->enabled()->pluck('id')->map(fn ($v) => (int) $v)->all();
+        }
+
         $ids = self::expandWithAncestors(array_map('intval', $permissionIds));
 
         Db::transaction(function () use ($id, $ids, $role) {
@@ -247,6 +261,12 @@ class RoleService
     {
         /** @var SysRoleModel $role */
         $role = Guard::found(SysRoleModel::find($id));
+
+        // 与功能权限同理，超级管理员的数据范围恒为全部，外部调用不能把它收窄。
+        if ($role->isSuperAdminRole()) {
+            $dataScope = DataScope::ALL;
+            $deptIds = [];
+        }
 
         if ($dataScope === 5 && !$deptIds) {
             throw new BusinessException('自定义数据范围至少要选择一个部门', BizCode::DATA_SCOPE_REQUIRES_DEPT);
@@ -349,6 +369,8 @@ class RoleService
     {
         $roleIds = array_values(array_unique(array_map('intval', $roleIds)));
 
+        self::assertSuperRoleAssignable($roleIds);
+
         $limit = (int) ParamService::value('sys.role.maxPerUser', 5);
         if ($limit > 0 && count($roleIds) > $limit) {
             throw new BusinessException("单账号最多持有 {$limit} 个角色", BizCode::ROLE_LIMIT_EXCEEDED);
@@ -372,6 +394,43 @@ class RoleService
             throw new BusinessException(
                 '角色「' . implode('」与「', $names) . '」互斥，不可同时授予',
                 BizCode::ROLE_MUTUAL_EXCLUSION,
+            );
+        }
+    }
+
+    /**
+     * 只有超管本人能把超管角色授予别人
+     *
+     * ⚠️ 这条是「超管角色 = 全部权限」带来的**新提权路径**，原先不存在：
+     * `is_super` 只能由 `scripts/install.php` 产生，界面上无论如何点不出一个超管。
+     * 而现在拥有 ROLE-0001 就等价于超管，于是任何持有 `sys:user:grantRole`
+     * 的人（比如系统管理员）都能把这个角色授给自己，一步登顶。
+     *
+     * 判定用「操作者的权限集里有没有 `*`」而不是 `is_super` 字段：
+     * 超管角色的持有者也算超管，否则第一个由角色获得超管身份的人反而不能再授权给别人。
+     *
+     * 无登录态（`install.php`、`seed.php`、队列进程）直接放行——
+     * 那些场景本来就在数据库层面操作，加这道判断只会让初始化脚本跑不起来。
+     */
+    private static function assertSuperRoleAssignable(array $roleIds): void
+    {
+        $superId = (int) (SysRoleModel::query()
+            ->where('code', SysRoleModel::SUPER_ADMIN_CODE)
+            ->value('id') ?? 0);
+
+        if ($superId === 0 || !in_array($superId, $roleIds, true)) {
+            return;
+        }
+
+        $actor = Ctx::user();
+        if ($actor === null) {
+            return;
+        }
+
+        if (!in_array('*', PermissionService::codesOf($actor), true)) {
+            throw new ForbiddenException(
+                '只有超级管理员才能授予超级管理员角色',
+                BizCode::SUPER_ADMIN_PROTECTED,
             );
         }
     }

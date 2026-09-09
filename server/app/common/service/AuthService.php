@@ -477,7 +477,9 @@ class AuthService
         // 权限点走 PermissionService，与鉴权中间件共用同一份缓存，避免两处逻辑漂移
         $permissions = PermissionService::codesOf($user);
 
-        if ($isSuper) {
+        // 超级管理员账号与拥有超级管理员角色的账号都返回完整菜单和全部数据范围。
+        // 权限数组以 `*` 表达这两种情况，避免角色判断在此处复制一份。
+        if (in_array('*', $permissions, true)) {
             $nodes = SysPermissionModel::query()->enabled()->orderBy('sort')->get()->toArray();
             $dataScope = 1;
         } else {

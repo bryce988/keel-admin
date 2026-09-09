@@ -18,6 +18,7 @@ use app\common\exception\ForbiddenException;
 use app\common\exception\ValidationException;
 use app\common\model\SysDeptModel;
 use app\common\model\SysPostModel;
+use app\common\model\SysRoleModel;
 use app\common\model\SysUserModel;
 use app\common\service\AuthService;
 use app\common\service\ParamService;
@@ -446,7 +447,34 @@ class UserService
             throw new ForbiddenException('不允许操作超级管理员', BizCode::SUPER_ADMIN_PROTECTED);
         }
 
+        /*
+         * 拥有超管角色的账号同样不能被改
+         *
+         * 「超管」现在有两个来源：`is_super` 字段，和持有 ROLE-0001 角色
+         * （后者同样拿到全部权限，见 PermissionService::queryCodes）。
+         * 保护只覆盖前一个的话，一个由角色获得超管身份的账号能被普通系统管理员
+         * 重置密码或停用——等于绕过保护接管了一个超管。
+         */
+        if (self::hasSuperRole((int) $user->id)) {
+            throw new ForbiddenException(
+                '该账号持有超级管理员角色，不允许操作',
+                BizCode::SUPER_ADMIN_PROTECTED,
+            );
+        }
+
         return $user;
+    }
+
+    /** 该账号是否持有超级管理员角色（停用与软删的角色不算） */
+    private static function hasSuperRole(int $userId): bool
+    {
+        return Db::table('sys_user_roles as ur')
+            ->join('sys_roles as r', 'r.id', '=', 'ur.role_id')
+            ->where('ur.user_id', $userId)
+            ->where('r.code', SysRoleModel::SUPER_ADMIN_CODE)
+            ->where('r.status', SysRoleModel::STATUS_ENABLED)
+            ->whereNull('r.deleted_at')
+            ->exists();
     }
 
     /** 停用/删除前确认名下没有还在流转的数据 */

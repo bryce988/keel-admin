@@ -85,6 +85,18 @@ class PermissionService
      */
     private static function queryCodes(int $userId): array
     {
+        // 拥有超级管理员角色即拥有全部权限，不依赖 sys_role_permissions 的存量关系；
+        // 因此新增权限点也会立即被包含在内。
+        if (Db::table('sys_user_roles as ur')
+            ->join('sys_roles as r', 'r.id', '=', 'ur.role_id')
+            ->where('ur.user_id', $userId)
+            ->where('r.code', SysRoleModel::SUPER_ADMIN_CODE)
+            ->where('r.status', SysRoleModel::STATUS_ENABLED)
+            ->whereNull('r.deleted_at')
+            ->exists()) {
+            return ['*'];
+        }
+
         return SysPermissionModel::query()
             ->join('sys_role_permissions as rp', 'rp.permission_id', '=', 'sys_permissions.id')
             ->join('sys_user_roles as ur', 'ur.role_id', '=', 'rp.role_id')

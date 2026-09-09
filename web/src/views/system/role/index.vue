@@ -171,7 +171,13 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
 
       <template #name="{ row }">
         {{ row.name }}
-        <el-tag v-if="row.is_builtin" size="small" type="warning" effect="plain">内置</el-tag>
+        <!--
+          超管行不加任何标签：名字本身已经写着「超级管理员」，再挂一个同名标签是重复。
+          「内置」这条留给将来别的内置角色（目前库里只有超管 is_builtin=1，所以不会出现）。
+        -->
+        <el-tag v-if="row.is_builtin && !row.is_super_role" size="small" type="warning" effect="plain">
+          内置
+        </el-tag>
       </template>
 
       <template #actions="{ row }">
@@ -187,6 +193,7 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
           </el-button>
           <!-- 角色页最常用的是授权：改名排序偶尔为之，配权限是天天要做的 -->
           <el-button
+            v-if="!row.is_super_role"
             v-permission.any="['sys:role:grantPerm', 'sys:role:grantData']"
             :icon="Key"
             link

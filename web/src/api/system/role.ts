@@ -11,6 +11,7 @@ export interface RoleRow {
   parent_id: number
   data_scope: number
   is_builtin: boolean
+  is_super_role: boolean
   sort: number
   status: number
   remark: string

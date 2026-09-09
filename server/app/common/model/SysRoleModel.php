@@ -47,6 +47,9 @@ class SysRoleModel extends BaseModel
     use SoftDeletes;
     use HasStatus;
 
+    /** 系统唯一的超级管理员角色；编码由固定主键 1 推导，名称可本地化而不影响权限语义。 */
+    public const SUPER_ADMIN_CODE = 'ROLE-0001';
+
     protected $table = 'sys_roles';
 
     protected $casts = [
@@ -71,5 +74,11 @@ class SysRoleModel extends BaseModel
     public function depts(): BelongsToMany
     {
         return $this->belongsToMany(SysDeptModel::class, 'sys_role_depts', 'role_id', 'dept_id');
+    }
+
+    /** 超级管理员角色不依赖可编辑的名称或内置标记识别。 */
+    public function isSuperAdminRole(): bool
+    {
+        return $this->code === self::SUPER_ADMIN_CODE;
     }
 }
