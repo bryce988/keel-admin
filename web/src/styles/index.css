@@ -387,9 +387,13 @@ html.theme-switching *::after {
  *
  * `:not(:last-child)`：说明条放在表单末尾时（角色编辑就是这样）再加下边距，
  * 会和底部按钮区拉出一段空白。
+ *
+ * `:root` 前缀是这份文件里覆盖 EP 的硬性要求（`scripts/check-el-overrides.mjs`
+ * 会拦下漏写的）：EP 的组件样式是懒加载 chunk，永远排在入口 CSS 之后，
+ * 同特异性下它赢，而且是**静默**赢——规则还在，只是被划了删除线。
  */
-.el-drawer .el-form > .el-alert:not(:last-child),
-.el-dialog .el-form > .el-alert:not(:last-child) {
+:root .el-drawer .el-form > .el-alert:not(:last-child),
+:root .el-dialog .el-form > .el-alert:not(:last-child) {
   margin-bottom: 18px;
 }
 
