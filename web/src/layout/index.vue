@@ -415,6 +415,11 @@ async function onUserCommand(cmd: string) {
   flex: 1;
 }
 
+/* 滚动条保留在侧栏边缘，菜单内容向内让出空间，避免状态底色贴住滚动条。 */
+.menu-scroll :deep(.el-scrollbar__view) {
+  padding-right: 8px;
+}
+
 /* ---------------- 页签 + 内容 ---------------- */
 .main {
   display: flex;
