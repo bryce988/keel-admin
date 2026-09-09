@@ -14,6 +14,7 @@ use app\admin\controller\NoticeController;
 use app\admin\controller\ParamController;
 use app\admin\controller\PostController;
 use app\admin\controller\ProfileController;
+use app\admin\controller\QueueController;
 use app\admin\controller\RoleController;
 use app\admin\controller\UserController;
 use app\common\middleware\AdminAuthMiddleware;
@@ -369,6 +370,32 @@ Route::group('/admin', function () {
     Route::get('/logs/login/export', [LogController::class, 'exportLogin'])->setParams([
         'perm' => 'sys:log:login:export',
         'log'  => ['module' => '日志审计/登录日志', 'action' => 4, 'title' => '导出登录日志'],
+    ]);
+
+    /*
+     * 队列监控
+     *
+     * 状态全在 Redis 里，没有表也就没有数据权限——队列是全局基础设施，
+     * 不属于任何部门。谁看得到由权限点决定，默认只有超管与运维。
+     *
+     * 失败消息的 id 是 `time().rand()` 拼出来的字符串（见 workerman/redis-queue
+     * 的 Client::send），**不是自增整数**，所以路由约束写 `[\w]+` 而不是 `\d+`。
+     */
+    Route::get('/queues', [QueueController::class, 'index'])
+        ->setParams(['perm' => 'sys:queue:list']);
+    Route::get('/queues/failed', [QueueController::class, 'failed'])
+        ->setParams(['perm' => 'sys:queue:list']);
+    // 执行记录是这一页唯一落库的东西：Redis 只有此刻的队列状态，
+    // 「昨天凌晨那次清理跑没跑」只能靠表回答
+    Route::get('/queues/tasks/logs', [QueueController::class, 'taskLogs'])
+        ->setParams(['perm' => 'sys:queue:list']);
+    Route::post('/queues/failed/{id:[\w-]+}/retry', [QueueController::class, 'retry'])->setParams([
+        'perm' => 'sys:queue:retry',
+        'log'  => ['module' => '系统配置/队列监控', 'action' => 6, 'title' => '重投失败任务'],
+    ]);
+    Route::delete('/queues/failed/{id:[\w-]+}', [QueueController::class, 'destroy'])->setParams([
+        'perm' => 'sys:queue:delete',
+        'log'  => ['module' => '系统配置/队列监控', 'action' => 3, 'title' => '丢弃失败任务'],
     ]);
 })->middleware([
     AdminAuthMiddleware::class,       // 认证：你是谁

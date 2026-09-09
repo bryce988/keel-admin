@@ -21,6 +21,14 @@ use Webman\RedisQueue\Consumer;
  */
 class ExportConsumer implements Consumer
 {
+    /**
+     * 这个队列是干什么的，给「队列监控」页显示
+     *
+     * 不写也能跑，只是监控页那一行只有 `keel:xxx` 一串标识符——
+     * 排查的人得回来翻代码才知道它是干嘛的。新增消费者时顺手写一句。
+     */
+    public string $desc = '生成导出文件（xlsx）';
+
     public string $queue = ExportService::QUEUE;
 
     public string $connection = 'default';

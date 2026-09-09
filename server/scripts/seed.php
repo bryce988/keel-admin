@@ -210,6 +210,21 @@ $tree = [
                  ['name' => '编辑参数', 'code' => 'sys:param:update', 'type' => 3, 'sort' => 2],
                  ['name' => '删除参数', 'code' => 'sys:param:delete', 'type' => 3, 'sort' => 3],
              ]],
+            /*
+             * 队列监控
+             *
+             * 只给超管：它读的是全局基础设施的状态，且「重投/丢弃失败任务」
+             * 影响的是所有人的任务，不是某个部门自己的事。
+             *
+             * 这一页没有 detail 权限点——失败任务的详情就在列表行里，
+             * 再点一次只是把同一份 JSON 换个地方显示。
+             */
+            ['name' => '队列监控', 'code' => 'sys:queue:list', 'type' => 2,
+             'path' => '/config/queue', 'component' => 'views/config/queue/index.vue', 'icon' => 'Histogram', 'sort' => 20,
+             'children' => [
+                 ['name' => '重投失败任务', 'code' => 'sys:queue:retry',  'type' => 3, 'sort' => 1],
+                 ['name' => '丢弃失败任务', 'code' => 'sys:queue:delete', 'type' => 3, 'sort' => 2],
+             ]],
         ],
     ],
 ];
@@ -405,6 +420,11 @@ $dicts = [
         ['导出', '4', 'warning'], ['授权', '5', 'info'], ['其他', '6', 'info'],
     ]],
     'log_status'    => ['执行结果', [['成功', '1', 'success'], ['失败', '0', 'danger']]],
+    // 定时任务执行状态。「排队中」不是过渡态而是**故障信号**：
+    // 投出去没人消费时它会一直停在这里，所以给的是 warning 而不是 info
+    'task_log_status' => ['任务执行状态', [
+        ['排队中', '0', 'warning'], ['成功', '1', 'success'], ['失败', '2', 'danger'],
+    ]],
     // 3 是邮箱登录的发码动作：它不是一次登录，但要留在同一条时间线上，
     // 否则「有人拿着我的密码在申请验证码」这件事在后台里查不到
     'login_type'    => ['登录类型', [

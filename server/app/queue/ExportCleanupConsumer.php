@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\queue;
 
 use app\common\service\ExportService;
+use app\common\service\TaskLogService;
 use support\Log;
 use Throwable;
 use Webman\RedisQueue\Consumer;
@@ -21,13 +22,19 @@ use Webman\RedisQueue\Consumer;
  */
 class ExportCleanupConsumer implements Consumer
 {
+    /** 用途说明，给「队列监控」页显示 */
+    public string $desc = '清理过期的导出任务记录';
+
     public string $queue = 'keel:export-cleanup';
 
     public string $connection = 'default';
 
     public function consume($data): void
     {
-        $result = ExportService::cleanup();
+        // track() 负责计时、把结果写回 sys_task_logs，并原样抛出异常
+        // （吞掉异常等于告诉队列「处理成功」，重试就失效了）。
+        // $data 里没有 task_log_id 时它不记日志、照常执行
+        $result = TaskLogService::track($data, fn () => ExportService::cleanup());
 
         Log::info('队列：导出清理', $result + ['trigger' => $data['trigger'] ?? 'unknown']);
     }

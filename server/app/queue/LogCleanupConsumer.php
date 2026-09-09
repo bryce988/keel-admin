@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\queue;
 
 use app\common\service\LogCleanupService;
+use app\common\service\TaskLogService;
 use support\Log;
 use Throwable;
 use Webman\RedisQueue\Consumer;
@@ -31,13 +32,19 @@ class LogCleanupConsumer implements Consumer
      * 队列 db 里除了我们还可能有别人的 key，前缀让 `KEYS keel:*` 一眼看清
      * 哪些队列是这个系统的。业务方新增队列建议沿用这个前缀。
      */
+    /** 用途说明，给「队列监控」页显示 */
+    public string $desc = '清理过期的操作日志与登录日志';
+
     public string $queue = 'keel:log-cleanup';
 
     public string $connection = 'default';
 
     public function consume($data): void
     {
-        $result = LogCleanupService::run();
+        // track() 负责计时、把结果写回 sys_task_logs，并原样抛出异常
+        // （吞掉异常等于告诉队列「处理成功」，重试就失效了）。
+        // $data 里没有 task_log_id 时它不记日志、照常执行
+        $result = TaskLogService::track($data, fn () => LogCleanupService::run());
 
         Log::info('队列：日志清理', $result + ['trigger' => $data['trigger'] ?? 'unknown']);
     }

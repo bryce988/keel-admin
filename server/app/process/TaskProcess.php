@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\process;
 
+use app\common\service\TaskLogService;
 use support\Log;
 use Throwable;
 use Webman\RedisQueue\Redis;
@@ -25,36 +26,71 @@ use Workerman\Crontab\Crontab;
  */
 class TaskProcess
 {
+    /**
+     * 计划任务登记表
+     *
+     * 抽成常量而不是散在 `onWorkerStart()` 里，是因为「队列监控」页要把它列出来
+     * （`QueueService::tasks()`）。定时任务跑在自己的进程里，HTTP 进程既看不到
+     * 它的 Crontab 实例、也没法问它「你注册了哪些任务」——只能共读同一份声明。
+     *
+     * 新增定时任务只改这里：`queue` 必须对应 `app/queue/` 下某个消费者的 `$queue`，
+     * 否则任务照投不误、却永远没人消费（监控页会把这种队列标成「无消费者」）。
+     *
+     * @var list<array{name:string, rule:string, queue:string, desc:string}>
+     */
+    public const TASKS = [
+        // 挑凌晨是因为这时候锁表影响最小；不挑整点是为了错开一堆默认写 0 0 * * * 的东西
+        [
+            'name'  => 'log-cleanup',
+            'rule'  => '30 3 * * *',
+            'queue' => 'keel:log-cleanup',
+            'desc'  => '清理过期日志',
+        ],
+        // 排在日志清理之后十分钟：两件事都要删数据，挤在同一分钟只会让锁竞争没有必要地重叠
+        [
+            'name'  => 'export-cleanup',
+            'rule'  => '40 3 * * *',
+            'queue' => 'keel:export-cleanup',
+            'desc'  => '清理过期的导出任务记录与文件',
+        ],
+    ];
+
     public function onWorkerStart(): void
     {
-        // 每天 03:30 清理过期日志。挑凌晨是因为这时候锁表影响最小；
-        // 不挑整点是为了错开一堆默认写 0 0 * * * 的东西
-        new Crontab('30 3 * * *', function () {
-            $this->dispatch('keel:log-cleanup', ['trigger' => 'cron']);
-        }, 'log-cleanup');
+        foreach (self::TASKS as $task) {
+            new Crontab($task['rule'], function () use ($task) {
+                $this->dispatch($task);
+            }, $task['name']);
+        }
 
-        // 每天 03:40 清理过期的导出任务记录。排在日志清理之后十分钟，
-        // 两件事都要删数据，挤在同一分钟只会让锁竞争没有必要地重叠
-        new Crontab('40 3 * * *', function () {
-            $this->dispatch('keel:export-cleanup', ['trigger' => 'cron']);
-        }, 'export-cleanup');
-
-        Log::info('定时任务进程已启动', ['tasks' => ['log-cleanup', 'export-cleanup']]);
+        Log::info('定时任务进程已启动', ['tasks' => array_column(self::TASKS, 'name')]);
     }
 
     /**
-     * 投递到队列
+     * 投递到队列，并留下一条执行记录
      *
-     * 单独抽出来是为了把 try/catch 收在一处：定时任务的回调里抛异常
-     * 不会有人看见（没有请求上下文、也没有中间件兜底），
-     * 表现就是「这个任务某天起就不跑了」，而日志里一个字都没有。
+     * try/catch 收在一处：定时任务的回调里抛异常不会有人看见
+     * （没有请求上下文、也没有中间件兜底），表现就是「这个任务某天起就不跑了」，
+     * 而日志里一个字都没有。
+     *
+     * 执行记录**投递前**就写（`status = 排队中`），消费者拿到 `task_log_id`
+     * 后回填结果。顺序不能反：先投递再写日志的话，消费进程可能在日志行还没
+     * 插进去时就已经跑完并回填了——那次执行会永远停在「排队中」。
+     *
+     * @param  array{name:string, rule:string, queue:string, desc:string}  $task
      */
-    private function dispatch(string $queue, array $payload): void
+    private function dispatch(array $task): void
     {
+        $logId = TaskLogService::start($task['name'], $task['desc'], $task['queue']);
+
         try {
-            Redis::send($queue, $payload);
+            Redis::send($task['queue'], ['trigger' => 'cron', 'task_log_id' => $logId]);
         } catch (Throwable $e) {
-            Log::error('定时任务投递失败', ['queue' => $queue, 'error' => $e->getMessage()]);
+            Log::error('定时任务投递失败', ['queue' => $task['queue'], 'error' => $e->getMessage()]);
+
+            // 没进队列就不会有消费者来回填，不标一下会永远挂在「排队中」，
+            // 与「投出去了但没人消费」混为一谈——两者的排查方向完全不同
+            TaskLogService::markDispatchFailed($logId, $e->getMessage());
         }
     }
 }

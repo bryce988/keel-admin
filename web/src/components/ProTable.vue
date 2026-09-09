@@ -153,6 +153,19 @@ const props = withDefaults(
     selection?: boolean
     /** 挂载时是否立即取数 */
     immediate?: boolean
+    /**
+     * 锁定表体高度（默认锁）
+     *
+     * 默认行为假设「表格就是这一页的主体」：量出自己距视口顶部的距离，
+     * 把剩下的高度全给表体，于是表头不动、分页条钉在底部、只有表体滚。
+     *
+     * 页面上方还压着别的面板时（队列监控就是这样）这个假设不成立——
+     * 表格的 top 很大，算出来的高度会一路撞到 180px 下限，
+     * 结果是「整页在滚，表体里还套一条滚动条」，而空状态插画比 180px 还高，
+     * 居中之后直接溢出到表头线上。这种页面传 `:lock-height="false"`，
+     * 让表格按内容自然撑开，滚动交给页面。
+     */
+    lockHeight?: boolean
     pageSize?: number
     /**
      * 首列显示主键 ID
@@ -175,6 +188,7 @@ const props = withDefaults(
     rowKey: 'id',
     selection: false,
     immediate: true,
+    lockHeight: true,
     /*
      * 每页 20 条
      *
@@ -481,7 +495,8 @@ function measure() {
   const el = tableWrapRef.value
   if (!el) return
 
-  if (window.innerWidth <= NARROW) {
+  // 窄屏是整页滚，不锁高度；页面显式关掉锁定的同理
+  if (!props.lockHeight || window.innerWidth <= NARROW) {
     tableHeight.value = undefined
     return
   }

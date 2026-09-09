@@ -231,7 +231,8 @@ start.php                 # 启动入口
 | `/system/dept` | 部门管理 | `sys:dept:list` | 组织树、岗位 |
 | `/system/role` | 角色管理 | `sys:role:list` | 功能权限、数据权限、字段权限 |
 | `/system/menu` | 菜单与权限 | `sys:menu:list` | 权限点字典（目录/菜单/按钮/接口/字段五类） |
-| `/config/param` | 参数配置 | `sys:param:edit` | 基础、安全、集成、高级、系统配置（含邮件）五组参数 |
+| `/config/param` | 参数配置 | `sys:param:edit` | 主从页：左选分组（基础/安全/集成/高级/邮件服务），右改这一组的参数 |
+| `/config/queue` | 队列监控 | `sys:queue:list` | 队列积压与消费者、定时任务、失败任务重投/丢弃；状态读 Redis 实时快照，无表 |
 | `/data/dict` | 数据字典 | `sys:dict:list` | 字典类型与字典项。挂在「数据管理」下，不在「系统管理」里 |
 | `/data/notice` | 系统公告 | `sys:notice:list` | 公告的草稿、发布、撤回；发布后所有登录用户在顶栏铃铛收到 |
 | `/data/export` | 数据导出 | `sys:export:list` | 异步导出任务的进度与下载；发起导出在各业务模块自己的页面上 |

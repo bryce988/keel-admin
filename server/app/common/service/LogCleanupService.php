@@ -29,7 +29,7 @@ class LogCleanupService
     /**
      * 一轮清理，返回各表删除的行数
      *
-     * @return array{operation: int, login: int, before: string}
+     * @return array{operation: int, login: int, task: int, before: string}
      */
     public static function run(): array
     {
@@ -38,15 +38,19 @@ class LogCleanupService
 
         $operation = self::purge(SysOperationLogModel::class, $before);
         $login     = self::purge(SysLoginLogModel::class, $before);
+        // 任务日志同样只增不减：一天两条看着不多，三年就是两千多行，且没人会去删。
+        // 它没有 HasDataScope，所以走自己的 purge（不需要 withoutGlobalScopes）
+        $task      = TaskLogService::purge($before, self::CHUNK);
 
         Log::info('日志清理完成', [
             'before'    => $before,
             'retain'    => $days,
             'operation' => $operation,
             'login'     => $login,
+            'task'      => $task,
         ]);
 
-        return ['operation' => $operation, 'login' => $login, 'before' => $before];
+        return ['operation' => $operation, 'login' => $login, 'task' => $task, 'before' => $before];
     }
 
     /**

@@ -796,6 +796,101 @@ PUT /admin/params
 
 ---
 
+## 9.2 队列监控
+
+| 方法 | 路径 | 权限标识 | 说明 |
+|---|---|---|---|
+| GET | `/admin/queues` | `sys:queue:list` | 总览：队列积压、Redis 状态、进程编制、定时任务 |
+| GET | `/admin/queues/failed` | `sys:queue:list` | 失败任务分页列表，支持 `queue` 筛选 |
+| GET | `/admin/queues/tasks/logs` | `sys:queue:list` | 定时任务执行记录分页列表，支持 `task_name` / `status` 筛选 |
+| POST | `/admin/queues/failed/{id}/retry` | `sys:queue:retry` | 重投，`attempts` 归零后回到原队列 |
+| DELETE | `/admin/queues/failed/{id}` | `sys:queue:delete` | 丢弃，不可恢复 |
+
+队列状态**来自 Redis 实时快照，没有对应的表**；只有定时任务的执行记录落库
+（`sys_task_logs`，见下）。因此：
+
+- 没有数据权限（队列是全局基础设施，不属于任何部门），也没有分页游标
+- 队列消息本身没有历史：消费成功的消息消费完就没了。**要留痕的是业务任务自己的事**——
+  执行记录这条链路只覆盖 `TaskProcess` 投递的定时任务
+- `{id}` 是队列消息 id（`time().rand()` 拼的**字符串**，不是自增整数），
+  路由约束是 `[\w-]+`
+
+`GET /admin/queues` 的结构：
+
+```json
+{
+  "queues": [
+    { "queue": "keel:export", "desc": "生成导出文件（xlsx）", "consumer": "ExportConsumer",
+      "connection": "default", "orphan": false, "waiting": 0, "delayed": 1, "failed": 2 }
+  ],
+  "redis": { "connected": true, "db": 1, "used_memory": "1.61M",
+             "delayed_total": 1, "failed_total": 2, "sampled": false, "scan_limit": 2000,
+             "max_attempts": 5, "retry_seconds": 5 },
+  "processes": { "http": 20, "task": 1, "consumer": 2, "consumer_dir": "app/queue",
+                 "queue_workers": 2, "pid": 28, "memory_mb": 16 },
+  "tasks": [
+    { "name": "log-cleanup", "rule": "30 3 * * *", "queue": "keel:log-cleanup",
+      "desc": "清理过期日志", "consumer": "LogCleanupConsumer", "orphan": false,
+      "next_run": "2026-09-10 03:30:00" }
+  ]
+}
+```
+
+⚠️ **每行的 `delayed` / `failed` 是采样值，`redis.*_total` 才是准确总数**。
+延迟与失败在 Redis 里是**所有队列共用**的一条 zset 与一条 list
+（`{redis-queue}-delayed` / `{redis-queue}-failed`，键名由 `workerman/redis-queue` 定），
+按队列分组只能把成员捞出来读 payload 里的 `queue` 字段，
+所以只取最近 `scan_limit`（2000）条。超出时 `sampled = true`，前端须如实说明，
+不能把采样数当总数展示。失败列表的筛选与分页同样在这个窗口内做。
+
+`desc` 由消费者自己声明（`app/queue/XxxConsumer.php` 里的 `public string $desc`），
+**新增消费者时顺手写一句**：不写接口回空串，监控页那一行就只有 `keel:xxx` 一串标识符，
+排查的人得回去翻代码才知道它是干什么的。后端不按类名编一个假说明——
+「ExportConsumer → 导出消费者」这种同义反复比空白更浪费一列。
+
+`orphan = true` 是本页最该被看见的异常：队列里有消息、`app/queue/` 下却没有对应的消费者
+（消费者被删了，或投递方把队列名拼错了）。这种情况不报任何错，表现只是积压一直涨。
+
+`processes` 读的是**配置**（本该跑几个），不是存活进程数——HTTP worker 与消费进程互相看不到
+对方的运行状态。「队列到底在不在跑」看积压有没有下降，那才是硬指标。
+`pid` / `memory_mb` 是应答这次请求的那个 HTTP worker 的自报。
+
+重投会把 `attempts` 归零。不归零的话消费者一取到就发现已超过 `max_attempts`，
+立刻打回失败——点了「重投」什么都不会发生。
+
+### 执行记录（`GET /admin/queues/tasks/logs`）
+
+界面入口在**定时任务表的「运行日志」**——记录是跟着任务走的，
+它回答的是「log-cleanup 昨天那次跑没跑、删了多少行」，只有盯着某个任务时才有意义。
+所以接口按 `task_name` 过滤即可，前端不做混合列表。
+
+一次执行一行，`status` 三态（字典 `task_log_status`）：
+
+| status | 含义 | 什么时候写 |
+|---|---|---|
+| 0 排队中 | 已投递，还没被消费 | `TaskProcess` 投递时插入 |
+| 1 成功 | 消费完成 | 消费者的 `TaskLogService::track()` 回填 |
+| 2 失败 | 消费抛异常，或投递就失败（Redis 挂了） | 同上 / `markDispatchFailed()` |
+
+⚠️ **「排队中」不只是过渡态，它同时是故障信号**：消费者被删、队列名拼错、
+消费进程没起来，这三种情况都不抛异常，唯一的现象就是记录一直停在排队中。
+所以执行记录在**投递时**就写，而不是干完再写——后者这类故障一条记录都不会留下。
+
+`message` 成功时是结果摘要（`{"operation":12,"login":3,...}` 这种，即「这次删了多少行」），
+失败时是异常信息。`duration_ms` 只算消费耗时，不含排队时间。
+
+给业务方：新增定时任务时，消费者里用 `TaskLogService::track($data, fn () => 干活())`
+包一层就会自动记录；不包也能跑，只是那个任务在这张表里永远是「排队中」。
+异常必须让它抛出去（`track` 会原样抛），吞掉等于告诉队列「处理成功」，重试就失效了。
+
+保留期与业务日志共用 `sys.log.retainDays`，由日志清理任务一起清。
+
+**没有「立即执行定时任务」接口**：定时任务进程是 `count => 1` 的独占设计
+（PROJECT.md §14.7），手动再触发一次等于让同一个清理任务并发跑两遍。
+要提前跑改 cron 规则，比开一个后门安全。
+
+---
+
 ## 10. 日志
 
 | 方法 | 路径 | 权限标识 | 说明 |

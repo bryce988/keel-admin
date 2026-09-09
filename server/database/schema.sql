@@ -321,6 +321,35 @@ CREATE TABLE IF NOT EXISTS `sys_export_tasks` (
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据导出任务';
 
+-- ---------------------------------------------------------------- 定时任务执行日志
+-- 一次执行一行：投递时插入（status=0 排队中），消费完成后回填结果与耗时。
+--
+-- 为什么在投递时就写：只有这样「投出去了但没人消费」才看得见——
+-- 消费者被删、队列名拼错时不会有任何异常，表现只是这一行永远停在「排队中」。
+-- 消费完成才写的话，那种故障在日志里一条记录都没有。
+--
+-- 没有 dept_id，也不挂 HasDataScope：定时任务是全局基础设施，不属于任何部门。
+-- （反过来说，将来若给它加 HasDataScope，必须先补上部门列——
+--  DataScope 找不到部门列时会直接放行，那才是真的越权）
+CREATE TABLE IF NOT EXISTS `sys_task_logs` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `task_name`     VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '任务标识，见 TaskProcess::TASKS 的 name',
+  `task_desc`     VARCHAR(128)    NOT NULL DEFAULT ''     COMMENT '任务说明，冗余存储：改了代码里的措辞，历史记录仍是当时那句',
+  `queue`         VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '投递到的队列名',
+  `trigger`       VARCHAR(16)     NOT NULL DEFAULT 'cron' COMMENT '触发方式，目前只有 cron',
+  `status`        TINYINT         NOT NULL DEFAULT 0      COMMENT '0排队中 1成功 2失败（字典 task_log_status）',
+  `message`       VARCHAR(500)    NOT NULL DEFAULT ''     COMMENT '结果摘要或错误信息',
+  `duration_ms`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '消费耗时（毫秒），不含排队时间',
+  `finished_at`   DATETIME        NULL     DEFAULT NULL   COMMENT '完成时间，未完成为 NULL',
+  `created_at`    DATETIME        NOT NULL                COMMENT '投递时间',
+  `updated_at`    DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  -- 列表固定按时间倒序，常带任务名筛选
+  KEY `idx_created` (`created_at`),
+  KEY `idx_task_time` (`task_name`, `created_at`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行日志';
+
 -- ---------------------------------------------------------------- 基础数据
 -- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）
 INSERT INTO `sys_depts` (`id`,`parent_id`,`ancestors`,`name`,`code`,`sort`,`created_at`,`updated_at`) VALUES

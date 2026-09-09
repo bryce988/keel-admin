@@ -516,6 +516,53 @@ CREATE TABLE `sys_export_tasks` (
 
 ---
 
+### 3.16 sys_task_logs 定时任务执行日志
+
+```sql
+CREATE TABLE `sys_task_logs` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `task_name`   VARCHAR(64)  NOT NULL DEFAULT ''     COMMENT '任务标识，见 TaskProcess::TASKS 的 name',
+  `task_desc`   VARCHAR(128) NOT NULL DEFAULT ''     COMMENT '任务说明，冗余存储',
+  `queue`       VARCHAR(64)  NOT NULL DEFAULT ''     COMMENT '投递到的队列名',
+  `trigger`     VARCHAR(16)  NOT NULL DEFAULT 'cron' COMMENT '触发方式，目前只有 cron',
+  `status`      TINYINT      NOT NULL DEFAULT 0      COMMENT '0排队中 1成功 2失败（字典 task_log_status）',
+  `message`     VARCHAR(500) NOT NULL DEFAULT ''     COMMENT '结果摘要或错误信息',
+  `duration_ms` INT UNSIGNED NOT NULL DEFAULT 0      COMMENT '消费耗时（毫秒），不含排队时间',
+  `finished_at` DATETIME     NULL DEFAULT NULL       COMMENT '完成时间，未完成为 NULL',
+  `created_at`  DATETIME     NOT NULL                COMMENT '投递时间',
+  `updated_at`  DATETIME     NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_created` (`created_at`),
+  KEY `idx_task_time` (`task_name`, `created_at`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行日志';
+```
+
+一次执行一行，写入分两步（`TaskLogService`）：
+
+1. **投递时**插入，`status = 0 排队中`（`TaskProcess` 调 `start()`）
+2. **消费完成后**回填结果、耗时与 `finished_at`（消费者用 `track()` 包住真正的活）
+
+⚠️ **顺序不能反**。先投递再写日志的话，消费进程可能在日志行还没插进去时就已经跑完，
+那次执行会永远停在「排队中」。更重要的是，**投递时就写**才能让
+「投出去了但没人消费」被看见——消费者被删、队列名拼错、消费进程没起来，
+这三种故障都不抛异常，唯一的现象就是这一行一直停在排队中。
+
+**没有 `dept_id`，也不挂 `HasDataScope`**：定时任务是全局基础设施，不属于任何部门。
+这两件事必须一致——`DataScope` 找不到部门列时会**直接放行不加条件**，
+挂了 trait 却没有列等于对所有人全量可见（见 §6 与 `sys_login_logs` 那条）。
+能不能看由权限点 `sys:queue:list` 决定。
+
+**没有审计列**（`creator_id` / `updater_id`）：任务由进程按点触发，没有「操作人」。
+模型必须覆写 `auditColumns()` 返回 `[]`，否则 `HasAudit` 会在 creating 时塞这两个字段，
+insert 直接报 `Unknown column 'creator_id'`——而写入方吞异常只记日志，
+表现是「执行记录一条都不写」，界面上没有任何报错。
+
+`message` 成功时存结果摘要（清理任务给的是各表删除行数的 JSON），失败时存异常信息，
+按列宽 500 截断。保留期与业务日志共用 `sys.log.retainDays`，由 `LogCleanupService` 一起清。
+
+---
+
 ## 4. 二期预留
 
 C 端用户**独立建表**，与 `sys_users` 永不混用（见项目文档 §8.4）。二期落地时再建，此处仅锁定结构方向：
