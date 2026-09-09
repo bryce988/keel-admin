@@ -18,11 +18,15 @@ import { BizCode } from '@/constants/bizCode'
 
 
 /**
- * 参数配置（按分组分 tab，一组一张表单）
+ * 参数配置（主从页：左选分组，右改这一组的参数）
  *
  * 与其他模块不同，这页不是列表页：参数是成组生效的配置
  * （失败次数与锁定时长这类彼此相关），所以整组一次提交，
  * 而不是每行一个保存按钮留下半新半旧的中间态。
+ *
+ * 原先分组走顶部 el-tabs，换成主从（PROJECT.md §9.3 页型③）有两个实际收益：
+ * 组名与组标识（`basic` / `mail` …）能一起显示——运维照文档找 `sys.mail.host`
+ * 在哪一组时，tab 只给中文名是猜；组数往上长时 tab 会挤到换行，左列不会。
  *
  * ⚠️ 改参数只落库，不会热改后端配置——webman 是常驻内存多进程，
  * 运行期改配置只影响当前 worker（PROJECT.md §14）。
@@ -38,6 +42,8 @@ const saving = ref(false)
 
 /** param_key → 当前编辑值。表单状态与接口数据分开存，才能算出「改了哪些」 */
 const form = ref<Record<string, string>>({})
+
+const currentGroup = computed(() => groups.value.find((g) => g.code === activeGroup.value))
 
 const dirtyKeys = computed(() =>
   rows.value.filter((r) => form.value[r.param_key] !== r.param_value).map((r) => r.param_key)
@@ -70,9 +76,8 @@ function resetForm() {
 /**
  * 切换分组
  *
- * el-tabs 用 `:model-value` 受控而不是 `v-model`：v-model 会在确认框弹出之前
- * 就把选中项改掉，用户点「留在本页」时界面已经切走了，只能再掰回来。
- * 受控之后不改 activeGroup 就等于没切，行为与用户的选择一致。
+ * 高亮由 `activeGroup` 单向决定，点击只是发起切换：确认框弹出期间选中项
+ * 不能先动——用户点「留在本页」时界面已经切走了，只能再掰回来。
  */
 async function onSwitchGroup(code: string | number) {
   if (String(code) === activeGroup.value) return
@@ -180,14 +185,32 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="page">
-    <el-tabs :model-value="activeGroup" @tab-change="onSwitchGroup">
-      <el-tab-pane v-for="g in groups" :key="g.code" :label="g.name" :name="g.code" />
-    </el-tabs>
+  <div class="page master-detail-page">
+    <!-- 主区：参数分组。固定五组，不分页也不搜索——五行东西加一个搜索框是负担 -->
+    <el-card class="master-panel" shadow="never">
+      <div class="panel-header">
+        <span class="panel-title">参数分组</span>
+      </div>
 
-    <el-card v-loading="loading" shadow="never">
+      <ul class="master-list">
+        <li
+          v-for="g in groups"
+          :key="g.code"
+          :class="{ active: g.code === activeGroup }"
+          @click="onSwitchGroup(g.code)"
+        >
+          <span class="name">{{ g.name }}</span>
+          <!-- 组标识一起给：照文档找 sys.mail.host 在哪一组时，只有中文名是猜 -->
+          <span class="code">{{ g.code }}</span>
+        </li>
+      </ul>
+    </el-card>
+
+    <!-- 从区：当前分组的参数表单 -->
+    <el-card v-loading="loading" class="detail-panel" shadow="never">
       <template #header>
         <div class="card-header">
+          <span class="panel-title">{{ currentGroup?.name ?? '参数' }}</span>
           <span class="hint">保存后立即生效，无需重启进程</span>
           <div class="actions">
             <el-button
@@ -351,11 +374,88 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.card-header {
+/* 页型③ 主从页的骨架，与 views/template/master-detail 一致 */
+.master-detail-page {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--keel-gap-lg);
+  align-items: start;
+}
+
+.master-panel :deep(.el-card__body) {
+  padding: 12px;
+}
+
+.master-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.master-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--keel-radius);
+  cursor: pointer;
+}
+
+.master-list li:hover {
+  background: var(--el-fill-color-light);
+}
+
+/* 选中态用主色浅底，不写死颜色 */
+.master-list li.active {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.master-list .name {
+  color: var(--el-text-color-primary);
+}
+
+.master-list li.active .name {
+  color: var(--el-color-primary);
+}
+
+.master-list .code {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.detail-panel {
+  min-width: 0;
+}
+
+.panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+/* 窄屏退回上下堆叠：240px 的左列再压就只剩一列字 */
+@media (max-width: 900px) {
+  .master-detail-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
   gap: 16px;
+}
+
+/* 标题与提示靠左、按钮组靠右 */
+.card-header .hint {
+  flex: 1;
 }
 
 .card-header .hint {

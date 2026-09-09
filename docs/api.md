@@ -744,9 +744,11 @@ GET /admin/exports → 200 OK
 | POST/PUT/DELETE | `/admin/params/{id}` | `sys:param:create` / `update` / `delete` | 自定义参数增改删（删内置 403 + `20601`，键重复 409 + `20602`） |
 | GET | `/admin/params/public` | 公开 | 登录页需要的少量参数（系统名、Logo、页脚） |
 
-分组固定五个：`basic` 基础设置 · `security` 安全策略 · `integration` 第三方集成 · `advanced` 高级选项 · `system` 系统配置。
+分组固定五个：`basic` 基础设置 · `security` 安全策略 · `integration` 第三方集成 · `advanced` 高级选项 · `mail` 邮件服务。
 
-`system` 组放的是邮件（`sys.mail.host` / `port` / `encryption` / `username` / `password` / `from` / `fromName`），邮箱登录靠它。**参数表优先、`.env` 的 `MAIL_*` 兜底**，两边都空才算没配；口令是 `is_secret`，读接口只回掩码、且未配置时回空串。
+⚠️ 邮件那一组原先叫 `system`「系统配置」，与菜单目录同名而内容只有 SMTP 七项，已改名为 `mail`「邮件服务」。存量库由 `scripts/seed.php` 幂等搬迁（含用户自建在该组下的参数）。
+
+`mail` 组放的是邮件（`sys.mail.host` / `port` / `encryption` / `username` / `password` / `from` / `fromName`），邮箱登录靠它。**参数表优先、`.env` 的 `MAIL_*` 兜底**，两边都空才算没配；口令是 `is_secret`，读接口只回掩码、且未配置时回空串。
 
 批量保存整组提交，一个事务：同组参数彼此相关（失败次数与锁定时长），
 逐条保存会留下半新半旧的中间态。

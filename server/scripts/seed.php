@@ -554,13 +554,13 @@ $params = [
      */
     // 第 7 位是 remark：说明写这里而不是塞进 name——name 是界面上的字段标签，
     // 写长了会折成两行，把整组表单撑得参差不齐
-    ['sys.mail.host',       '',    'system', 'string', 'SMTP 服务器', 0, 'QQ 邮箱是 smtp.qq.com'],
-    ['sys.mail.port',       '465', 'system', 'int',    'SMTP 端口',   0, 'ssl 用 465，tls 用 587'],
-    ['sys.mail.encryption', 'ssl', 'system', 'string', '加密方式',    0, 'ssl(465) / tls(587) / none'],
-    ['sys.mail.username',   '',    'system', 'string', 'SMTP 账号',   0, '通常就是完整的邮箱地址'],
-    ['sys.mail.password',   '',    'system', 'string', 'SMTP 密码',   1, 'QQ / 163 等要填授权码，不是邮箱的登录密码'],
-    ['sys.mail.from',       '',    'system', 'string', '发件人地址',  0, '多数服务商要求与 SMTP 账号一致，否则被拒收'],
-    ['sys.mail.fromName',   '',    'system', 'string', '发件人显示名', 0, '留空取系统名称'],
+    ['sys.mail.host',       '',    'mail', 'string', 'SMTP 服务器', 0, 'QQ 邮箱是 smtp.qq.com'],
+    ['sys.mail.port',       '465', 'mail', 'int',    'SMTP 端口',   0, 'ssl 用 465，tls 用 587'],
+    ['sys.mail.encryption', 'ssl', 'mail', 'string', '加密方式',    0, 'ssl(465) / tls(587) / none'],
+    ['sys.mail.username',   '',    'mail', 'string', 'SMTP 账号',   0, '通常就是完整的邮箱地址'],
+    ['sys.mail.password',   '',    'mail', 'string', 'SMTP 密码',   1, 'QQ / 163 等要填授权码，不是邮箱的登录密码'],
+    ['sys.mail.from',       '',    'mail', 'string', '发件人地址',  0, '多数服务商要求与 SMTP 账号一致，否则被拒收'],
+    ['sys.mail.fromName',   '',    'mail', 'string', '发件人显示名', 0, '留空取系统名称'],
 ];
 foreach ($params as $row) {
     [$key, $value, $group, $type, $name] = $row;
@@ -583,6 +583,19 @@ foreach ($params as $row) {
         'created_at' => $now, 'updated_at' => $now,
     ]);
 }
+/*
+ * 退役的分组：`system` → `mail`
+ *
+ * 上面的 upsert 按 param_key 更新，内置的七项邮件参数会自己搬过去；
+ * 但用户**自建**在 `system` 组里的参数不在 $params 里，没人管它——
+ * 而 `ParamService::GROUPS` 已经没有这个键了，界面上那一组连同参数一起消失，
+ * 不报错、也不提示，只是「我加的参数不见了」。所以这里显式搬一次。
+ */
+$moved = Db::table('sys_params')->where('group', 'system')->update(['group' => 'mail', 'updated_at' => $now]);
+if ($moved) {
+    echo "  ✓ 参数分组 system → mail，搬迁 {$moved} 项\n";
+}
+
 echo '  ✓ 系统参数 ' . count($params) . " 项\n";
 
 // ─────────────────────────────────────────── 演示账号
