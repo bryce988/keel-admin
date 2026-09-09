@@ -375,6 +375,24 @@ html.theme-switching *::after {
   padding: 0 16px;
 }
 
+/* ---------------------------------------------------------------- 表单里的说明条
+ *
+ * `el-form-item` 的下间距来自它自己的 margin-bottom，`el-alert` 没有——
+ * 抽屉/弹窗顶部放一条说明时，它会直接贴在下面第一个输入框上。
+ *
+ * ⚠️ 这条**不能**写在 FormDrawer/FormDialog 的 scoped 样式里：抽屉与弹窗的内容
+ * 是 teleport 到 body 的，组件的 scope 属性没落到那棵子树的祖先上，
+ * `:deep()` 编译出的 `[data-v-x] .el-form > .el-alert` 根本匹配不到（试过，没效果）。
+ * 所以按容器类名写在全局层。
+ *
+ * `:not(:last-child)`：说明条放在表单末尾时（角色编辑就是这样）再加下边距，
+ * 会和底部按钮区拉出一段空白。
+ */
+.el-drawer .el-form > .el-alert:not(:last-child),
+.el-dialog .el-form > .el-alert:not(:last-child) {
+  margin-bottom: 18px;
+}
+
 /* ---------------- 页面容器：面板之间用大间距 ---------------- */
 .page {
   display: flex;
@@ -650,4 +668,21 @@ html.theme-switching *::after {
    */
   font-size: calc(var(--keel-avatar-size, 34px) * 0.42);
   line-height: 1;
+}
+
+/* ---------------------------------------------------------------- 菜单文字不可选中
+ *
+ * 侧边栏的一级目录点开／收起是"点两下同一个地方"，浏览器会把这当双击，
+ * 于是把目录名连同展开后的子项一起刷成蓝色选区（截图里"数据管理"下面三项全被选中）。
+ * 菜单项是控件不是正文，没有复制文字的需求，整棵 el-menu 关掉选中即可。
+ *
+ * 折叠态的浮层子菜单（.el-menu--popup）被 teleport 到 body，
+ * 组件内的 scoped 样式够不着，所以这条放全局而不是 SidebarMenu.vue 里。
+ * 它本身也是 .el-menu，一条选择器就一起覆盖了。
+ *
+ * `:root` 前缀是这份文件里覆盖 EP 的硬性要求，原因见 scripts/check-el-overrides.mjs。
+ */
+:root .el-menu {
+  user-select: none;
+  -webkit-user-select: none;
 }

@@ -413,6 +413,19 @@ h3,
      56px 一屏放不下十项，天天要滚。高度由 EP 自己按这个变量算，
      子菜单项跟着 --el-menu-sub-item-height（= 本值 - 6px）走，不用手写 */
   --el-menu-item-height: 44px;
+
+  /*
+   * 悬浮是中性灰，不是主色
+   *
+   * EP 默认把 --el-menu-hover-bg-color 也设成 primary-light-9，与选中态**同色**，
+   * 于是鼠标划过哪一项，哪一项就长得像「当前页」——满屏两个蓝块，
+   * 而真正的当前页反而认不出来了。
+   *
+   * 两者表达的是不同的东西：悬浮只说明「鼠标在这」（瞬时、无状态），
+   * 选中说明「你正在这一页」（持续、有状态）。前者用中性灰退到背景里，
+   * 把主色留给后者独用。
+   */
+  --el-menu-hover-bg-color: var(--el-fill-color-light);
   border-right: none;
 }
 
@@ -434,21 +447,59 @@ h3,
  * 于是子项既下移又被裁，收起动画的第一帧就是那个「抖」。`afterLeave` 还原 overflow
  * 时再抖回来一次。
  *
- * 结论不是「别用外边距」，是**别让外边距穿过一个会被动画改 overflow 的容器折叠**。
- * 竖向留白改由容器的 padding 给（见下一条），padding 不参与折叠，
- * 而且 collapse-transition 本来就会把它一起动画掉，收起时反而更顺。
+ * 结论不是「别用外边距」，是**这个容器的竖向尺寸一点都不能碰**——见下一条。
  */
 :root .el-menu--vertical .el-menu-item,
 :root .el-menu--vertical .el-sub-menu__title {
   margin: 0 8px;
   width: auto;
   border-radius: var(--keel-radius);
+
+  /*
+   * 行与行之间的气口：用**透明边框**做，不用 margin
+   *
+   * 想要的效果是相邻两项的底色块不连成一片（连起来时，两个相邻的选中/悬浮块
+   * 看着像一整块，分不出边界）。但上一条注释里那个坑摆在这儿：
+   * 这两个元素的**竖向尺寸一点都不能碰**，margin 会在收起动画里抖，
+   * 容器的 padding 会跟着动画漂移。
+   *
+   * 透明边框绕开了这一点：全局 `* { box-sizing: border-box }` 之下，
+   * 加 2px 上下边框**不改变元素的外部高度**（仍是 --el-menu-item-height 的 44px），
+   * 只是把内容区压到 40px；而 EP 的菜单项是 flex + align-items:center，
+   * 内容在 40px 里居中 = 在 44px 盒子里仍然居中，位置不动。
+   * 动画量的是外部高度，因此这一改对收起/展开完全无感。
+   *
+   * `background-clip: padding-box` 是关键的另一半：默认背景会画到边框底下，
+   * 只加边框看不出任何间隙。
+   */
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  background-clip: padding-box;
 }
 
-/* 二级菜单组上下留一点气口。用 padding 而不是子项的 margin，理由见上一条 */
-:root .el-menu--inline {
-  padding: 2px 0;
-}
+/*
+ * ⚠️ `.el-menu--inline` 上下不留任何空间：padding 不行，margin 也不行
+ *
+ * 上一版为了躲开外边距折叠，把 2px 气口从子项的 margin 挪到了这里的 padding。
+ * 结果是把「抖一下」换成了「滑一下」：EP 的 collapse-transition **连 padding-top /
+ * padding-bottom 一起动画**（`beforeEnter` 把两者置 0，`enter` 再还原，
+ * 过渡 CSS 里 height 和这两条 padding 是并列的）。逐帧实测收起过程：
+ *
+ *     t=14ms  高 154   padding-top 2px      第一个子项 top 244
+ *     t=97ms  高 117.7 padding-top 1.53px   第一个子项 top 243.5
+ *     t=254ms 高 8.7   padding-top 0.11px   第一个子项 top 242.1
+ *
+ * 也就是说子项在整段动画里被 padding 匀速拖着上下平移 2px。收起是「拉帘子」，
+ * 帘子后面的内容本该钉在原地，一起漂移就成了肉眼可见的位移。
+ *
+ * 换成容器自己的 margin 也不行：margin 不参与动画，收起到最后一帧 v-show 把元素
+ * display:none，那 4px 会整块瞬间消失，下面的菜单项在动画收尾处跳一下。
+ * 子项的 margin 更不行（外边距折叠，见上一条）。
+ *
+ * 所以这里干脆不留气口。二级项本来就有缩进和图标做分组标识，2px 不值得拿
+ * 「每次展开都在漂」去换。真要加，只能加在**不被动画的元素**上（如 li 或标题），
+ * 别再往这个容器身上打主意。
+ */
 
 :root .el-menu--collapse .el-menu-item,
 :root .el-menu--collapse .el-sub-menu__title {
@@ -459,6 +510,30 @@ h3,
 :root .el-menu--vertical .el-menu-item.is-active {
   background: var(--el-color-primary-light-9);
   font-weight: 500;
+}
+
+/*
+ * ⚠️ 压掉 EP 给激活父级画的那条下划线
+ *
+ * EP 有一条 `.el-sub-menu.is-active .el-sub-menu__title { border-bottom-color: 主色 }`，
+ * 那是给**横排**菜单画「当前一级」指示线用的。竖排里它一直存在，只是
+ * border 宽度是 0 所以看不见——上面为了做行间气口把上下边框设成 2px 之后，
+ * 它立刻显形：展开的那个一级目录下面多出一条蓝色圆角横线。
+ *
+ * 特异性要压过 EP 那条（0,2,1），所以这里用子选择器凑到 0,4,0。
+ */
+:root .el-menu--vertical .el-sub-menu.is-active > .el-sub-menu__title {
+  border-color: transparent;
+}
+
+/*
+ * 选中项被悬浮时保持主色
+ *
+ * EP 的 hover 规则与 is-active 同级、且排在后面，不写这一条的话
+ * 鼠标一放上去，当前页会**从蓝变灰**——看着像刚才点错了页。
+ */
+:root .el-menu--vertical .el-menu-item.is-active:hover {
+  background: var(--el-color-primary-light-9);
 }
 
 /* ----------------------------------------------------------------

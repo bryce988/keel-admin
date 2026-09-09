@@ -533,8 +533,13 @@ onMounted(async () => {
 
 .type-list {
   margin: 12px 0 0;
-  padding: 0;
+  /* 滚动条会贴在列表右缘；留出缓冲，选中条目的描边和“项数”不会显得拥挤。 */
+  padding: 0 10px 0 0;
   list-style: none;
+  /* 条目之间留出呼吸感，悬浮底色不会直接贴住相邻的选中边框。 */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   max-height: calc(100vh - 280px);
   overflow-y: auto;
 }

@@ -69,6 +69,8 @@ function hasChildren(node: MenuNode) {
 
 <style scoped>
 .sidebar-menu {
+  /* 与侧栏容器共用白色内容底，避免菜单之外的空白区域出现灰色断层。 */
+  --el-menu-bg-color: var(--el-bg-color);
   border-right: none;
 }
 
