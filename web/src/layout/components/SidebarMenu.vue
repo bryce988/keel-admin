@@ -78,4 +78,13 @@ function hasChildren(node: MenuNode) {
 .sidebar-menu:not(.el-menu--collapse) {
   width: 100%;
 }
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  font-weight: 500;
+}
+
+.sidebar-menu :deep(.el-sub-menu .el-menu-item) {
+  min-width: 0;
+  margin-left: 20px;
+}
 </style>

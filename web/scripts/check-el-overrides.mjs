@@ -28,7 +28,7 @@
  * `.table-actions .el-button + .el-button` 不算——它锚在我们自己的类上，
  * 特异性本来就比 EP 高。
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
@@ -65,4 +65,75 @@ if (problems.length) {
   process.exit(1)
 }
 
-console.log('EP 覆盖前缀检查通过')
+/*
+ * 折叠菜单的高度护栏
+ *
+ * `.el-menu--inline` 的首尾外边距会折叠到容器外；EP 收起时先读取 scrollHeight，
+ * 再设置 overflow:hidden。后一步创建 BFC 后外边距停止折叠，内容会在动画首帧跳动。
+ * design.css 用盒内透明边框制造行间距，因此 scoped 组件里不能重新引入垂直 margin。
+ */
+const menuMarginProblems = []
+
+function vueFiles(dir, prefix = '') {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name
+    if (entry.isDirectory()) return vueFiles(resolve(dir, entry.name), relative)
+    return entry.isFile() && entry.name.endsWith('.vue') ? [relative] : []
+  })
+}
+
+const isZero = (value) => /^0(?:[a-z%]+)?$/i.test(value.trim())
+
+for (const relative of vueFiles(resolve(root, 'src/layout'))) {
+  const file = `src/layout/${relative}`
+  const raw = readFileSync(resolve(root, file), 'utf8')
+  const styleRe = /<style\b[^>]*>([\s\S]*?)<\/style>/g
+  let styleMatch
+
+  while ((styleMatch = styleRe.exec(raw))) {
+    const styleOffset = styleMatch.index + styleMatch[0].indexOf(styleMatch[1])
+    const css = styleMatch[1].replace(/\/\*[\s\S]*?\*\//g, (comment) =>
+      comment.replace(/[^\n]/g, ' ')
+    )
+    const ruleRe = /([^{}]+)\{([^{}]*)\}/g
+    let rule
+
+    while ((rule = ruleRe.exec(css))) {
+      const selector = rule[1]
+      if (!selector.includes('.el-menu-item') && !selector.includes('.el-sub-menu__title')) continue
+
+      const declarations = rule[2]
+      const violations = []
+      const shorthand = declarations.match(/(?:^|;)\s*margin\s*:\s*([^;]+)/)
+
+      if (shorthand) {
+        const values = shorthand[1].replace(/!important/g, '').trim().split(/\s+/)
+        const top = values[0]
+        const bottom = values.length >= 3 ? values[2] : values[0]
+        if (!isZero(top) || !isZero(bottom)) violations.push(`margin: ${shorthand[1].trim()}`)
+      }
+
+      const verticalRe = /(?:^|;)\s*(margin-(?:top|bottom|block(?:-start|-end)?))\s*:\s*([^;]+)/g
+      let vertical
+      while ((vertical = verticalRe.exec(declarations))) {
+        const values = vertical[2].replace(/!important/g, '').trim().split(/\s+/)
+        if (values.some((value) => !isZero(value))) {
+          violations.push(`${vertical[1]}: ${vertical[2].trim()}`)
+        }
+      }
+
+      if (!violations.length) continue
+      const line = raw.slice(0, styleOffset + rule.index).split('\n').length
+      violations.forEach((violation) => menuMarginProblems.push(`${file}:${line}  ${violation}`))
+    }
+  }
+}
+
+if (menuMarginProblems.length) {
+  console.error('侧栏菜单项禁止设置上下外边距，否则收起动画会发生首帧跳动：\n')
+  menuMarginProblems.forEach((p) => console.error('  ' + p))
+  console.error('\n行间距使用 design.css 已有的透明边框；左右留白可写 `margin: 0 8px`。')
+  process.exit(1)
+}
+
+console.log('CSS 覆盖与侧栏菜单盒模型检查通过')
