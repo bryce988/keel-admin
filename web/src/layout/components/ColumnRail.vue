@@ -117,6 +117,11 @@ function onSelect(node: MenuNode) {
   color: var(--el-text-color-primary);
 }
 
+.rail-item:focus-visible {
+  outline: 2px solid var(--el-color-primary-light-5);
+  outline-offset: 1px;
+}
+
 .rail-item.is-active {
   background: var(--el-color-primary-light-9);
   color: var(--el-color-primary);

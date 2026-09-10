@@ -76,6 +76,7 @@ defineExpose({ open })
 .section-title {
   margin-bottom: 10px;
   font-size: 13px;
+  font-weight: 500;
   color: var(--el-text-color-secondary);
 }
 
@@ -103,6 +104,11 @@ defineExpose({ open })
 .layout-option:hover {
   border-color: var(--el-color-primary-light-5);
   background: var(--el-fill-color-lighter);
+}
+
+.layout-option:focus-visible {
+  outline: 2px solid var(--el-color-primary-light-5);
+  outline-offset: 2px;
 }
 
 .layout-option.is-active {

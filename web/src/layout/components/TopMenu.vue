@@ -90,6 +90,11 @@ function onSelect(node: MenuNode) {
   color: var(--el-text-color-primary);
 }
 
+.top-item:focus-visible {
+  outline: 2px solid var(--el-color-primary-light-5);
+  outline-offset: 1px;
+}
+
 .top-item.is-active {
   background: var(--el-color-primary-light-9);
   color: var(--el-color-primary);

@@ -260,7 +260,7 @@ onUnmounted(() => {
      但也不能像原来 26px / 12px 那样小到要凑近才看清 */
   height: 30px;
   padding: 0 8px;
-  border: 1px solid var(--el-border-color-light);
+  border: 1px solid transparent;
   /*
    * 控件档（8px），不用胶囊
    *
@@ -269,7 +269,7 @@ onUnmounted(() => {
    * 胶囊是给 44px 级别的大控件定的，尺寸降一半之后比例就不对了。
    */
   border-radius: var(--keel-radius);
-  background: var(--el-bg-color);
+  background: transparent;
   color: var(--el-text-color-regular);
   font-size: 13px;
   text-decoration: none;
@@ -278,6 +278,7 @@ onUnmounted(() => {
 
 .tag:hover {
   color: var(--el-color-primary);
+  background: var(--el-fill-color-light);
 }
 
 .tag .dot {
@@ -288,13 +289,13 @@ onUnmounted(() => {
 }
 
 .tag.is-active {
-  background: var(--el-color-primary);
-  border-color: var(--el-color-primary);
-  color: #fff;
+  background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary-light-7);
+  color: var(--el-color-primary-dark-2);
 }
 
 .tag.is-active .dot {
-  background: #fff;
+  background: var(--el-color-primary);
 }
 
 .tag .close {
@@ -310,8 +311,8 @@ onUnmounted(() => {
 }
 
 .tag.is-active .close:hover {
-  background: #fff;
-  color: var(--el-color-primary);
+  background: var(--el-color-primary);
+  color: var(--el-bg-color);
 }
 
 .tag .pin {

@@ -467,6 +467,12 @@ async function onUserCommand(cmd: string) {
   background: var(--el-fill-color-light);
 }
 
+.topbar :deep(.icon-btn:focus-visible),
+.hamburger:focus-visible {
+  outline: 2px solid var(--el-color-primary-light-5);
+  outline-offset: 1px;
+}
+
 /*
  * 混合版式：品牌标记与一级菜单都在顶栏
  *
@@ -502,8 +508,19 @@ async function onUserCommand(cmd: string) {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 34px;
+  padding: 0 8px 0 4px;
+  border: 1px solid transparent;
+  border-radius: var(--keel-radius);
   cursor: pointer;
   outline: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.user:hover,
+.user:focus-visible {
+  background: var(--el-fill-color-light);
+  border-color: var(--el-border-color-lighter);
 }
 
 .user .name {
@@ -565,6 +582,26 @@ async function onUserCommand(cmd: string) {
   .content {
     min-height: 0;
     overflow-y: visible;
+    padding: 12px;
+  }
+
+  .topbar {
+    gap: 8px;
+    padding: 0 12px;
+  }
+
+  .topbar :deep(.el-breadcrumb) {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .topbar :deep(.user .name) {
+    display: none;
+  }
+
+  .topbar :deep(.user) {
+    padding-right: 4px;
   }
 
   .sidebar {
