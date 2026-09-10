@@ -69,6 +69,7 @@ Keel 是船体最底层的那根主梁，整艘船的结构都搭在它上面。
 | 定时任务 | `workerman/crontab` ^1.0 | `app/process/TaskProcess`，**count 必须为 1**，见 §14.7 |
 | 队列 | `webman/redis-queue` ^2.1 | 耗时任务异步化；消费进程见 `app/queue/`，配置在 `config/plugin/` |
 | 接口文档 | `docs/api.md`（手写契约）+ 控制器 docblock 的 `@url` / `@perm` / `@error` | 与前端联调的唯一依据。⚠️ **没有**接了 OpenAPI 生成器，注解只给人看 |
+| 界面规范 | `DESIGN.md` | 颜色、字号、间距、组件默认值与新页面检查清单。`web/src/styles/design.css` 是它的落地实现，`npm run check-css` 守住其中两条硬约束 |
 
 **为什么选 webman**：常驻内存带来的性能收益（相比 FPM 提升数倍），且天然适合长连接与定时任务。代价是编程模型与 FPM 不同，全局状态会跨请求存活，**所有开发人员上手前必须先读 §14**。
 
@@ -89,6 +90,7 @@ keel-admin/
 ├── docker/               # 一键启动：nginx + php + mysql + redis
 ├── scripts/              # 仓库级脚本：deploy / acceptance / check-bizcode / bench-workers
 ├── .github/workflows/    # CI
+├── DESIGN.md             # 界面规范：颜色、字号、间距、组件默认值与新页面检查清单
 ├── README.md             # 英文 + 中文双语说明
 ├── CONTRIBUTING.md       # 贡献指南与提交规范
 ├── CHANGELOG.md          # 按语义化版本记录

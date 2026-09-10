@@ -10,7 +10,7 @@
 [![webman](https://img.shields.io/badge/webman-2.x-42b983.svg)](https://www.workerman.net/webman)
 [![Vue](https://img.shields.io/badge/Vue-3.x-42b883.svg)](https://vuejs.org/)
 
-[在线预览](http://43.143.249.52:8080) · [项目文档](PROJECT.md) · [数据库设计](docs/database.md) · [接口契约](docs/api.md) · [更新日志](CHANGELOG.md)
+[在线预览](http://43.143.249.52:8080) · [项目文档](PROJECT.md) · [设计规范](DESIGN.md) · [数据库设计](docs/database.md) · [接口契约](docs/api.md) · [更新日志](CHANGELOG.md)
 
 [GitHub](https://github.com/bryce988/keel-admin) · [Gitee](https://gitee.com/yewang_top/keel-admin)　两边都是主仓库，内容一致，就近选一个
 
@@ -264,6 +264,7 @@ keel-admin/
 ├── server/     后端（app/admin · app/client · app/open · app/common）
 ├── docs/       文档
 ├── docker/     一键启动
+├── DESIGN.md   界面规范（新增页面与评审 UI 的依据）
 └── PROJECT.md  完整项目文档
 ```
 

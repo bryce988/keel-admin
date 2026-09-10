@@ -20,6 +20,9 @@
 - 筛选区、抽屉表单、顶栏与页签的间距和焦点样式统一；可聚焦元素补 `:focus-visible` 描边
 
 ### 新增
+- **`DESIGN.md` 进仓库**：界面规范（颜色、字号、间距、组件默认值、新页面检查清单、禁止事项）。
+  此前它一直是本地文件，而 `design.css` 里十几处注释指向它——clone 下来的人看到「见 DESIGN.md」
+  却找不到文件，而它恰恰是新增页面与评审 UI 的共同依据。README 与 PROJECT.md 的文档索引已挂上
 - **侧栏菜单外边距的自动护栏**（`scripts/check-el-overrides.mjs`）：递归扫描 `src/layout`
   下所有 `.vue`，禁止给菜单项写上下外边距——那会让收起动画首帧跳动
   （外边距折叠遇上 EP 的 `overflow:hidden`，`design.css` 里记着这个坑）。
