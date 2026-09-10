@@ -1,8 +1,13 @@
 <div align="center">
 
-# Keel
+![Keel 标志](staff/static/icons/icon-96.png)
 
-多端后台脚手架，不含业务逻辑
+# Keel Admin
+
+**开箱即用的多端后台脚手架**
+
+登录鉴权、完整 RBAC、系统管理、日志审计、异步任务与员工移动端均已落地。
+行业业务从清晰、稳定的工程底座上开始开发。
 
 [![Stars](https://img.shields.io/github/stars/bryce988/keel-admin?style=flat&logo=github)](https://github.com/bryce988/keel-admin)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -10,334 +15,300 @@
 [![webman](https://img.shields.io/badge/webman-2.x-42b983.svg)](https://www.workerman.net/webman)
 [![Vue](https://img.shields.io/badge/Vue-3.x-42b883.svg)](https://vuejs.org/)
 
-[在线预览](http://43.143.249.52:8080) · [项目文档](PROJECT.md) · [设计规范](DESIGN.md) · [数据库设计](docs/database.md) · [接口契约](docs/api.md) · [更新日志](CHANGELOG.md)
+[在线预览](http://43.143.249.52:8080) · [快速开始](#快速开始) · [核心能力](#核心能力) · [项目文档](PROJECT.md) · [设计规范](DESIGN.md)
 
-[GitHub](https://github.com/bryce988/keel-admin) · [Gitee](https://gitee.com/yewang_top/keel-admin)　两边都是主仓库，内容一致，就近选一个
+[GitHub](https://github.com/bryce988/keel-admin) · [Gitee](https://gitee.com/yewang_top/keel-admin)
 
 </div>
 
----
+![Keel Admin 用户管理页面](docs/images/admin-user.jpg)
 
-## 这是什么
+## 项目定位
 
-一套不含业务逻辑的后台管理脚手架。clone 下来 `docker compose up`，得到的是一个能登录、
-能管权限、能查日志的后台，剩下的工作是往里加业务模块。
+Keel 是一套面向多端应用的后台管理脚手架。启动项目即可获得能登录、能管权限、能查日志、
+能运行异步任务的管理后台，开发者可以直接增加业务模块。
 
-已经就位的：登录鉴权、菜单导航、多页签工作区、RBAC 权限体系（功能 / 数据 / 字段三个维度）、
-系统管理八个模块（用户、部门、岗位、角色、菜单权限、字典、参数、日志）、五种页型模板、
-操作日志、队列与定时任务进程，以及一个**员工移动端 App**（`staff/`，uni-app）——
-登后台同一套账号，手机上能看工作台与系统公告。
+框架已经包含五端入口、八个系统管理模块、五种通用页型模板和员工移动端 App。
+行业模型、业务流程与演示数据保持分离，演示数据可一键清理。
 
-不做的是任何行业逻辑。它不是 CRM 也不是 ERP，那些是在它之上写的东西，演示数据可以一键清空。
-
-### 在线预览
-
-http://43.143.249.52:8080 ，账号 `admin` / `admin123`。
-
-想看权限体系的效果，再用 `manager` / `demo123456`（部门主管）登录一次：菜单少了几项，
-用户列表只剩本部门的人。同一个接口，返回的数据自己变少了——过滤是数据库层注入的，
-不是前端藏起来的。
-
-### 几个设计取向
-
-后端跑在 webman（Workerman）上，常驻内存，比 PHP-FPM 快数倍，定时任务和长连接不用另外找地方放。
-
-一开始就是多端结构。`admin` / `staff` / `client` / `open` / `internal` 五个入口按 webman
-多应用切好，各有各的中间件与异常处理器——**加一个端就是加一个目录，不改架构**，
-员工移动端就是这么长出来的：身份复用管理端（同一张表、同一个令牌、同一份权限点），
-接口另开一套，业务逻辑一行不重写。
-
-权限做到了完整而不是演示：功能权限、数据权限、字段级权限三个维度正交，
-角色继承（RBAC1）与职责分离（RBAC2）都落到了实现。前端的 `v-permission` 只负责收敛界面，
-真正的拦截在后端路由的权限点声明上，没声明就是 403。
-
-页型模板有五种（标准列表、树表联动、主从、表单、详情），新模块从模板复制，
-视觉和交互不会各写各的。权限标识、状态色、字典枚举、日志策略都在框架层解决，
-业务代码里不用重复实现一遍。
-
-## 技术栈
-
-| | |
+| 设计重点 | Keel 的实现 |
 |---|---|
-| 管理后台前端 | Vue 3 + TypeScript + Vite 5 + Element Plus + Pinia |
-| 员工移动端 | uni-app + Vue 3（HBuilderX 工程，云打包出 Android 包） |
-| 后端 | PHP 8.4+ + webman 2.x（多应用）+ Eloquent + Redis |
-| 数据库 | MySQL 8.0+ |
+| 多端架构 | `admin`、`staff`、`client`、`open`、`internal` 独立路由、中间件与异常响应 |
+| 权限边界 | 功能权限、数据权限、字段权限相互独立，服务端默认拒绝未声明权限的接口 |
+| 开发效率 | 列表、树表、主从、表单、详情五种模板，共用查询、表格、抽屉与字典组件 |
+| 运行能力 | webman 常驻内存，队列消费者与定时任务随服务一起运行 |
 
 ## 快速开始
 
-只需要 Docker，不必在本机装 PHP / Node / MySQL / Redis。
+开发环境只需要 Docker，无需在本机安装 PHP、Node、MySQL 或 Redis。
 
 ```bash
-git clone https://github.com/bryce988/keel-admin.git   # 国内建议换 Gitee 地址，快很多
+git clone https://github.com/bryce988/keel-admin.git
 cd keel-admin
 
-cp .env.example .env      # 按需改端口、密码、JWT 密钥
-docker compose up -d      # 首次会拉 webman 骨架并装依赖，约 2-3 分钟
+cp .env.example .env
+docker compose up -d
 ```
 
-起来之后：
+首次启动会构建镜像并安装依赖，通常需要 2–3 分钟。
 
-| 地址 | 说明 |
+| 服务 | 地址 | 说明 |
+|---|---|---|
+| 管理后台 | http://localhost:5173 | `admin` / `admin123` |
+| 后端探测 | http://localhost:8787/admin/ping | 返回服务存活状态 |
+
+在线预览地址为 http://43.143.249.52:8080 。使用 `manager` / `demo123456` 登录，
+可以查看部门主管的数据权限效果：菜单和用户数据会根据角色自动收敛。
+
+<details>
+<summary><strong>查看日志与常用命令</strong></summary>
+
+```bash
+# 查看运行状态
+docker compose ps
+docker compose logs -f server
+docker compose logs -f web
+
+# 开发与维护
+docker compose restart server
+docker compose exec server php start.php reload
+docker compose exec server php scripts/install.php
+
+# 提交前检查
+docker compose exec -T web npm run check
+docker compose exec -T server composer check
+
+# 进入数据库
+docker compose exec mysql mysql -ukeel -pkeel123456 keel
+
+# 停止服务并清空本地数据卷
+docker compose down -v
+```
+
+`scripts/install.php` 只会补建默认管理员，账号已存在时会跳过。修改普通 PHP 代码时调试模式会自动
+reload；修改 `config/`、自定义进程或依赖后需要重启 server 容器。
+
+</details>
+
+## 核心能力
+
+所有 v1.0 功能均有实际页面和接口，不包含只有菜单的占位模块。
+
+| 模块 | 已实现能力 |
 |---|---|
-| http://localhost:5173 | 管理后台，账号 `admin` / `admin123` |
-| http://localhost:8787/admin/ping | 后端存活探测 |
+| 登录与工作区 | 图形验证码、JWT、失败锁定、菜单下发、菜单搜索、多页签、面包屑、深浅色主题 |
+| 界面布局 | 经典、混合、分栏三种导航布局，支持侧栏收起、通知中心与偏好持久化 |
+| 权限体系 | RBAC1 角色继承、RBAC2 职责分离、五种数据范围、字段脱敏、权限点拦截 |
+| 系统管理 | 用户、部门、岗位、角色、菜单权限、字典、参数、登录与操作日志 |
+| 数据与任务 | 流式导入导出、异步导出中心、系统公告、队列监控、定时清理 |
+| 个人中心 | 资料维护、修改密码、换绑手机、个人登录记录 |
+| 开发模板 | 标准列表、树表联动、主从、表单、详情五种页型，仅在开发环境注册 |
+| 员工移动端 | 同账号体系登录、工作台、公告收件箱、未读提醒、资料与头像维护 |
 
-看启动进度和日志：
+## 架构与技术栈
 
-```bash
-docker compose logs -f server     # 后端
-docker compose logs -f web        # 前端
-docker compose ps                 # 服务状态
+| 层级 | 技术 |
+|---|---|
+| 管理后台 | Vue 3、TypeScript、Vite 5、Element Plus、Pinia |
+| 员工移动端 | uni-app、Vue 3、HBuilderX |
+| 服务端 | PHP 8.4+、webman 2.x、Eloquent、Redis |
+| 数据存储 | MySQL 8.0+ |
+
+### 多端入口
+
+五个入口共用基础设施和领域能力，并保留独立的接口边界：
+
+```text
+管理后台 admin   ─┐
+员工应用 staff   ─┤
+C 端应用 client  ─┼─→ common 共享能力 ─→ MySQL / Redis / Queue
+开放平台 open    ─┤
+内部服务 internal ─┘
 ```
 
-常用命令：
+员工端复用管理端的账号、令牌和权限点，接口独立位于 `/staff/v1/*`。其他端也分别维护自己的
+路由、中间件与异常响应；新增端时无需改动整体架构。
 
-```bash
-docker compose restart server                        # 重启后端
-docker compose exec server php start.php reload      # 改完 PHP 平滑重载
-docker compose exec server php scripts/install.php   # 重新初始化管理员，幂等
-docker compose exec mysql mysql -ukeel -pkeel123456 keel   # 进数据库
-docker compose down -v                               # 停止并清空数据，从头再来
+### 权限模型
+
+```text
+用户 ──多对多── 角色 ──多对多── 权限点 ──→ 菜单 / 按钮 / 接口 / 数据
+                 └──→ 数据范围：全部 / 本部门及下属 / 本部门 / 仅本人 / 自定义
 ```
 
-改 PHP 代码调试模式会自动 reload；改了 `config/` 或自定义进程要 `docker compose restart server`。
+权限定义、角色授权、用户分配三层职责分开。前端的 `v-permission` 用于收敛界面，
+服务端路由上的权限声明负责真正拦截请求；未声明权限点的受保护接口默认返回 403。
 
-### 不用 Docker（本机直跑）
+### 目录结构
 
-**需要自备**
+```text
+keel-admin/
+├── web/                 管理后台前端
+├── staff/               员工移动端，详见 staff/README.md
+├── server/              webman 后端
+│   └── app/
+│       ├── admin/       管理后台接口
+│       ├── staff/       员工端接口
+│       ├── client/      C 端接口
+│       ├── open/        开放平台接口
+│       ├── internal/    内部接口
+│       ├── common/      多端共享能力
+│       ├── middleware/  静态资源中间件
+│       ├── process/     HTTP 与定时任务进程
+│       └── queue/       异步任务消费者
+├── docs/                数据库、接口与实施记录
+├── docker/              开发与生产容器配置
+├── DESIGN.md            界面规范
+└── PROJECT.md           完整项目文档
+```
+
+`staff/` 是 HBuilderX 工程，不参与 Docker Compose 和 CI；其余部分均可在容器中构建。
+
+## 开发指南
+
+项目约定和详细设计已经拆分到独立文档，README 只保留启动入口。
+
+| 文档 | 内容 |
+|---|---|
+| [PROJECT.md](PROJECT.md) | 架构、权限、多端划分、页型规范、开发红线与里程碑 |
+| [DESIGN.md](DESIGN.md) | 颜色、排版、间距、组件和页面设计规范 |
+| [docs/api.md](docs/api.md) | 接口契约、状态码与错误响应 |
+| [docs/database.md](docs/database.md) | 表结构与数据关系 |
+| [staff/README.md](staff/README.md) | 员工移动端运行与打包 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
+
+新增功能时请遵守三条基础约定：
+
+1. 写接口必须声明权限点，并记录操作日志。
+2. 数据权限由模型全局 Scope 注入，业务查询不要重复拼接部门条件。
+3. 新页面使用 `SearchForm`、`ProTable`、`FormDrawer` 和现有页型模板保持体验一致。
+
+<details>
+<summary><strong>不用 Docker，在本机直接运行</strong></summary>
+
+### 环境要求
 
 | 组件 | 版本 | 说明 |
 |---|---|---|
-| PHP | **8.4+** | 扩展：`pcntl` `posix` `pdo_mysql` `sockets` `zip` `redis` `mbstring` `curl` `openssl` `dom`（HTML 净化用）|
-| Composer | 2.x | |
-| MySQL | 8.0+ | 排序规则用 `utf8mb4_0900_ai_ci`，5.7 不支持 |
-| Redis | 6+ | 缓存、限流、队列都要，**不是可选项** |
-| Node | 20+ | 只有管理后台前端需要 |
+| PHP | 8.4+ | 需要 `pcntl`、`posix`、`pdo_mysql`、`sockets`、`zip`、`redis`、`mbstring`、`curl`、`openssl`、`dom` |
+| Composer | 2.x | 安装 PHP 依赖 |
+| MySQL | 8.0+ | 使用 `utf8mb4_0900_ai_ci`，不支持 MySQL 5.7 |
+| Redis | 6+ | 缓存、限流和队列的必需服务 |
+| Node.js | 20+ | 仅管理后台前端需要 |
 
-⚠️ **`ext-redis`（phpredis）是硬依赖**，不是性能优化：队列插件的
-`RedisConnection extends \Redis`，没有这个扩展连投递任务都会致命错误。
-装法：`pecl install redis && docker-php-ext-enable redis`（或发行版的 `php8.4-redis` 包）。
-缓存走的是纯 PHP 的 predis，两者并存。
+`ext-redis`（phpredis）是队列插件的硬依赖。可使用 `pecl install redis` 安装；缓存层仍使用
+predis，两者同时存在。Windows 下 webman 只能单进程调试，可使用 `server/windows.bat`。
 
-装完用 `php -m` 对一遍：官方镜像里跑通的那份是
-`pcntl pdo_mysql posix redis sockets zip mbstring curl dom openssl`（其余为 PHP 自带）。
+### 1. 设置环境变量
 
-Windows 上 workerman 无法多进程，只能单进程调试（`server/windows.bat`），生产请用 Linux。
-
-**第一步：环境变量**
-
-⚠️ 这一步最容易踩空：**项目不解析 `.env` 文件**。`app\common\support\Env` 只读
-`getenv()`——容器里由 docker compose 注入，本机直跑就得自己 export。
-也**不要** `source .env`：那个文件里有行内注释（`APP_ENV=dev  # dev / test / prod`），
-source 进去会把注释一起当成值。
+项目本身不解析 `.env` 文件，本机直跑时需要将变量注入当前 shell。不要直接 `source .env`，
+其中的行内注释会被一起当作值。
 
 ```bash
 export APP_ENV=dev APP_DEBUG=true
-export APP_URL=http://127.0.0.1:8787          # App 端头像要绝对地址，见 staff/README.md
+export APP_URL=http://127.0.0.1:8787
 export DB_HOST=127.0.0.1 DB_PORT=3306 DB_DATABASE=keel DB_USERNAME=root DB_PASSWORD=你的密码
 export REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_PASSWORD=
-export JWT_SECRET=$(openssl rand -hex 32)     # 必填，见下
+export JWT_SECRET=$(openssl rand -hex 32)
 ```
 
-`JWT_SECRET` 是**唯一必填项**：HS256 要求至少 32 字节，不设或太短会直接抛异常
-（这是刻意的——默认密钥等于没有密钥）。生产上务必固定下来，重启换一次值
-等于把所有人踢下线。其余变量都有默认值（见上表与 `.env.example`），
-默认连 `127.0.0.1:3306` 的 `keel` 库、`root` 空密码、本机 Redis。
+`JWT_SECRET` 至少需要 32 字节，生产环境必须固定保存；更换它会让所有现有登录令牌失效。
 
-**第二步：建库**
+### 2. 创建数据库
 
 ```sql
 CREATE DATABASE keel DEFAULT CHARSET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 ```
 
-表结构不用手动导入——下一步的 `migrate.php` 会按 `server/database/schema.sql` 幂等对齐。
-
-**第三步：后端**
+### 3. 启动后端
 
 ```bash
 cd server
 composer install
 
-php scripts/migrate.php     # 建表 / 补列，幂等，可重复执行
-php scripts/install.php     # 建管理员（默认 admin / admin123，可用 ADMIN_USERNAME、ADMIN_PASSWORD 覆盖）
-php scripts/seed.php --demo # 权限点、字典、参数；--demo 另播三个演示账号
-
-php start.php start         # 前台运行，Ctrl+C 停止
-# php start.php start -d    # 守护进程
+php scripts/migrate.php
+php scripts/install.php
+php scripts/seed.php --demo
+php start.php start
 ```
 
-跑起来后 `curl http://127.0.0.1:8787/admin/ping` 应返回 `{"pong":true,"app":"admin"}`。
+`migrate.php` 会根据 `server/database/schema.sql` 幂等建表和补列。服务启动后，访问
+http://127.0.0.1:8787/admin/ping 应得到 `{"pong":true,"app":"admin"}`。
 
-进程管理：
+常用进程命令：
 
 ```bash
-php start.php reload     # 平滑重载（改 PHP 业务代码用它，0 秒停机）
-php start.php restart    # 重启（改 config/、自定义进程、装了新依赖必须用它）
+php start.php reload
+php start.php restart
 php start.php stop
 php start.php status
 ```
 
-确保 `server/runtime/` 与 `server/public/uploads/` 可写（日志、PID、上传的头像都在里面）。
+确保 `server/runtime/` 和 `server/public/uploads/` 对运行用户可写。
 
-**第四步：管理后台前端**
+### 4. 启动管理后台
 
 ```bash
 cd web
-npm install
+npm ci
 VITE_PROXY_TARGET=http://127.0.0.1:8787 npm run dev
 ```
 
-`VITE_PROXY_TARGET` 必须给：默认值是 `http://server:8787`（Docker 里的服务名），
-本机直跑解析不到。开发服务器在 http://localhost:5173 ，接口由 vite 代理转发，
-所以**不需要**后端开跨域。
+本机直跑时必须指定 `VITE_PROXY_TARGET`；其默认值 `http://server:8787` 只在 Docker 网络中有效。
 
-**第五步（可选）：员工移动端**
+### 5. 运行员工移动端
 
-`staff/` 是 HBuilderX 工程，不参与上面的流程，也不需要 Node 环境——
-用 HBuilderX 打开该目录运行即可，详见 [staff/README.md](staff/README.md)。
+使用 HBuilderX 打开 `staff/` 目录运行或云打包，详细步骤见 [staff/README.md](staff/README.md)。
 
-**原生部署到服务器**
+</details>
 
-进程守护用 systemd 或 supervisor 拉起 `php start.php start -d`；前端 `npm run build`
-后把 `web/dist` 交给 nginx，并按 `docker/nginx/default.conf` 配好转发——
-那份配置里注释了四条必须守住的规则（按端前缀转发、XFF 覆盖式、`/internal/` 拒绝、
-`/uploads/` 用 `^~`），照抄即可。
-
-### 部署到服务器
+## 部署
 
 ```bash
-# 首次
 git clone https://gitee.com/yewang_top/keel-admin.git /opt/keel
 cd /opt/keel
-cp .env.example .env && vi .env      # 数据库密码、JWT 密钥务必换成随机值
-docker compose -f docker-compose.prod.yml up -d --build
 
-# 后续更新：拉代码、重建、健康检查一条命令搞定
+cp .env.example .env
+vi .env
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+后续更新使用：
+
+```bash
 ./scripts/deploy.sh
 ```
 
-生产编排跟开发编排的区别：前端构建成静态文件交给 nginx，不跑 vite；MySQL 与 Redis
-不对宿主机暴露端口；只开一个 HTTP 端口，默认 8080。网络受限时可以在 `.env` 里设
-`APK_MIRROR` 和 `COMPOSER_MIRROR` 加速构建。
+生产编排会将前端构建为静态文件并交给 nginx，只暴露一个 HTTP 端口，默认是 `8080`；
+MySQL 与 Redis 不暴露宿主机端口。部署前请更换数据库密码和 JWT 密钥。网络受限时可在 `.env`
+中设置 `APK_MIRROR` 与 `COMPOSER_MIRROR`。
 
-## 功能一览
+原生部署时，使用 systemd 或 supervisor 守护 `php start.php start -d`，并参考
+`docker/nginx/default.conf` 配置端前缀转发、XFF、`/internal/` 拒绝和 `/uploads/` 静态资源规则。
 
-下面是 v1.0 规划的全部内容，也是当前代码的真实进度——**全部已完成**，
-没有「菜单在侧边栏、点进去是占位页」的条目。
+## 项目进度
 
-| 模块 | 内容 |
-|---|---|
-| 登录与鉴权 | 图形验证码、JWT、失败锁定、权限与菜单下发 |
-| 工作区 | 可折叠二级菜单、多页签、面包屑、深浅色主题 |
-| 权限体系 | 数据权限五种范围、字段级脱敏、权限点拦截、操作日志 |
-| 概览 | 模块规模、登录趋势、最近操作、运行状态，全部真实数据 |
-| 用户管理 | 部门树筛选、角色分配、导入导出、停用交接 |
-| 数据字典 | 字典类型与字典项，驱动全站枚举与状态色 |
-| 系统公告 | 草稿/发布/撤回，顶栏铃铛未读角标与新公告提示 |
-| 数据导出 | 异步导出：点导出建任务进队列，完成后到导出中心下载 |
-| 部门管理 | 组织树、岗位、默认角色 |
-| 角色管理 | 功能权限树、数据范围、字段级权限、成员、继承与互斥约束 |
-| 菜单与权限 | 菜单树、权限点定义（五种类型） |
-| 参数配置 | 基础设置、安全策略、集成配置、高级参数，密钥只写不读 |
-| 操作日志 | 操作 / 登录日志，字段级变更留痕，越权尝试同样入库 |
-| 个人中心 | 资料、安全设置（改密 / 换绑手机）、我的登录记录 |
-| 页型模板 | 五种页型，只在开发环境注册，不进生产包 |
+| 阶段 | 状态 | 主要成果 |
+|---|:---:|---|
+| M1 框架搭建 | ✅ | 登录闭环、动态路由、权限指令、通用组件、数据权限 Scope |
+| M2 系统管理 | ✅ | 八个系统模块、导入导出、权限矩阵、操作日志 |
+| M3 工程能力 | ✅ | 五种页型模板、个人中心、队列与定时任务、空状态与骨架屏 |
+| M4 联调加固 | ✅ | 54 项验收断言、30 分钟压测、断线重连与部署验证 |
+| M5 员工移动端 | ✅ | 登录、工作台、公告消息、个人资料、跨域与续期机制 |
+| 二期 | 规划中 | 面向终端用户的 C 端业务接口与开放平台 |
 
-## 权限模型
-
-```
-用户 ──多对多── 角色 ──多对多── 权限点 ──→ 资源（菜单/按钮/接口/数据）
-                 └──→ 数据范围（全部/本部门及下属/本部门/仅本人/自定义）
-```
-
-三层职责分开，一层只做一件事：定义（菜单与权限）→ 授权（角色管理）→ 分配（用户管理）。
-
-用户身上没有独立授权。所有写接口与敏感读接口都在服务端独立校验，前端隐藏不算权限控制。
-
-## 目录结构
-
-```
-keel-admin/
-├── web/        管理后台前端（Vue 3 + Vite）
-├── staff/      员工移动端（uni-app + Vue 3，对应 server/app/staff，见 staff/README.md）
-├── server/     后端（app/admin · app/client · app/open · app/common）
-├── docs/       文档
-├── docker/     一键启动
-├── DESIGN.md   界面规范（新增页面与评审 UI 的依据）
-└── PROJECT.md  完整项目文档
-```
-
-> `staff/` 不在 `docker compose` 与 CI 里：它是 HBuilderX 工程，运行与云打包都在 HBuilderX 里做。
-> 其余部分都能在容器里构建。
->
-> 命名：`staff/` 跟着**端名**走（对应 `server/app/staff`、`/staff/v1/*`）；
-> `web/` 是历史命名，指管理后台前端（`server/app/admin`）。两者不一致但都不产生歧义，
-> 改 `web/` 要动 CI、compose、部署脚本，不值当。
-
-## 进度
-
-- [x] 交互原型、项目文档、数据库设计、接口契约
-- [x] Docker 一键启动环境
-- [x] 登录闭环：验证码 → JWT 签发 → 鉴权中间件 → 用户/权限/菜单下发
-- [x] M1 框架搭建
-  - [x] 多页签工作区（上限、右键菜单、刷新恢复）
-  - [x] `v-permission` 权限指令、菜单驱动的动态路由
-  - [x] `ProTable` / `SearchForm` / `DictSelect` / `DictTag` 通用组件
-  - [x] Eloquent 模型层 + 数据权限全局 Scope（五种范围）
-  - [x] 权限中间件（没声明权限点就拒绝）+ 操作日志中间件（越权尝试同样留痕）
-  - [x] 分端隔离：`app/{admin,client,open,internal}` 各有中间件与异常处理器（后来加入 `staff`）
-  - [x] 日志三通道：业务 / 未捕获异常 / 慢查询
-- [x] M2 系统管理：用户 / 部门 / 岗位 / 角色 / 菜单权限 / 字典 / 参数 / 日志
-  - [x] 列表状态同步 URL、表单抽屉规范、写接口通用件（唯一性 / 引用 / 成环 / 内置数据断言）
-  - [x] 七个模块的完整增删改查，写接口一律带权限点与操作日志
-  - [x] 导入导出走 openspout 流式读写（两万行内存峰值 4MB）
-  - [x] 权限矩阵收尾：内置角色授权补齐，`manager` / `dev01` 双账号全量走查
-- [x] M3 页型模板、个人中心与通用组件
-  - [x] 五种页型模板，开发环境可直接打开预览
-  - [x] 个人中心：资料、安全设置（改密 / 换绑手机）、我的登录记录
-  - [x] `EmptyState` 空状态（四场景 + 必带动作）与 `PageSkeleton` 首屏骨架屏
-  - [x] 队列消费进程 + 定时任务进程（日志按保留天数自动清理）
-- [x] M4 联调加固：13 条验收项逐条实测
-  - [x] 权限矩阵、数据权限五种范围、字段级脱敏、多端隔离 —— `sh scripts/acceptance.sh`，**54 项断言**（仅开发环境，脚本会临时改角色与部门再还原）
-  - [x] 连续压测 30 分钟：284,920 次请求 / 1 次失败，内存预热后进入平台期
-  - [x] 进程数定值：`max(8, 核数 × 2)`，吞吐拐点由逐档压测测出——`sh scripts/bench-workers.sh`
-  - [x] MySQL 断开重连（含在死连接上开事务）无需重启进程
-  - [x] 部署脚本与守护配置，`reload` 0 秒、`restart` 约 2 秒的停机窗口已实测
-- [x] M5 员工移动端 `staff/`（uni-app + Vue 3，HBuilderX 工程）
-  - [x] 新增 `app/staff` 端：**身份与后台同一套**（同一张 `sys_users`、同一个令牌、
-        同一份权限点与数据权限），**接口另开一套** `/staff/v1/*`
-  - [x] 登录（账号 + 密码 + 图形验证码）一次返回令牌与身份；401 自动用 refresh 续期并重试（单飞），7 天内免登录
-  - [x] 工作台聚合：一个请求拿回身份 + 权限 + 概览 + 未读数
-  - [x] 消息：系统公告收件箱，未读角标、下拉刷新、触底加载、一键已读，详情用 `rich-text` 渲染
-  - [x] 我的：资料、换头像、退出；App 图标与 tabBar 图标由脚本从品牌标记生成
-  - [x] 跨域中间件（默认关闭，白名单从 `.env` 读）——H5 与浏览器预览需要
-- [ ] 二期：C 端（App / 小程序面向终端用户）业务接口、开放平台
-
-M2 各阶段的执行拆分与实测记录见 [docs/roadmap-m2.md](docs/roadmap-m2.md)。
+详细里程碑和实测结论见 [PROJECT.md](PROJECT.md)；M2 的实施记录见
+[docs/roadmap-m2.md](docs/roadmap-m2.md)。
 
 ## 参与贡献
 
-GitHub 与 Gitee 都是主仓库，维护者一条 `git push` 同时推两边，内容始终一致，
-在哪边方便就用哪边，提 Issue、提 PR 都行。
+GitHub 与 Gitee 内容保持一致，可就近提交 Issue 或 Pull Request。提交前请阅读
+[CONTRIBUTING.md](CONTRIBUTING.md)，提交信息使用 `type(scope): subject`。
 
-没有 Issue / PR 模板，把话说清楚就够了：这是什么问题、怎么复现、你期望的行为。
-提 PR 时说明改了什么、为什么这么改、怎么验证的。
-
-提交前请读一遍 [CONTRIBUTING.md](CONTRIBUTING.md)，另外注意：
-
-- 提交信息用 `type(scope): subject`
-- 新增写接口必须带权限点、操作日志与数据权限约束
-- 后端改动前先看项目文档里的「webman 常驻内存注意事项」
-
-## 联系方式
-
-邮箱 1306811834@qq.com，使用问题、功能建议、二次开发咨询都可以发。不过更建议走 Issue：
-
-- Bug 与功能建议：[GitHub Issue](https://github.com/bryce988/keel-admin/issues)，公开讨论对后来遇到同样问题的人有用
-- 安全漏洞：不要发 Issue，按 [SECURITY.md](SECURITY.md) 的私密渠道报告；发邮件也行，但请在标题注明「安全」
-- 其他：邮件
+- Bug 与功能建议：[GitHub Issues](https://github.com/bryce988/keel-admin/issues)
+- 安全问题：按 [SECURITY.md](SECURITY.md) 提供的私密渠道报告
+- 使用与二次开发咨询：1306811834@qq.com
 
 ## 开源协议
 
-[MIT](LICENSE)，可商用，可闭源二次开发。
+Keel 使用 [MIT License](LICENSE)，允许商业使用和闭源二次开发。
