@@ -230,4 +230,36 @@ function onReset() {
 .search-form :deep(.el-form-item.actions) {
   flex: none;
 }
+/* 紧凑筛选是列表页默认样式，模板与新页面无需额外 class 才能保持一致。 */
+.search-form {
+  container-type: inline-size;
+}
+
+.search-form .fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+.search-form :deep(.el-input),
+.search-form :deep(.el-select),
+.search-form :deep(.el-date-editor) {
+  --el-component-size: 36px;
+}
+
+.search-form :deep(.actions .el-button:not(.is-link)) {
+  height: 36px;
+}
+
+@container (max-width: 650px) {
+  .search-form :deep(.el-form--inline) {
+    flex-direction: column;
+  }
+
+  .search-form .fields {
+    width: 100%;
+  }
+
+  .search-form :deep(.actions) {
+    align-self: flex-end;
+  }
+}
 </style>

@@ -92,22 +92,15 @@ import type { PageResult, TableQuery } from '@/types/api'
  * 真填了十个字仍然会走 tooltip——那是可接受的降级，但产品自带的种子数据
  * （`系统管理员`、`技术负责人`）必须一个不截。
  *
- * ## 对齐：默认居中，左对齐是例外
+ * ## 对齐：文字左对齐，定长状态与数字居中
  *
- * 表头已经在模板里写死居中。**正文也一律 `align: 'center'`**——
- * 后台列表的字段绝大多数是短的（账号、姓名、部门、编码、时间、状态），
- * 表头居中而正文靠左时，两者错开半个格子，一屏扫下来是歪的。
+ * refined 是默认模式，页面列定义仍须显式声明 align，避免审查和复制模板时依赖组件
+ * 默认值。名称、编码、账号、时间、IP、路径、描述等可阅读文本写 `align: 'left'`；
+ * 尤其树形表格的名称列必须左对齐，否则展开箭头与层级缩进会被居中布局吃掉。
  *
- * 只有两类列**保持左对齐**，加列时对着这两条判断，别的一律居中：
- *
- * 1. **树形表格的名称列**（部门、菜单的「名称」）。这是硬约束不是审美：
- *    展开箭头和层级缩进都画在这一列上，居中之后缩进量被两侧的空白吃掉，
- *    父子层级就看不出来了。这两处的 `align: 'left'` 是显式写的，别当成漏改删掉
- * 2. **会被 tooltip 截断的自由文本**：备注、登录地址（`United StatesCalifornia
- *    【Google LLC】` 35 字符 vs `回环地址` 4 字符）、操作对象、接口路径、组件路径、
- *    失败说明。这类列每行长度差好几倍，居中会让首尾都参差，比靠左更难扫
- *
- * 数字列也不单独右对齐：全表就一两列数字时右对齐反而像漏改了。
+ * 只有短且定长、适合按列纵向比较的内容显式写 `align: 'center'`：数字、排序、状态、
+ * 枚举标签、图标和操作列。数字不单独右对齐，避免一张表只有一两列右对齐时像漏改。
+ * 传统网格模式可显式传 `:refined="false"`，它的表头仍保持居中。
  */
 export interface ProColumn<Row = Record<string, unknown>> {
   prop: string
@@ -116,7 +109,7 @@ export interface ProColumn<Row = Record<string, unknown>> {
   width?: number | string
   /** 宽度下限，有富余时按比例摊开——绝大多数列该用这个 */
   minWidth?: number | string
-  /** 不写即左对齐。定长内容用 'center'，见上面的对齐约定 */
+  /** 页面应显式声明：可阅读文本用 'left'，定长内容用 'center'，见上面的对齐约定 */
   align?: 'left' | 'center' | 'right'
   fixed?: boolean | 'left' | 'right'
   sortable?: boolean
@@ -153,19 +146,16 @@ const props = withDefaults(
     selection?: boolean
     /** 挂载时是否立即取数 */
     immediate?: boolean
+    /** 轻量列表样式：弱化网格线，突出行内容与操作层级 */
+    refined?: boolean
     /**
-     * 锁定表体高度（默认锁）
-     *
-     * 默认行为假设「表格就是这一页的主体」：量出自己距视口顶部的距离，
-     * 把剩下的高度全给表体，于是表头不动、分页条钉在底部、只有表体滚。
-     *
-     * 页面上方还压着别的面板时（队列监控就是这样）这个假设不成立——
-     * 表格的 top 很大，算出来的高度会一路撞到 180px 下限，
-     * 结果是「整页在滚，表体里还套一条滚动条」，而空状态插画比 180px 还高，
-     * 居中之后直接溢出到表头线上。这种页面传 `:lock-height="false"`，
-     * 让表格按内容自然撑开，滚动交给页面。
+     * 表体高度策略
+     * - fill：固定占满剩余视口，数据少时保留空白
+     * - fit：按内容收缩，以剩余视口为上限
+     * - auto：完全按内容撑开，滚动交给页面
      */
-    lockHeight?: boolean
+    height?: 'fill' | 'fit' | 'auto'
+    title?: string
     pageSize?: number
     /**
      * 首列显示主键 ID
@@ -188,12 +178,13 @@ const props = withDefaults(
     rowKey: 'id',
     selection: false,
     immediate: true,
-    lockHeight: true,
+    refined: true,
+    height: 'fit',
     /*
      * 每页 20 条
      *
-     * 表体是定高的（见下面的 measure），一屏大约放得下 11 行。
-     * 每页 10 条填不满，表格下方会空出一块；20 条正好让表体滚起来，
+     * 表体默认受视口高度限制（见下面的 measure），一屏大约放得下 11 行。
+     * 每页 10 条经常需要多翻页；20 条能充分利用表体滚动区域，
      * 也和接口的默认值对上（docs/api.md §1.3、Paginator::DEFAULT_SIZE）。
      */
     pageSize: 20,
@@ -473,11 +464,9 @@ function writeUrlFromState(filters: Record<string, unknown>) {
  * 触发点：挂载、窗口尺寸变化、keep-alive 切回来、每次取数之后
  * （搜索栏展开/收起会把表格顶部推下去，那时 top 变了要重算）。
  *
- * ⚠️ 用 `height` 不是 `max-height`。max-height 只封顶不定高：10 条时表格
- * 自然高度没到顶（实测 462 < 514），换成 20 条才长到 514——中间这 52px
- * 是长出来的，分页条就被一路推下去，正是要避免的那个现象。
- * 定高之后行数再怎么变，表体永远是同一个高度，分页条一格不动；
- * 数据不足时表体下方留白，那是 EP 的既有行为。
+ * `fill` 使用 height，分页位置稳定但少量数据会留下空白；默认的 `fit` 使用
+ * max-height，少量数据时随内容收缩，超过可用空间后再让表体滚动；`auto` 不传
+ * 任何高度，由整页承担滚动。三个值互斥，不再让两个布尔开关组合语义。
  */
 const tableWrapRef = ref<HTMLElement>()
 const pagerRef = ref<HTMLElement>()
@@ -495,8 +484,8 @@ function measure() {
   const el = tableWrapRef.value
   if (!el) return
 
-  // 窄屏是整页滚，不锁高度；页面显式关掉锁定的同理
-  if (!props.lockHeight || window.innerWidth <= NARROW) {
+  // 窄屏是整页滚；auto 模式同样把滚动交给页面
+  if (props.height === 'auto' || window.innerWidth <= NARROW) {
     tableHeight.value = undefined
     return
   }
@@ -552,19 +541,20 @@ defineExpose({ reload, refresh, selected, loading })
 </script>
 
 <template>
-  <div class="panel pro-table">
+  <div class="panel pro-table" :class="{ 'is-refined': refined }">
     <div class="toolbar">
       <div class="left">
+        <span v-if="title" class="table-title">{{ title }}</span>
         <slot name="toolbar" :selected="selected" />
       </div>
       <div class="right">
         <el-tooltip content="刷新">
-          <el-button :icon="Refresh" circle @click="refresh()" />
+          <el-button :icon="Refresh" :circle="!refined" class="table-tool" aria-label="刷新表格" @click="refresh()" />
         </el-tooltip>
 
         <el-tooltip content="密度">
           <el-dropdown @command="(cmd: any) => (size = cmd)">
-            <el-button :icon="Sort" circle />
+            <el-button :icon="Sort" :circle="!refined" class="table-tool" aria-label="表格密度" />
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="large">宽松</el-dropdown-item>
@@ -577,9 +567,10 @@ defineExpose({ reload, refresh, selected, loading })
 
         <el-popover placement="bottom-end" trigger="click" :width="180">
           <template #reference>
-            <el-button :icon="Setting" circle />
+            <el-button :icon="Setting" :circle="!refined" class="table-tool" aria-label="列设置" />
           </template>
           <div class="col-settings">
+            <span class="col-settings-title">显示列</span>
             <el-checkbox
               v-for="col in columns"
               :key="col.prop"
@@ -595,13 +586,14 @@ defineExpose({ reload, refresh, selected, loading })
       <el-table
         v-loading="loading"
         :data="rows"
-        :height="tableHeight"
+        :height="height === 'fill' ? tableHeight : undefined"
+        :max-height="height === 'fit' ? tableHeight : undefined"
         :row-key="rowKey"
         :size="size"
         :default-expand-all="tree && defaultExpandAll"
         :tree-props="{ children: 'children' }"
-        border
-        stripe
+        :border="!refined"
+        :stripe="!refined"
         @sort-change="onSortChange"
         @selection-change="onSelectionChange"
       >
@@ -633,18 +625,13 @@ defineExpose({ reload, refresh, selected, loading })
         v-if="idColumn && !tree"
         prop="id"
         label="ID"
-        width="80"
+        :width="refined ? 64 : 80"
         align="center"
         header-align="center"
         fixed="left"
       />
 
-      <!--
-        表头一律居中，正文的对齐仍由列自己的 align 决定。
-        表头是标签、正文是数据，两者对齐方式本来就不必一致——
-        文字列左对齐读起来顺，而表头居中之后一排看下来是整齐的，
-        不会因为「状态」两个字缩在 90px 格子的左边而显得歪。
-      -->
+      <!-- 轻量列表的表头跟随列对齐；其他页面保留原有居中表头。 -->
       <el-table-column
         v-for="col in shownColumns"
         :key="col.prop"
@@ -653,7 +640,7 @@ defineExpose({ reload, refresh, selected, loading })
         :width="col.width"
         :min-width="col.minWidth"
         :align="col.align"
-        header-align="center"
+        :header-align="refined ? (col.align || 'left') : 'center'"
         :fixed="col.fixed"
         :sortable="col.sortable ? 'custom' : false"
         :show-overflow-tooltip="col.showOverflowTooltip ?? true"
@@ -697,7 +684,7 @@ defineExpose({ reload, refresh, selected, loading })
         v-model:page-size="pager.pageSize"
         :total="total"
         :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
+        :layout="refined && total <= pager.pageSize ? 'total, sizes, prev, pager, next' : 'total, sizes, prev, pager, next, jumper'"
         background
         @current-change="fetch"
         @size-change="reload"
@@ -736,4 +723,93 @@ defineExpose({ reload, refresh, selected, loading })
   margin-top: var(--keel-gap);
 }
 
+.table-title {
+  flex: none;
+  margin-right: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.col-settings-title {
+  margin-bottom: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.is-refined .toolbar {
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.is-refined .toolbar .left {
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.is-refined .toolbar .right {
+  flex: none;
+  gap: 6px;
+}
+
+.is-refined .toolbar :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.is-refined .table-tool {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: var(--keel-radius);
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-regular);
+}
+
+.is-refined .table-tool:hover,
+.is-refined .table-tool:focus-visible {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.is-refined :deep(.el-table) {
+  --el-table-row-hover-bg-color: var(--el-color-primary-light-9);
+}
+
+.is-refined :deep(.el-table .cell) {
+  padding-right: 12px;
+  padding-left: 12px;
+}
+
+.is-refined :deep(.el-table--default .el-table__cell) {
+  padding: 11px 0;
+}
+
+.is-refined :deep(.el-table--small .el-table__cell) {
+  padding: 7px 0;
+}
+
+.is-refined :deep(.el-table--large .el-table__cell) {
+  padding: 15px 0;
+}
+
+.is-refined .pagination {
+  padding-top: 2px;
+  overflow-x: auto;
+}
+
+@media (max-width: 600px) {
+  .is-refined .toolbar {
+    align-items: flex-start;
+  }
+
+  .is-refined .table-title {
+    width: 100%;
+  }
+
+  .is-refined .pagination {
+    justify-content: flex-start;
+  }
+}
 </style>

@@ -52,6 +52,7 @@ defineExpose({ open, close, form })
     @closed="onClosed"
   >
     <el-form
+      class="drawer-form"
       ref="formRef"
       :model="form"
       :rules="readonly ? undefined : rules"
@@ -78,5 +79,17 @@ defineExpose({ open, close, form })
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.drawer-form {
+  padding-bottom: 8px;
+}
+
+.drawer-form :deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+
+.drawer-form :deep(.el-form-item__label) {
+  color: var(--el-text-color-regular);
 }
 </style>
