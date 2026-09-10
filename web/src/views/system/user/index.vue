@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { ArrowDown, Fold, Expand, Delete, Download, EditPen, Key, Plus, Upload, View } from '@element-plus/icons-vue'
+import { ArrowDown, Delete, Download, EditPen, Key, Plus, Upload, View } from '@element-plus/icons-vue'
 import {
   createUser,
   deleteUser,
@@ -75,7 +75,6 @@ const columns: ProColumn<UserRow>[] = [
 
 // ---------------------------------------------------------------- 部门树与选项
 const deptTree = ref<DeptNode[]>([])
-const deptCollapsed = ref(false)
 const deptLoading = ref(false)
 const roleOptions = ref<Array<{ id: number; name: string }>>([])
 const postOptions = ref<PostOption[]>([])
@@ -361,8 +360,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page user-page" :class="{ 'dept-collapsed': deptCollapsed }">
-    <aside v-if="!deptCollapsed" class="panel dept-panel" v-loading="deptLoading">
+  <div class="page user-page">
+    <aside class="panel dept-panel" v-loading="deptLoading">
       <div class="panel-title">部门</div>
       <el-tree
         :data="deptTree"
@@ -400,11 +399,6 @@ onMounted(() => {
         title="用户列表"
       >
         <template #toolbar>
-          <el-button
-            :icon="deptCollapsed ? Expand : Fold"
-            :aria-expanded="!deptCollapsed"
-            @click="deptCollapsed = !deptCollapsed"
-          >部门筛选{{ query.dept_id ? ' · 已选' : '' }}</el-button>
           <el-button v-permission="'sys:user:create'" type="primary" :icon="Plus" @click="onCreate">
             新增
           </el-button>
@@ -601,10 +595,6 @@ onMounted(() => {
   /* 左树与右侧内容是两个面板，用面板之间的大间距 */
   gap: var(--keel-gap-lg);
   align-items: start;
-}
-
-.user-page.dept-collapsed {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .dept-panel {

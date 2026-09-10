@@ -132,7 +132,7 @@ export const useAppStore = defineStore('app', {
      * `initTheme` 在首屏跑，那时候页面还没画出来，套上过渡只会让首屏
      * 从浅色淡入深色——正是要避免的那种"闪一下"。
      *
-     * 观感全部交给 View Transitions（交叉淡化两张快照），同时把全站
+     * 观感交给 View Transitions：以视口右上角为圆心揭示下一套主题，同时把全站
      * 逐元素过渡按掉。两件事缺一不可，原因写在 styles/index.css 那两段注释里。
      */
     toggleTheme() {
@@ -141,8 +141,17 @@ export const useAppStore = defineStore('app', {
       const doc = document as ViewTransitionDocument
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+      // 动画的快照还没释放时忽略连点，避免两组伪元素争用同一套方向与圆心变量。
+      if (root.classList.contains('theme-switching')) return
+
       root.classList.add('theme-switching')
-      const release = () => root.classList.remove('theme-switching')
+      const release = () => {
+        root.classList.remove('theme-switching')
+        root.removeAttribute('data-theme-transition')
+        root.style.removeProperty('--theme-transition-x')
+        root.style.removeProperty('--theme-transition-y')
+        root.style.removeProperty('--theme-transition-radius')
+      }
 
       if (reduced || typeof doc.startViewTransition !== 'function') {
         // 降级：关了动效的用户，以及还没支持 View Transitions 的浏览器。
@@ -153,7 +162,20 @@ export const useAppStore = defineStore('app', {
         return
       }
 
-      // 回调里做 DOM 改动，浏览器负责拍前后两张快照并交叉淡化。
+      // 官网的开关位于页面右上方；这里直接把圆心锁在视口右上角，
+      // 不受本项目顶栏里搜索、全屏、通知等按钮数量影响。
+      const x = window.innerWidth
+      const y = 0
+      // 多留 96px：渐变蒙版有 48px 的柔化带，结束时让整条柔化带也完全离开
+      // 左下角，随后释放快照就不会再出现最后一帧突然切齐的感觉。
+      const radius = Math.hypot(window.innerWidth, window.innerHeight) + 96
+
+      root.dataset.themeTransition = next === 'dark' ? 'to-dark' : 'to-light'
+      root.style.setProperty('--theme-transition-x', `${x}px`)
+      root.style.setProperty('--theme-transition-y', `${y}px`)
+      root.style.setProperty('--theme-transition-radius', `${radius}px`)
+
+      // 回调里做 DOM 改动，浏览器负责拍前后两张快照；CSS 再裁出圆形边界。
       // `finished` 在动画被跳过时（页面不可见、并发切换）同样会落地，
       // 所以类不会有留在身上摘不掉的情况——最坏也只是退化成瞬变
       doc.startViewTransition(() => {

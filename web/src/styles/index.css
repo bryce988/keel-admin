@@ -156,7 +156,8 @@ body {
 }
 
 /* ---------------------------------------------------------------- 主题切换过渡
- * 深浅色互换如果是瞬变的，看着像"闪了一下"；但**别用逐元素 transition 去淡**。
+ * 与 Element Plus 官网一致，从视口右上角揭示下一套主题。
+ * 这是官网文档站基于 View Transition API 写的效果，不是组件库内置组件。
  *
  * 试过那条路：`html.theme-switching *` 套一条 0.2s 的
  * background-color/color 过渡。帧率是稳的（实测 17ms 一帧、只在起手掉一帧），
@@ -164,19 +165,56 @@ body {
  * 底色也在变，字形的亚像素抗锯齿跟着每帧重算，笔画粗细就会"呼吸"。
  * 这是逐元素动画的固有代价，调时长或砍属性都救不了。
  *
- * 改成 View Transitions：浏览器把切换前后各拍一张，交叉淡化两张**位图**。
- * 文字只栅格化两次（切换前、切换后），中间没有重画，自然不会抖。
- *
- * 默认的 UA 关键帧是错开的（旧的 90ms 先淡出、新的延后 90ms 再淡入），
- * 中途会露出底下已经换好的新底色，深浅切换时那一下很明显。
- * 这里改成同时、等长，配合 UA 自带的 `mix-blend-mode: plus-lighter`
- * 才是真正的交叉淡化——两层透明度和恒为 1，中间不会发灰也不会发亮。
+ * View Transitions 只栅格化切换前后两次；圆形边界由快照的渐变蒙版裁出，
+ * 不会让页面里几百个元素各自重绘颜色。两个方向都把新主题放在上层并从
+ * 右上角向外展开。蒙版边缘留 48px 柔化带，避免浅色覆盖深色时出现硬切线。
  */
+@property --keel-theme-reveal-radius {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.22s;
-  animation-delay: 0s;
-  animation-timing-function: linear;
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  --keel-theme-reveal-radius: 0px;
+  z-index: 2147483646;
+  -webkit-mask-image: radial-gradient(
+    circle at var(--theme-transition-x) var(--theme-transition-y),
+    #000 0,
+    #000 max(0px, calc(var(--keel-theme-reveal-radius) - 48px)),
+    transparent var(--keel-theme-reveal-radius)
+  );
+  mask-image: radial-gradient(
+    circle at var(--theme-transition-x) var(--theme-transition-y),
+    #000 0,
+    #000 max(0px, calc(var(--keel-theme-reveal-radius) - 48px)),
+    transparent var(--keel-theme-reveal-radius)
+  );
+}
+
+html[data-theme-transition='to-dark']::view-transition-new(root),
+html[data-theme-transition='to-light']::view-transition-new(root) {
+  animation: keel-theme-reveal 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes keel-theme-reveal {
+  from {
+    --keel-theme-reveal-radius: 0px;
+  }
+
+  to {
+    --keel-theme-reveal-radius: var(--theme-transition-radius);
+  }
 }
 
 /* ---------------------------------------------------------------- 切换期间禁用过渡

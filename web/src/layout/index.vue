@@ -428,7 +428,8 @@ async function onUserCommand(cmd: string) {
   /* flex 子项默认 min-height:auto，不置 0 的话 .content 撑不小，
      滚动条又会跑回 window 上——这一行是整套固定外壳的关键 */
   min-height: 0;
-  background: var(--el-bg-color-page);
+  /* 内容区是三级表面的底层，具体浅/深色值由 design.css 的角色令牌决定。 */
+  background: var(--keel-content-bg);
 }
 
 /* ---------------- 顶栏 ---------------- */
@@ -440,8 +441,8 @@ async function onUserCommand(cmd: string) {
   height: var(--keel-topbar-height);
   padding: 0 20px;
   flex: none;
-  /* 与侧栏同一块 chrome，同色同发丝线（理由见 .sidebar） */
-  background: var(--el-bg-color-page);
+  /* 顶栏是三级表面的最高层，与下方页签、内容画布拉开明度。 */
+  background: var(--keel-topbar-bg);
   border-bottom: 1px solid var(--el-border-color-light);
 }
 

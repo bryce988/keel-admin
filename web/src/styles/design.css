@@ -10,7 +10,7 @@
  * 最初的视觉参考来自低密度营销页，后台则要在一屏内处理大量表格和表单。
  * 当前取舍已经收口在 DESIGN.md：
  *
- *   保留：Action Blue · 中性色阶（ink / parchment / hairline）· 8px 控件圆角 ·
+ *   保留：Element Plus 官方主色与语义色 · 官方中性色阶 · 8px 控件圆角 ·
  *         14px 容器圆角 · 轻量浮层阴影 · 负字距标题 · 克制的按下反馈
  *
  *   后台适配：14px 正文 · 16px 面板间距 · 紧凑表格 · 成功/警告/危险语义色 ·
@@ -18,7 +18,7 @@
  * ---------------------------------------------------------------- */
 
 /* ----------------------------------------------------------------
- * 主色：Action Blue #0066cc，派生档用 color-mix 现算
+ * 颜色：采用当前项目所安装 Element Plus 2.8.4 的官方色板
  *
  * index.css 里曾写明「别在这里贴十六进制、要换主色就去重编 EP 主题」，
  * 理由是 light-3/5/7/8/9 + dark-2 六档、浅深两套、五个语义色 = 七十个手算色值，
@@ -32,29 +32,32 @@
  *
  * 于是这里只声明**五个基色**，其余全是派生。想换主色改一行即可。
  *
- * 语义色不用 EP 原色而用 Apple 的系统色（浅色用其 accessible 档）：
- * index.css 里记过 EP 原色压浅底的文字对比度只有 2.0~2.8，
- * 并且给出了正确解法是「换一套 base 档本身就够深的主色」——这里就是在做那件事，
- * 而不是在个别组件上打补丁。
+ * 基色、RGB 三元组与官方 theme-chalk/base.css 保持一致，light-N / dark-2
+ * 继续用相同混色公式生成。这样既不复制整张派生色表，也不会让组件出现两套蓝色。
  * ---------------------------------------------------------------- */
 :root {
-  --keel-blue: #0066cc;         /* colors.primary   —— 唯一的交互色 */
-  --keel-blue-focus: #0071e3;   /* colors.primary-focus —— 只用于焦点环 */
-  --keel-green: #248a3d;
-  --keel-orange: #b25000;
-  --keel-red: #d70015;
-  --keel-gray: #6e6e73;
+  --keel-blue: #409eff;
+  --keel-blue-focus: #409eff;
+  --keel-green: #67c23a;
+  --keel-orange: #e6a23c;
+  --keel-red: #f56c6c;
+  --keel-gray: #909399;
 
   /* 派生的混合底：浅色向白靠，深色主题里会被改成向近黑靠 */
   --keel-tint: #ffffff;
   --keel-shade: #000000;
+
+  /* 应用外壳的三级表面：顶栏 → 页签 → 内容画布 */
+  --keel-topbar-bg: var(--el-bg-color);
+  --keel-tags-bg: var(--el-fill-color-light);
+  --keel-content-bg: var(--el-bg-color-page);
 }
 
 /* 五个语义色一视同仁地走同一套公式。
    `--el-color-*-rgb` 是 EP 拿去拼 rgba() 的，只能给三元组，不能给变量 */
 :root {
   --el-color-primary: var(--keel-blue);
-  --el-color-primary-rgb: 0, 102, 204;
+  --el-color-primary-rgb: 64, 158, 255;
   --el-color-primary-light-3: color-mix(in srgb, var(--keel-blue) 70%, var(--keel-tint));
   --el-color-primary-light-5: color-mix(in srgb, var(--keel-blue) 50%, var(--keel-tint));
   --el-color-primary-light-7: color-mix(in srgb, var(--keel-blue) 30%, var(--keel-tint));
@@ -63,7 +66,7 @@
   --el-color-primary-dark-2: color-mix(in srgb, var(--keel-blue) 80%, var(--keel-shade));
 
   --el-color-success: var(--keel-green);
-  --el-color-success-rgb: 36, 138, 61;
+  --el-color-success-rgb: 103, 194, 58;
   --el-color-success-light-3: color-mix(in srgb, var(--keel-green) 70%, var(--keel-tint));
   --el-color-success-light-5: color-mix(in srgb, var(--keel-green) 50%, var(--keel-tint));
   --el-color-success-light-7: color-mix(in srgb, var(--keel-green) 30%, var(--keel-tint));
@@ -72,7 +75,7 @@
   --el-color-success-dark-2: color-mix(in srgb, var(--keel-green) 80%, var(--keel-shade));
 
   --el-color-warning: var(--keel-orange);
-  --el-color-warning-rgb: 178, 80, 0;
+  --el-color-warning-rgb: 230, 162, 60;
   --el-color-warning-light-3: color-mix(in srgb, var(--keel-orange) 70%, var(--keel-tint));
   --el-color-warning-light-5: color-mix(in srgb, var(--keel-orange) 50%, var(--keel-tint));
   --el-color-warning-light-7: color-mix(in srgb, var(--keel-orange) 30%, var(--keel-tint));
@@ -81,7 +84,7 @@
   --el-color-warning-dark-2: color-mix(in srgb, var(--keel-orange) 80%, var(--keel-shade));
 
   --el-color-danger: var(--keel-red);
-  --el-color-danger-rgb: 215, 0, 21;
+  --el-color-danger-rgb: 245, 108, 108;
   --el-color-danger-light-3: color-mix(in srgb, var(--keel-red) 70%, var(--keel-tint));
   --el-color-danger-light-5: color-mix(in srgb, var(--keel-red) 50%, var(--keel-tint));
   --el-color-danger-light-7: color-mix(in srgb, var(--keel-red) 30%, var(--keel-tint));
@@ -91,7 +94,7 @@
 
   /* EP 里 error 是 danger 的别名，两套变量都有组件在读，得一起给 */
   --el-color-error: var(--keel-red);
-  --el-color-error-rgb: 215, 0, 21;
+  --el-color-error-rgb: 245, 108, 108;
   --el-color-error-light-3: var(--el-color-danger-light-3);
   --el-color-error-light-5: var(--el-color-danger-light-5);
   --el-color-error-light-7: var(--el-color-danger-light-7);
@@ -100,7 +103,7 @@
   --el-color-error-dark-2: var(--el-color-danger-dark-2);
 
   --el-color-info: var(--keel-gray);
-  --el-color-info-rgb: 110, 110, 115;
+  --el-color-info-rgb: 144, 147, 153;
   --el-color-info-light-3: color-mix(in srgb, var(--keel-gray) 70%, var(--keel-tint));
   --el-color-info-light-5: color-mix(in srgb, var(--keel-gray) 50%, var(--keel-tint));
   --el-color-info-light-7: color-mix(in srgb, var(--keel-gray) 30%, var(--keel-tint));
@@ -110,106 +113,94 @@
 }
 
 /* ----------------------------------------------------------------
- * 中性色：ink / parchment / hairline
+ * 中性色：采用 Element Plus 官方文本、背景、边框与填充色阶
  *
- * DESIGN.md 的中性色只有三样东西：近黑的字（#1d1d1f，刻意不用纯黑，
- * 让页面看着像照片而不是印刷品）、米白的底（#f5f5f7，与纯白差一档，
- * 靠这一档而不是靠边框来分块）、发丝线（#e0e0e0）。
- *
- * EP 原来那套中性色偏蓝（#303133 / #f2f3f5 / #dcdfe6），与 Action Blue 并排时
- * 灰里带的蓝会跟主色抢，整屏发冷。换成中性偏暖的这一套之后，
- * 页面上唯一有色相的东西就只剩交互色本身——这正是 DESIGN.md 要的效果。
+ * 不再另造 ink / parchment 色阶。文本、页面、边框与填充均直接对齐官方
+ * theme-chalk/base.css，组件内部使用的同名变量因此拥有一致的层级关系。
  * ---------------------------------------------------------------- */
 :root {
-  --el-text-color-primary: #1d1d1f;    /* colors.ink */
-  --el-text-color-regular: #333333;    /* colors.ink-muted-80 */
-  --el-text-color-secondary: #7a7a7a;  /* colors.ink-muted-48 */
-  --el-text-color-placeholder: #a1a1a6;
-  --el-text-color-disabled: #c7c7cc;
+  --el-text-color-primary: #303133;
+  --el-text-color-regular: #606266;
+  --el-text-color-secondary: #909399;
+  --el-text-color-placeholder: #a8abb2;
+  --el-text-color-disabled: #c0c4cc;
 
   --el-bg-color: #ffffff;              /* colors.canvas */
-  --el-bg-color-page: #f5f5f7;         /* colors.canvas-parchment */
+  --el-bg-color-page: #f2f3f5;
   --el-bg-color-overlay: #ffffff;
 
   /* 边框四档全部压在 hairline 附近：DESIGN.md 里的「边框」本来就只是一条发丝，
      不承担分隔以外的任何表达，所以档与档之间只差几个百分点 */
-  --el-border-color-darker: #b0b0b8;
-  --el-border-color-dark: #c7c7cc;
-  --el-border-color: #d2d2d7;          /* colors.surface-chip-translucent 的实色 */
-  --el-border-color-light: #e0e0e0;    /* colors.hairline */
-  --el-border-color-lighter: #ececee;
-  --el-border-color-extra-light: #f0f0f0; /* colors.divider-soft */
+  --el-border-color-darker: #cdd0d6;
+  --el-border-color-dark: #d4d7de;
+  --el-border-color: #dcdfe6;
+  --el-border-color-light: #e4e7ed;
+  --el-border-color-lighter: #ebeef5;
+  --el-border-color-extra-light: #f2f6fc;
 
-  --el-fill-color-darker: #e0e0e5;
-  --el-fill-color-dark: #e8e8ed;
-  --el-fill-color: #ececee;
-  --el-fill-color-light: #f5f5f7;      /* 表头、hover 底 —— 就是 parchment */
-  --el-fill-color-lighter: #fafafc;    /* colors.surface-pearl */
-  --el-fill-color-extra-light: #fafafa;
+  --el-fill-color-darker: #e6e8eb;
+  --el-fill-color-dark: #ebedf0;
+  --el-fill-color: #f0f2f5;
+  --el-fill-color-light: #f5f7fa;
+  --el-fill-color-lighter: #fafafa;
+  --el-fill-color-extra-light: #fafcff;
   --el-fill-color-blank: #ffffff;
 }
 
 /* ----------------------------------------------------------------
- * 深色主题
+ * 深色主题：采用 Element Plus 官方 dark/css-vars.css 色板
  *
- * 两处必须改，别的沿用 EP：
- *
- * 1. **交互色换成 Sky Link Blue #2997ff**。Action Blue 压在近黑上只有 2.4:1，
- *    按钮看着像是禁用的。DESIGN.md 为此专门留了 `colors.primary-on-dark`，
- *    并且明说这一档**不许用在浅底上**——所以它只出现在 html.dark 里。
- *    语义色同理换成 Apple 的深色档（浅色那套 accessible 档是为白底调的，
- *    压在近黑上同样发闷）。
- *
- * 2. **light-N 的混合底从白改成页面底色**。深色主题里 light-N 的语义是
- *    「主色往背景里退」，混白会得到一堆比主色还亮的粉彩，EP 自己也是混 #141414。
- *
- * 表面色顺带对齐 DESIGN.md 的近黑图块（#000 / #1d1d1f / #272729）：
- * 页面底是真黑（surface-black），面板抬到 ink，浮层再抬一档——
- * 深色下的「浮起」本来就该靠明度差而不是靠阴影。
+ * 官方深色主题保持与浅色相同的五个语义基色，light-N 向 #141414 混合，
+ * dark-2 向白色混合；页面、面板、浮层和中性色也使用官方深色阶梯。
  * ---------------------------------------------------------------- */
 html.dark {
-  --keel-blue: #2997ff;   /* colors.primary-on-dark */
-  --keel-blue-focus: #2997ff;
-  --keel-green: #30d158;
-  --keel-orange: #ff9f0a;
-  --keel-red: #ff453a;
-  --keel-gray: #98989d;
+  --keel-blue: #409eff;
+  --keel-blue-focus: #409eff;
+  --keel-green: #67c23a;
+  --keel-orange: #e6a23c;
+  --keel-red: #f56c6c;
+  --keel-gray: #909399;
 
   /* 混合方向整体翻面：往底色里退，往白里提 */
-  --keel-tint: #1d1d1f;
+  --keel-tint: #141414;
   --keel-shade: #ffffff;
 
-  --el-color-primary-rgb: 41, 151, 255;
-  --el-color-success-rgb: 48, 209, 88;
-  --el-color-warning-rgb: 255, 159, 10;
-  --el-color-danger-rgb: 255, 69, 58;
-  --el-color-error-rgb: 255, 69, 58;
-  --el-color-info-rgb: 152, 152, 157;
+  /* 深色下逐级降低明度，仍全部取自官方表面色阶 */
+  --keel-topbar-bg: var(--el-bg-color-overlay);
+  --keel-tags-bg: var(--el-bg-color);
+  --keel-content-bg: var(--el-bg-color-page);
 
-  --el-bg-color-page: #000000;         /* colors.surface-black */
-  --el-bg-color: #1d1d1f;
-  --el-bg-color-overlay: #272729;      /* colors.surface-tile-1 */
+  --el-color-primary-rgb: 64, 158, 255;
+  --el-color-success-rgb: 103, 194, 58;
+  --el-color-warning-rgb: 230, 162, 60;
+  --el-color-danger-rgb: 245, 108, 108;
+  --el-color-error-rgb: 245, 108, 108;
+  --el-color-info-rgb: 144, 147, 153;
 
-  --el-text-color-primary: #ffffff;    /* colors.body-on-dark */
-  --el-text-color-regular: #cccccc;    /* colors.body-muted */
-  --el-text-color-secondary: #98989d;
-  --el-text-color-placeholder: #7a7a7e;
-  --el-text-color-disabled: #5a5a5e;
+  --el-bg-color-page: #0a0a0a;
+  --el-bg-color: #141414;
+  --el-bg-color-overlay: #1d1e1f;
 
-  --el-border-color-darker: #5a5a5e;
-  --el-border-color-dark: #48484c;
-  --el-border-color: #3a3a3d;
-  --el-border-color-light: #2f2f32;
-  --el-border-color-lighter: #2a2a2c;
-  --el-border-color-extra-light: #252527;
+  --el-text-color-primary: #e5eaf3;
+  --el-text-color-regular: #cfd3dc;
+  --el-text-color-secondary: #a3a6ad;
+  --el-text-color-placeholder: #8d9095;
+  --el-text-color-disabled: #6c6e72;
 
-  --el-fill-color-darker: #3a3a3d;
-  --el-fill-color-dark: #333336;
-  --el-fill-color: #2a2a2c;            /* colors.surface-tile-2 */
-  --el-fill-color-light: #252527;      /* colors.surface-tile-3 */
-  --el-fill-color-lighter: #202022;
-  --el-fill-color-extra-light: #1a1a1c;
-  --el-fill-color-blank: #1d1d1f;
+  --el-border-color-darker: #636466;
+  --el-border-color-dark: #58585b;
+  --el-border-color: #4c4d4f;
+  --el-border-color-light: #414243;
+  --el-border-color-lighter: #363637;
+  --el-border-color-extra-light: #2b2b2c;
+
+  --el-fill-color-darker: #424243;
+  --el-fill-color-dark: #39393a;
+  --el-fill-color: #303030;
+  --el-fill-color-light: #262727;
+  --el-fill-color-lighter: #1d1d1d;
+  --el-fill-color-extra-light: #191919;
+  --el-fill-color-blank: #141414;
 }
 
 /* ----------------------------------------------------------------
@@ -245,8 +236,7 @@ html.dark {
  *   base     轻       弹出层
  *   dark     稍重     对话框
  *
- * 颜色改用 ink（#1d1d1f）而不是 index.css 里的 EP 中性色 #303133：
- * 那一档偏蓝，投在 parchment 上会带出一圈冷灰。
+ * 阴影使用低透明度中性黑，只表达浮层关系，不改变官方表面色阶。
  * ---------------------------------------------------------------- */
 :root {
   --el-box-shadow-lighter: none;
@@ -264,8 +254,7 @@ html.dark {
   --el-box-shadow-dark: 0 12px 40px rgb(0 0 0 / 56%);
 }
 
-/* 卡片与面板不再挂阴影：它们贴在页面上，靠 hairline + 白底与 parchment 的
-   一档色差分块，这正是 DESIGN.md 说的「色差本身就是分隔线」 */
+/* 卡片与面板不再挂阴影：它们贴在页面上，靠官方页面底色、白底和轻边框分块。 */
 :root .el-card {
   box-shadow: none;
   border: 1px solid var(--el-border-color-lighter);
@@ -350,7 +339,7 @@ h3,
 
 :root .el-button {
   transition: transform 0.1s ease, background-color 0.2s, border-color 0.2s, color 0.2s;
-  /* 焦点环用 primary-focus（#0071e3），DESIGN.md 里这一档只干这一件事 */
+  /* 焦点环使用官方主色 */
   --el-button-outline-color: var(--keel-blue-focus);
 }
 
@@ -364,17 +353,14 @@ h3,
 /* ----------------------------------------------------------------
  * 表格：把「表头是一条灰带」换成「表头是一行更重的字」
  *
- * index.css 给表头上了 --el-fill-color-light 的底色，那是为了让表头从表体里
- * 跳出来。换成本设计语言之后底色只比白多一档（parchment），跳不出来了——
- * 但这恰恰是想要的：DESIGN.md 里分隔靠的是发丝线和字重，不是色带。
- * 底色保留（它现在是 parchment，正好与页面底同色，表头看着像是"挖空"的），
- * 再补一条比表体更实的下边线，表头就立住了。
+ * 表头使用官方 --el-fill-color-light，与白色表体拉开一档；再补一条较实的
+ * 下边线和更高字重，让表头清楚但不过度突出。
  * ---------------------------------------------------------------- */
 :root .el-table th.el-table__cell {
   border-bottom-color: var(--el-border-color);
 }
 
-/* 行悬停用 parchment 的更浅一档（pearl），避免与表头同色 */
+/* 普通表格行悬停使用官方 lighter 填充色，避免与表头同色 */
 :root .el-table {
   --el-table-row-hover-bg-color: var(--el-fill-color-lighter);
   --el-table-border-color: var(--el-border-color-lighter);

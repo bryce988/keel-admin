@@ -229,8 +229,8 @@ onUnmounted(() => {
   gap: 8px;
   height: var(--keel-tags-height);
   padding: 0 16px;
-  /* 页签条属于 chrome，跟顶栏、侧栏同一块底色（见 layout/index.vue 的 .sidebar） */
-  background: var(--el-bg-color-page);
+  /* 页签栏是顶栏与内容画布之间的过渡层，避免三块 chrome 连成一片。 */
+  background: var(--keel-tags-bg);
   border-bottom: 1px solid var(--el-border-color-light);
   /* 阴影令牌在设计层里已经归零（DESIGN.md：chrome 一律扁平，分隔靠发丝线）。
      这一行保留是为了让「页签条要不要浮起」跟着令牌走，而不是散落在这里 */
