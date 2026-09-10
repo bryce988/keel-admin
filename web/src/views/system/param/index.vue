@@ -386,6 +386,17 @@ onMounted(async () => {
   padding: 12px;
 }
 
+.master-panel,
+.detail-panel {
+  border-radius: var(--keel-radius-lg);
+}
+
+.master-panel :deep(.el-card__header),
+.detail-panel :deep(.el-card__header) {
+  padding: 14px 16px;
+  background: var(--el-fill-color-lighter);
+}
+
 .master-list {
   margin: 12px 0 0;
   padding: 0;
@@ -396,7 +407,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 10px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
   border-radius: var(--keel-radius);
   cursor: pointer;
 }
@@ -408,6 +420,7 @@ onMounted(async () => {
 /* 选中态用主色浅底，不写死颜色 */
 .master-list li.active {
   background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary-light-7);
   color: var(--el-color-primary);
 }
 
@@ -471,7 +484,22 @@ onMounted(async () => {
 }
 
 .param-form {
-  max-width: 900px;
+  max-width: 960px;
+}
+
+.param-form :deep(.el-form-item) {
+  margin-bottom: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.param-form :deep(.el-form-item:first-child) {
+  padding-top: 0;
+}
+
+.param-form :deep(.el-form-item:last-child) {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .param-label {
@@ -489,7 +517,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 2px;
+  margin-top: 5px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
@@ -520,5 +548,25 @@ code {
   border-radius: 3px;
   background: var(--el-fill-color-light);
   font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .card-header {
+    flex-wrap: wrap;
+  }
+
+  .card-header .hint {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .param-form :deep(.el-form-item__label) {
+    width: 112px !important;
+  }
+
+  .param-form :deep(.el-form-item__content) {
+    margin-left: 112px !important;
+  }
 }
 </style>

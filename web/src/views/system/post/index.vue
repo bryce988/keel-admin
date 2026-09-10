@@ -39,13 +39,13 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<PostRow>[] = [
-  { prop: 'name', label: '岗位名称', minWidth: 150, align: 'center' },
-  { prop: 'code', label: '岗位编码', minWidth: 150, align: 'center' },
-  { prop: 'dept_name', label: '所属部门', minWidth: 130, align: 'center' },
+  { prop: 'name', label: '岗位名称', minWidth: 150, align: 'left' },
+  { prop: 'code', label: '岗位编码', minWidth: 150, align: 'left' },
+  { prop: 'dept_name', label: '所属部门', minWidth: 130, align: 'left' },
   { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
-  { prop: 'remark', label: '备注', minWidth: 180, hidden: true },
-  { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', sortable: true, hidden: true },
+  { prop: 'remark', label: '备注', minWidth: 180, align: 'left', hidden: true },
+  { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'left', sortable: true, hidden: true },
   { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -210,6 +210,7 @@ onMounted(() => {
       :columns="columns"
       selection
       id-column
+      title="岗位列表"
       @selection-change="selected = $event as PostRow[]"
     >
       <template #toolbar>

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormRules } from 'element-plus'
-import { ArrowDown, Delete, Download, EditPen, Key, Plus, Upload, View } from '@element-plus/icons-vue'
+import { ArrowDown, Fold, Expand, Delete, Download, EditPen, Key, Plus, Upload, View } from '@element-plus/icons-vue'
 import {
   createUser,
   deleteUser,
@@ -62,19 +62,20 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<UserRow>[] = [
-  { prop: 'username', label: '账号', minWidth: 130, align: 'center', sortable: true, fixed: 'left' },
-  { prop: 'real_name', label: '姓名', minWidth: 120, align: 'center' },
-  { prop: 'dept_name', label: '部门', minWidth: 130, align: 'center' },
-  { prop: 'post_name', label: '岗位', minWidth: 140, align: 'center' },
-  { prop: 'phone', label: '手机号', minWidth: 140, align: 'center' },
-  { prop: 'email', label: '邮箱', minWidth: 200, align: 'center', hidden: true },
-  { prop: 'status', label: '状态', width: 110, align: 'center', slot: 'status' },
-  { prop: 'last_login_at', label: '最后登录', minWidth: 190, align: 'center', sortable: true },
-  { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
+  { prop: 'username', label: '账号', minWidth: 140, align: 'left', sortable: true, fixed: 'left' },
+  { prop: 'real_name', label: '姓名', minWidth: 120, align: 'left' },
+  { prop: 'dept_name', label: '部门', minWidth: 130, align: 'left' },
+  { prop: 'status', label: '状态', width: 88, align: 'center', slot: 'status' },
+  { prop: 'post_name', label: '岗位', minWidth: 140, align: 'left', hidden: true },
+  { prop: 'phone', label: '手机号', minWidth: 140, align: 'left', hidden: true },
+  { prop: 'email', label: '邮箱', minWidth: 200, align: 'left', hidden: true },
+  { prop: 'last_login_at', label: '最后登录', minWidth: 190, align: 'left', sortable: true, hidden: true },
+  { prop: 'actions', label: '操作', width: 200, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
 // ---------------------------------------------------------------- 部门树与选项
 const deptTree = ref<DeptNode[]>([])
+const deptCollapsed = ref(false)
 const deptLoading = ref(false)
 const roleOptions = ref<Array<{ id: number; name: string }>>([])
 const postOptions = ref<PostOption[]>([])
@@ -360,8 +361,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page user-page">
-    <aside class="panel dept-panel" v-loading="deptLoading">
+  <div class="page user-page" :class="{ 'dept-collapsed': deptCollapsed }">
+    <aside v-if="!deptCollapsed" class="panel dept-panel" v-loading="deptLoading">
       <div class="panel-title">部门</div>
       <el-tree
         :data="deptTree"
@@ -396,8 +397,14 @@ onMounted(() => {
         :param-parsers="paramParsers"
         :columns="columns"
         id-column
+        title="用户列表"
       >
         <template #toolbar>
+          <el-button
+            :icon="deptCollapsed ? Expand : Fold"
+            :aria-expanded="!deptCollapsed"
+            @click="deptCollapsed = !deptCollapsed"
+          >部门筛选{{ query.dept_id ? ' · 已选' : '' }}</el-button>
           <el-button v-permission="'sys:user:create'" type="primary" :icon="Plus" @click="onCreate">
             新增
           </el-button>
@@ -569,7 +576,7 @@ onMounted(() => {
             <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="255" />
           </el-form-item>
           <el-alert v-if="!editingId" type="info" :closable="false" show-icon>
-            不填密码时系统会生成一串随机初始密码，保存后只显示一次。
+            创建后系统会自动生成初始密码，保存成功后仅显示一次。
           </el-alert>
         </template>
       </template>
@@ -590,10 +597,19 @@ onMounted(() => {
 <style scoped>
 .user-page {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 180px minmax(0, 1fr);
   /* 左树与右侧内容是两个面板，用面板之间的大间距 */
   gap: var(--keel-gap-lg);
   align-items: start;
+}
+
+.user-page.dept-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dept-panel {
+  padding-top: 20px;
+  padding-bottom: 20px;
 }
 
 /* 面板外观走全局 .panel（styles/index.css） */

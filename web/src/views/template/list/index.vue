@@ -44,14 +44,14 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<DemoRow>[] = [
-  { prop: 'name', label: '名称', minWidth: 160, align: 'center' },
-  { prop: 'code', label: '编码', minWidth: 140, align: 'center' },
-  { prop: 'owner', label: '负责人', minWidth: 100, align: 'center' },
+  { prop: 'name', label: '名称', minWidth: 160, align: 'left' },
+  { prop: 'code', label: '编码', minWidth: 140, align: 'left' },
+  { prop: 'owner', label: '负责人', minWidth: 100, align: 'left' },
   { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   // 默认列不超过 8 列，多出来的用 hidden 收进列设置里（§9.1）
-  { prop: 'remark', label: '备注', minWidth: 160, hidden: true },
-  { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'center', sortable: true },
+  { prop: 'remark', label: '备注', minWidth: 160, align: 'left', hidden: true },
+  { prop: 'created_at', label: '创建时间', minWidth: 190, align: 'left', sortable: true },
   { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -132,6 +132,7 @@ async function onDelete(row: DemoRow) {
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
+      title="业务列表"
     >
       <template #toolbar>
         <el-button type="primary" :icon="Plus" @click="onCreate">新增</el-button>

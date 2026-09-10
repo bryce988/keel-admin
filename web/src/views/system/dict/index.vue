@@ -86,12 +86,12 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<DictItemRow>[] = [
-  { prop: 'label', label: '显示文案', minWidth: 140, align: 'center' },
-  { prop: 'value', label: '存储值', minWidth: 180, align: 'center', slot: 'value' },
+  { prop: 'label', label: '显示文案', minWidth: 140, align: 'left' },
+  { prop: 'value', label: '存储值', minWidth: 180, align: 'left', slot: 'value' },
   { prop: 'tag_type', label: '标签预览', width: 120, align: 'center', slot: 'preview' },
   { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
-  { prop: 'remark', label: '备注', minWidth: 160, hidden: true },
+  { prop: 'remark', label: '备注', minWidth: 160, align: 'left', hidden: true },
   { prop: 'actions', label: '操作', width: 150, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -364,6 +364,7 @@ onMounted(async () => {
         :immediate="false"
         selection
         id-column
+        title="字典项"
         @selection-change="selected = $event as DictItemRow[]"
       >
         <template #toolbar>

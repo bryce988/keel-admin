@@ -51,15 +51,15 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<NoticeRow>[] = [
-  { prop: 'title', label: '标题', minWidth: 180 },
+  { prop: 'title', label: '标题', minWidth: 180, align: 'left' },
   // 摘要是正文剥成纯文字后的前 60 字（服务端算好），列表里不渲染 HTML
-  { prop: 'summary', label: '摘要', minWidth: 220, hidden: true },
+  { prop: 'summary', label: '摘要', minWidth: 220, align: 'left', hidden: true },
   { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'notice_type' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'notice_status' },
-  { prop: 'publisher_name', label: '发布人', width: 110, align: 'center' },
-  { prop: 'published_at', label: '发布时间', minWidth: 170, align: 'center', sortable: true },
+  { prop: 'publisher_name', label: '发布人', width: 110, align: 'left' },
+  { prop: 'published_at', label: '发布时间', minWidth: 170, align: 'left', sortable: true },
   { prop: 'read_count', label: '已读', width: 80, align: 'center' },
-  { prop: 'created_at', label: '创建时间', minWidth: 170, align: 'center', sortable: true, hidden: true },
+  { prop: 'created_at', label: '创建时间', minWidth: 170, align: 'left', sortable: true, hidden: true },
   { prop: 'actions', label: '操作', width: 220, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -196,11 +196,12 @@ async function onBatchDelete() {
       :columns="columns"
       id-column
       selection
+      title="公告列表"
       @selection-change="selected = $event as NoticeRow[]"
     >
       <template #toolbar>
         <el-button v-permission="'sys:notice:create'" type="primary" :icon="Plus" @click="onCreate">
-          新增
+          新增公告
         </el-button>
         <el-button
           v-permission="'sys:notice:delete'"
@@ -210,7 +211,7 @@ async function onBatchDelete() {
           :disabled="!selected.length"
           @click="onBatchDelete"
         >
-          批量删除
+          批量删除{{ selected.length ? `（${selected.length}）` : '' }}
         </el-button>
       </template>
 

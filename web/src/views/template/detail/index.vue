@@ -42,8 +42,8 @@ const childTableRef = ref<ProTableInstance | null>(null)
 const childQuery = ref<Record<string, unknown>>({ master_id: 0 })
 
 const childColumns: ProColumn<DemoChild>[] = [
-  { prop: 'label', label: '标签', minWidth: 140, align: 'center' },
-  { prop: 'value', label: '值', minWidth: 120, align: 'center' },
+  { prop: 'label', label: '标签', minWidth: 140, align: 'left' },
+  { prop: 'value', label: '值', minWidth: 120, align: 'left' },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' }
 ]
@@ -141,6 +141,7 @@ onMounted(load)
               :request="fetchDemoChildren"
               :columns="childColumns"
               :sync-url="false"
+              height="auto"
             />
           </el-card>
 

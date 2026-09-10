@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Download, Refresh } from '@element-plus/icons-vue'
+import { Delete, Download } from '@element-plus/icons-vue'
 import {
   deleteExportTask,
   downloadExportTask,
@@ -37,10 +37,10 @@ const columns: ProColumn<ExportTaskRow>[] = [
   { prop: 'status', label: '状态', width: 100, align: 'center', slot: 'status' },
   { prop: 'row_count', label: '行数', width: 90, align: 'center' },
   { prop: 'file_size', label: '大小', width: 100, align: 'center', slot: 'size' },
-  { prop: 'creator_name', label: '发起人', width: 110, align: 'center' },
-  { prop: 'created_at', label: '发起时间', minWidth: 170, align: 'center', sortable: true },
-  { prop: 'finished_at', label: '完成时间', minWidth: 170, align: 'center', sortable: true },
-  { prop: 'expired_at', label: '过期时间', minWidth: 170, align: 'center', hidden: true },
+  { prop: 'creator_name', label: '发起人', width: 110, align: 'left' },
+  { prop: 'created_at', label: '发起时间', minWidth: 170, align: 'left', sortable: true },
+  { prop: 'finished_at', label: '完成时间', minWidth: 170, align: 'left', sortable: true },
+  { prop: 'expired_at', label: '过期时间', minWidth: 170, align: 'left', hidden: true },
   { prop: 'actions', label: '操作', width: 160, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -132,9 +132,9 @@ function formatSize(bytes: number): string {
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
+      title="导出任务"
     >
       <template #toolbar>
-        <el-button :icon="Refresh" @click="tableRef?.refresh()">刷新</el-button>
         <!-- 有任务在跑时给一句说明：否则用户不知道这一页会自己变 -->
         <span v-if="pendingCount" class="polling-tip">
           {{ pendingCount }} 个任务处理中，页面会自动刷新

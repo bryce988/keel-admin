@@ -624,7 +624,7 @@ onMounted(loadCaptcha)
 
 .form-title {
   margin: 0 0 20px;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -653,7 +653,8 @@ onMounted(loadCaptcha)
 
 .login-btn {
   width: 100%;
-  height: 40px;
+  height: 42px;
+  font-weight: 500;
   letter-spacing: 0.24em;
 }
 

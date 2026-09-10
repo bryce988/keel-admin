@@ -72,7 +72,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-loading="loading" class="page">
+  <div v-loading="loading" class="page dashboard-page">
     <el-alert
       v-if="nothingVisible"
       type="info"
@@ -92,7 +92,7 @@ onMounted(() => {
         @click="go(s.to, s.perm)"
       >
         <span class="label">{{ s.label }}</span>
-        <span class="value num">
+        <span class="value num" :aria-label="`${s.label}${s.value}${s.unit}`">
           {{ s.value }}<small>{{ s.unit }}</small>
         </span>
         <!-- 卡脚贴底：只有「今日登录」有 extra，它把整行撑高，
@@ -109,7 +109,7 @@ onMounted(() => {
 
     <div class="main-grid">
       <!-- 登录趋势 -->
-      <el-card v-if="data?.trend.length" shadow="never">
+      <el-card v-if="data?.trend.length" class="dashboard-card trend-card" shadow="never">
         <template #header>
           <div class="card-head">
             <b>近 7 天登录</b>
@@ -139,7 +139,7 @@ onMounted(() => {
       </el-card>
 
       <!-- 系统状态：只报真的测得到的东西 -->
-      <el-card shadow="never">
+      <el-card class="dashboard-card status-card" shadow="never">
         <template #header>
           <div class="card-head">
             <b>运行状态</b>
@@ -168,15 +168,13 @@ onMounted(() => {
             <span class="num">{{ data?.system.slow_query_ms }} ms</span>
           </el-descriptions-item>
         </el-descriptions>
-        <p class="foot-note">
-          CPU 与磁盘没有列：容器里读到的不是你以为的那台机器，给个会误导的数字不如不给
-        </p>
+        <p class="foot-note">展示应用进程与依赖服务的实时状态</p>
       </el-card>
     </div>
 
     <div class="main-grid">
       <!-- 最近操作 -->
-      <el-card v-if="data?.recent.length || userStore.can('sys:log:operation:list')" shadow="never">
+      <el-card v-if="data?.recent.length || userStore.can('sys:log:operation:list')" class="dashboard-card" shadow="never">
         <template #header>
           <div class="card-head">
             <b>最近操作</b>
@@ -213,7 +211,7 @@ onMounted(() => {
       </el-card>
 
       <!-- 模块规模 -->
-      <el-card v-if="data?.modules.length" shadow="never">
+      <el-card v-if="data?.modules.length" class="dashboard-card" shadow="never">
         <template #header>
           <div class="card-head">
             <b>模块</b>
@@ -252,6 +250,23 @@ onMounted(() => {
   gap: var(--keel-gap-lg);
 }
 
+.dashboard-page {
+  gap: 16px;
+}
+
+.dashboard-page :deep(.el-card__header) {
+  min-height: 48px;
+  padding: 14px 16px 12px;
+}
+
+.dashboard-page :deep(.el-card__body) {
+  padding: 16px;
+}
+
+.dashboard-card {
+  min-width: 0;
+}
+
 .stat-card :deep(.el-card__body) {
   display: flex;
   flex-direction: column;
@@ -274,7 +289,7 @@ onMounted(() => {
 }
 
 .stat-card .value {
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 600;
   line-height: 1.2;
   /* display 档的负字距（DESIGN.md 的签名特征）。正文那档在 body 上统一给了，
@@ -329,6 +344,12 @@ onMounted(() => {
   gap: 10px;
 }
 
+.card-head b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
 .card-head .desc,
 .card-head .el-button {
   margin-left: auto;
@@ -361,7 +382,9 @@ onMounted(() => {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  height: 190px;
+  height: 204px;
+  padding-top: 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .chart .col {
@@ -383,6 +406,7 @@ onMounted(() => {
   /* 段与段之间留一道缝，堆叠的两色不会糊成一片 */
   gap: 2px;
   cursor: default;
+  border-bottom: 1px dashed var(--el-border-color-extra-light);
 }
 
 .bar {
@@ -463,7 +487,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 8px;
+  padding: 9px 8px;
   border-radius: 4px;
   font-size: 13px;
   color: var(--el-text-color-regular);

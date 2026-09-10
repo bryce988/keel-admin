@@ -71,13 +71,13 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<RoleRow>[] = [
-  { prop: 'name', label: '角色名称', minWidth: 170, align: 'center', slot: 'name' },
-  { prop: 'code', label: '角色编码', minWidth: 200, align: 'center' },
+  { prop: 'name', label: '角色名称', minWidth: 170, align: 'left', slot: 'name' },
+  { prop: 'code', label: '角色编码', minWidth: 200, align: 'left' },
   { prop: 'data_scope', label: '数据范围', minWidth: 145, align: 'center', dict: 'data_scope' },
   { prop: 'member_count', label: '成员', width: 80, align: 'center' },
   { prop: 'sort', label: '排序', width: 100, align: 'center', sortable: true },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
-  { prop: 'remark', label: '备注', minWidth: 200, hidden: true },
+  { prop: 'remark', label: '备注', minWidth: 200, align: 'left', hidden: true },
   { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -162,6 +162,7 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
+      title="角色列表"
     >
       <template #toolbar>
         <el-button v-permission="'sys:role:create'" type="primary" :icon="Plus" @click="onCreate">

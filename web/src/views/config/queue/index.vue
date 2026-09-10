@@ -149,10 +149,10 @@ const searchFields = computed<SearchField[]>(() => [
 ])
 
 const columns: ProColumn<FailedJobRow>[] = [
-  { prop: 'queue', label: '队列', width: 190 },
+  { prop: 'queue', label: '队列', width: 190, align: 'left' },
   { prop: 'attempts', label: '已重试', width: 100, align: 'center', slot: 'attempts' },
-  { prop: 'created_at', label: '投递时间', width: 180, align: 'center' },
-  { prop: 'data', label: '参数', minWidth: 260, slot: 'data' },
+  { prop: 'created_at', label: '投递时间', width: 180, align: 'left' },
+  { prop: 'data', label: '参数', minWidth: 260, align: 'left', slot: 'data' },
   { prop: 'actions', label: '操作', width: 160, align: 'center', fixed: 'right', slot: 'actions' }
 ]
 
@@ -299,7 +299,7 @@ async function onDiscard(row: FailedJobRow) {
         </span>
       </div>
 
-      <el-table :data="queues" size="small" empty-text="还没有队列">
+      <el-table class="summary-table" :data="queues" size="small" empty-text="还没有队列">
         <el-table-column prop="queue" label="队列名" min-width="190" />
         <!-- 说明由消费者自己声明；没声明的（含没有消费者的队列）显示占位 -->
         <el-table-column label="说明" min-width="220">
@@ -331,7 +331,7 @@ async function onDiscard(row: FailedJobRow) {
         </span>
       </div>
 
-      <el-table :data="overview?.tasks ?? []" size="small" empty-text="没有定时任务">
+      <el-table class="summary-table" :data="overview?.tasks ?? []" size="small" empty-text="没有定时任务">
         <el-table-column prop="name" label="任务" width="170" />
         <el-table-column prop="desc" label="说明" min-width="220" />
         <el-table-column prop="rule" label="cron" width="140" align="center" />
@@ -386,7 +386,7 @@ async function onDiscard(row: FailedJobRow) {
       />
 
       <!--
-        `lock-height="false"`：这一页上面还压着三块面板，ProTable 默认的定高
+        `height="auto"`：这一页上面还压着三块面板，ProTable 默认的视口限高
         （视口 - 表格顶部）会撞到下限，表体只剩一百多像素，既在整页滚里又套一条
         自己的滚动条，空状态插画还会溢出到表头线上。这里让表格自然撑开。
       -->
@@ -396,7 +396,7 @@ async function onDiscard(row: FailedJobRow) {
         :request="request"
         :columns="columns"
         row-key="id"
-        :lock-height="false"
+        height="auto"
       >
         <template #attempts="{ row }">{{ row.attempts }} / {{ row.max_attempts }}</template>
 
@@ -514,6 +514,20 @@ async function onDiscard(row: FailedJobRow) {
   padding: 12px 14px;
   background: var(--el-fill-color-lighter);
   border-radius: var(--keel-radius);
+}
+
+.summary-table {
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.summary-table :deep(th.el-table__cell) {
+  background: var(--el-fill-color-lighter);
+  color: var(--el-text-color-secondary);
+  font-weight: 500;
+}
+
+.summary-table :deep(.el-table__row:hover > td.el-table__cell) {
+  background: var(--el-color-primary-light-9);
 }
 
 .stat .label {

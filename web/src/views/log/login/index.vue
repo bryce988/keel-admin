@@ -38,15 +38,15 @@ const searchFields: SearchField[] = [
 ]
 
 const columns: ProColumn<LoginLogRow>[] = [
-  { prop: 'created_at', label: '时间', minWidth: 190, align: 'center', sortable: true },
-  { prop: 'username', label: '账号', minWidth: 130, align: 'center' },
-  { prop: 'ip', label: 'IP', minWidth: 150, align: 'center' },
-  { prop: 'location', label: '登录地址', minWidth: 200, showOverflowTooltip: true },
-  { prop: 'browser', label: '浏览器', minWidth: 110, align: 'center' },
-  { prop: 'os', label: '操作系统', minWidth: 110, align: 'center' },
-  { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'login_type' },
-  { prop: 'status', label: '结果', width: 90, align: 'center', dict: 'log_status' },
-  { prop: 'msg', label: '说明', minWidth: 160, slot: 'msg' }
+  { prop: 'created_at', label: '时间', minWidth: 190, align: 'left', sortable: true },
+  { prop: 'username', label: '账号', minWidth: 130, align: 'left' },
+  { prop: 'ip', label: 'IP', minWidth: 150, align: 'left' },
+  { prop: 'location', label: '登录地址', minWidth: 180, align: 'left', showOverflowTooltip: true },
+  { prop: 'browser', label: '浏览器', minWidth: 110, align: 'left', hidden: true },
+  { prop: 'os', label: '操作系统', minWidth: 110, align: 'left', hidden: true },
+  { prop: 'type', label: '类型', width: 80, align: 'center', dict: 'login_type' },
+  { prop: 'status', label: '结果', width: 80, align: 'center', dict: 'log_status' },
+  { prop: 'msg', label: '说明', minWidth: 160, align: 'left', slot: 'msg' }
 ]
 
 function requestLogs(params: TableQuery) {
@@ -85,6 +85,7 @@ onMounted(() => dictStore.preload(['login_type', 'log_status']))
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
+      title="登录日志"
     >
       <template #toolbar>
         <el-button
@@ -95,7 +96,7 @@ onMounted(() => dictStore.preload(['login_type', 'log_status']))
         >
           导出
         </el-button>
-        <span class="hint">不选时间范围时默认查最近 7 天</span>
+        <span class="hint">未选时间范围时查询最近 7 天</span>
       </template>
 
       <template #msg="{ row }">

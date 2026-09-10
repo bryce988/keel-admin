@@ -63,9 +63,9 @@ const columns: ProColumn<MenuNodeRow>[] = [
   // 放在名称之后：树形表格的展开箭头在第一列，图标列插到最前会把层级压没
   { prop: 'icon', label: '图标', width: 70, align: 'center', slot: 'icon' },
   { prop: 'type', label: '类型', width: 90, align: 'center', dict: 'perm_type' },
-  { prop: 'perm_code', label: '权限标识', minWidth: 210, align: 'center' },
-  { prop: 'path', label: '路由路径', minWidth: 160, align: 'center', slot: 'path' },
-  { prop: 'component', label: '组件', minWidth: 200, hidden: true },
+  { prop: 'perm_code', label: '权限标识', minWidth: 210, align: 'left' },
+  { prop: 'path', label: '路由路径', minWidth: 160, align: 'left', slot: 'path' },
+  { prop: 'component', label: '组件', minWidth: 200, align: 'left', hidden: true },
   { prop: 'sort', label: '排序', width: 80, align: 'center' },
   { prop: 'status', label: '状态', width: 90, align: 'center', dict: 'enable_status' },
   { prop: 'actions', label: '操作', width: 210, align: 'center', fixed: 'right', slot: 'actions' }
@@ -218,6 +218,7 @@ onMounted(() => {
       :param-parsers="paramParsers"
       :columns="columns"
       tree
+      title="菜单列表"
     >
       <template #toolbar>
         <el-button
