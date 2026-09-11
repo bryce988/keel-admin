@@ -3,7 +3,7 @@
 		<text class="large-title">工作台</text>
 		<text class="large-title-sub">{{ today }}</text>
 
-		<!-- 全 App 唯一的深色面：设计稿的明暗区块交替，这里只用一次，让「这是谁的工作台」最先被看到 -->
+		<!-- 全 App 唯一的深色面：Apple 式的明暗区块交替，这里只用一次，让「这是谁的工作台」最先被看到 -->
 		<view class="welcome">
 			<text class="welcome-name">{{ greeting }}</text>
 			<view class="welcome-meta">

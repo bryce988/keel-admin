@@ -3,7 +3,7 @@
  *
  * 两个来源，分工明确：
  *   - 品牌与语义色：与后台 web/ 同源（Element Plus 官方色板），同一个账号在两端看到同一种蓝
- *   - 中性色、字体、圆角、层次：按 staff/docs/DESIGN.md（Apple 设计语言分析）
+ *   - 中性色、字体、圆角、层次：按 staff/docs/DESIGN.md（移动端设计规范）
  *
  * 页面样式只准用这里的变量；唯一例外是实色底上的纯白前景可以直接写 #fff（与后台同一条规则）。
  * 通用的界面零件（大标题、分组列表、按钮、按下态）在 common/ui.css，页面优先复用那边的类。
@@ -35,9 +35,9 @@ page {
 
 	/*
 	 * 文字：Apple 在浅底上只用一种近黑（ink）
-	 * secondary 取 #6e6e73 而不是设计稿（staff/docs/DESIGN.md）的 #7a7a7a：后者在 #f5f5f7 上对比度只有 4.0，
+	 * secondary 取 #6e6e73 而不是 Apple 官网分析里的 #7a7a7a：后者在 #f5f5f7 上对比度只有 4.0，
 	 * 不到 WCAG AA 的 4.5；#6e6e73 是 Apple 官网自己的次要灰，两种底上都过 4.5。
-	 * #7a7a7a 留给占位符与页脚小字（设计稿里它本来就是 fine-print / 禁用态的颜色）
+	 * #7a7a7a 留给占位符与页脚小字（Apple 那边它本来就是 fine-print / 禁用态的颜色）
 	 */
 	--keel-text-color-primary: #1d1d1f;
 	--keel-text-color-regular: #333333;
@@ -54,7 +54,7 @@ page {
 	--keel-surface-dark: #272729;
 	--keel-text-on-dark-muted: #cccccc;
 
-	/* 按下态：列表行变灰（iOS 的做法），按钮缩放（设计稿的全局微交互） */
+	/* 按下态：列表行变灰（iOS 的做法），按钮缩放（Apple 的全局微交互） */
 	--keel-pressed-bg: #e8e8ed;
 	--keel-press-scale: 0.95;
 
