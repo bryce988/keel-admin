@@ -1,50 +1,59 @@
 <template>
-	<view class="page">
-		<view class="card profile">
+	<view class="screen">
+		<text class="large-title">我的</text>
+
+		<view class="group profile">
 			<!-- 点头像即换：不做「进设置页 → 点头像 → 选图」三步 -->
-			<view class="avatar-wrap" @click="changeAvatar">
+			<view class="avatar-wrap" hover-class="avatar-pressed" @click="changeAvatar">
 				<image v-if="avatar" class="avatar" :src="avatar" mode="aspectFill" />
 				<view v-else class="avatar avatar-fallback">
 					<text class="avatar-text">{{ initial }}</text>
 				</view>
-				<text class="avatar-tip">{{ uploading ? '上传中…' : '点击更换' }}</text>
+				<text class="avatar-action">{{ uploading ? '上传中' : '更换' }}</text>
 			</view>
 
 			<view class="meta">
 				<text class="name">{{ profile.real_name || profile.username }}</text>
-				<text class="sub">{{ profile.username }} · {{ profile.dept_name || '未分配部门' }}</text>
-				<view class="tags">
-					<text class="tag" v-for="role in profile.roles" :key="role">{{ role }}</text>
+				<text class="sub">{{ profile.username }}</text>
+				<text class="sub">{{ profile.dept_name || '未分配部门' }}</text>
+				<view v-if="profile.roles.length" class="roles">
+					<text class="role" v-for="role in profile.roles" :key="role">{{ role }}</text>
 				</view>
 			</view>
 		</view>
 
-		<view class="card">
+		<view class="group form">
 			<view class="row">
 				<text class="row-label">姓名</text>
-				<input class="row-input" placeholder="填写姓名" v-model="draftName" />
+				<input class="row-input" placeholder="填写姓名" placeholder-class="row-placeholder" v-model="draftName" />
 			</view>
 			<view class="row">
 				<text class="row-label">邮箱</text>
-				<input class="row-input" placeholder="填写邮箱" v-model="draftEmail" />
+				<input class="row-input" placeholder="填写邮箱" placeholder-class="row-placeholder" v-model="draftEmail" />
 			</view>
 			<view class="row">
 				<text class="row-label">手机号</text>
 				<!-- 只读：换绑手机要验当前密码，是单独的流程（api.md §11），不在这一页做 -->
 				<text class="row-value">{{ profile.phone || '未绑定' }}</text>
 			</view>
-			<view class="row row-last">
+			<view class="row">
 				<text class="row-label">上次登录</text>
 				<text class="row-value">{{ profile.last_login_at || '—' }}</text>
 			</view>
-			<button class="save" :disabled="saving" @click="save">
-				{{ saving ? '保存中…' : '保存资料' }}
-			</button>
 		</view>
 
-		<button class="logout" @click="doLogout">退出登录</button>
+		<button class="btn btn-primary save" :class="{ 'is-busy': saving }" hover-class="btn-pressed" @click="save">
+			{{ saving ? '正在保存' : '保存资料' }}
+		</button>
 
-		<text class="version">Keel 移动工作台 v{{ version }}</text>
+		<!-- 退出单独成组、红字居中：iOS 设置里破坏性操作的位置和写法 -->
+		<view class="group logout-group">
+			<view class="row logout" hover-class="row-pressed" @click="doLogout">
+				<text class="logout-text">退出登录</text>
+			</view>
+		</view>
+
+		<text class="fine-print version">Keel 移动工作台 v{{ version }}</text>
 	</view>
 </template>
 
@@ -154,30 +163,25 @@
 	})
 </script>
 
-<style>
-	.page {
-		flex: 1;
-		padding: 16px;
-		background-color: var(--keel-bg-color-page);
-	}
-
-	.card {
-		padding: 16px;
-		margin-bottom: 12px;
-		border-radius: 12px;
-		background-color: var(--keel-bg-color);
-	}
+<style scoped>
+	/* ---------- 头像与身份 ---------- */
 
 	.profile {
 		display: flex;
 		flex-direction: row;
-		align-items: center;
+		align-items: flex-start;
+		margin-top: 20px;
+		padding: 20px 16px;
 	}
 
 	.avatar-wrap {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+	}
+
+	.avatar-pressed {
+		opacity: 0.6;
 	}
 
 	.avatar {
@@ -195,104 +199,81 @@
 
 	.avatar-text {
 		font-size: 26px;
+		font-weight: 600;
 		color: #fff;
 	}
 
-	.avatar-tip {
-		margin-top: 6px;
-		font-size: 11px;
-		color: var(--keel-text-color-secondary);
+	/* 可点的地方用品牌色写明动作，而不是一行灰色提示 */
+	.avatar-action {
+		margin-top: 8px;
+		font-size: 14px;
+		color: var(--keel-color-primary);
 	}
 
 	.meta {
-		margin-left: 16px;
 		flex: 1;
+		min-width: 0;
+		margin-left: 16px;
 	}
 
 	.name {
-		font-size: 18px;
-		font-weight: bold;
+		display: block;
+		font-size: 21px;
+		font-weight: 600;
+		line-height: 1.19;
 		color: var(--keel-text-color-primary);
 	}
 
 	.sub {
 		display: block;
-		margin-top: 6px;
-		font-size: 13px;
+		margin-top: 4px;
+		font-size: 15px;
 		color: var(--keel-text-color-secondary);
 	}
 
-	.tags {
+	.roles {
 		display: flex;
 		flex-direction: row;
 		flex-wrap: wrap;
-		margin-top: 8px;
+		margin-top: 10px;
 	}
 
-	.tag {
-		margin-right: 6px;
-		margin-bottom: 4px;
-		padding: 2px 8px;
-		border-radius: 4px;
-		font-size: 11px;
-		color: var(--keel-color-primary);
-		background-color: var(--keel-color-primary-light-9);
+	/* 角色是信息不是动作：中性描边胶囊，不用品牌色 */
+	.role {
+		margin: 0 6px 6px 0;
+		padding: 2px 10px;
+		border: 1px solid var(--keel-border-color-lighter);
+		border-radius: var(--keel-radius-pill);
+		font-size: 12px;
+		line-height: 18px;
+		color: var(--keel-text-color-regular);
 	}
 
-	.row {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		height: 44px;
-		border-bottom: 1px solid var(--keel-border-color-lighter);
-	}
+	/* ---------- 资料与操作 ---------- */
 
-	.row-last {
-		border-bottom: none;
-	}
-
-	.row-label {
-		width: 76px;
-		font-size: 14px;
-		color: var(--keel-text-color-secondary);
-	}
-
-	.row-input {
-		flex: 1;
-		font-size: 15px;
-		color: var(--keel-text-color-primary);
-	}
-
-	.row-value {
-		flex: 1;
-		font-size: 14px;
-		color: var(--keel-text-color-primary);
+	.form {
+		margin-top: 20px;
 	}
 
 	.save {
-		margin-top: 14px;
-		height: 42px;
-		line-height: 42px;
-		border-radius: 8px;
-		font-size: 15px;
-		color: #fff;
-		background-color: var(--keel-color-primary);
+		margin-top: 20px;
+	}
+
+	.logout-group {
+		margin-top: 32px;
 	}
 
 	.logout {
-		height: 44px;
-		line-height: 44px;
-		border-radius: 10px;
-		font-size: 15px;
+		justify-content: center;
+	}
+
+	.logout-text {
+		font-size: 17px;
 		color: var(--keel-color-danger);
-		background-color: var(--keel-bg-color);
 	}
 
 	.version {
-		display: block;
-		margin-top: 16px;
-		font-size: 11px;
-		color: var(--keel-text-color-placeholder);
+		margin-top: 20px;
 		text-align: center;
 	}
 </style>

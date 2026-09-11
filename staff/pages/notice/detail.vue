@@ -1,6 +1,7 @@
 <template>
-	<view class="page">
-		<view v-if="notice" class="card">
+	<!-- 阅读页整页白底：从灰底的列表点进来，底色切换本身就说明「进到正文里了」 -->
+	<view class="article">
+		<block v-if="notice">
 			<text class="title">{{ notice.title }}</text>
 			<view class="meta">
 				<text class="meta-text">{{ notice.publisher_name }}</text>
@@ -13,11 +14,9 @@
 				rich-text 只认白名单标签，顺带把 XSS 面收窄了。
 			-->
 			<rich-text class="content" :nodes="notice.content"></rich-text>
-		</view>
+		</block>
 
-		<view v-else class="hint">
-			<text class="hint-text">{{ error || '加载中…' }}</text>
-		</view>
+		<text v-else class="hint">{{ error || '正在加载公告' }}</text>
 	</view>
 </template>
 
@@ -49,54 +48,66 @@
 	})
 </script>
 
-<style>
-	.page {
-		flex: 1;
-		padding: 16px;
-		background-color: var(--keel-bg-color-page);
-	}
-
-	.card {
-		padding: 18px 16px;
-		border-radius: 12px;
+<style scoped>
+	/*
+	 * 撑满一屏：body 是全局的 parchment 底，正文短时下面会露出一截灰。
+	 * 不在这里写 page { background }——H5 下页面级的 page 样式会留在文档里，
+	 * 返回列表后整个 App 都变白。--window-top / --window-bottom 是 uni 内置变量（导航栏、tabBar 高度）
+	 */
+	.article {
+		min-height: calc(100vh - var(--window-top) - var(--window-bottom));
+		padding: 24px 20px 48px;
+		box-sizing: border-box;
 		background-color: var(--keel-bg-color);
 	}
 
 	.title {
-		font-size: 19px;
-		font-weight: bold;
+		display: block;
+		font-size: 28px;
+		font-weight: 600;
+		line-height: 1.2;
+		letter-spacing: -0.28px;
 		color: var(--keel-text-color-primary);
-		line-height: 27px;
 	}
 
 	.meta {
+		position: relative;
 		display: flex;
 		flex-direction: row;
-		margin-top: 10px;
-		padding-bottom: 14px;
-		border-bottom: 1px solid var(--keel-border-color-lighter);
+		flex-wrap: wrap;
+		margin-top: 12px;
+		padding-bottom: 20px;
+	}
+
+	.meta::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 1px;
+		background-color: var(--keel-border-color-lighter);
+		transform: scaleY(0.5);
 	}
 
 	.meta-text {
 		margin-right: 12px;
-		font-size: 12px;
-		color: var(--keel-text-color-placeholder);
+		font-size: 14px;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.content {
 		display: block;
-		margin-top: 14px;
-		font-size: 15px;
+		margin-top: 20px;
+		font-size: 17px;
+		line-height: 1.47;
 		color: var(--keel-text-color-primary);
-		line-height: 25px;
 	}
 
 	.hint {
-		padding: 40px 20px;
-	}
-
-	.hint-text {
-		font-size: 13px;
+		display: block;
+		padding: 48px 0;
+		font-size: 15px;
 		color: var(--keel-text-color-secondary);
 		text-align: center;
 	}

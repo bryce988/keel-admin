@@ -10,37 +10,42 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "首页"
+				"navigationBarTitleText": "首页",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/notice/list",
 			"style": {
 				"navigationBarTitleText": "消息",
-				"enablePullDownRefresh": true
+				"enablePullDownRefresh": true,
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/notice/detail",
 			"style": {
-				"navigationBarTitleText": "公告详情"
+				"navigationBarTitleText": "公告详情",
+				"navigationBarBackgroundColor": "#ffffff",
+				"backgroundColor": "#ffffff"
 			}
 		},
 		{
 			"path": "pages/mine/mine",
 			"style": {
-				"navigationBarTitleText": "我的"
+				"navigationBarTitleText": "我的",
+				"navigationStyle": "custom"
 			}
 		}
 	],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "Keel",
-		"navigationBarBackgroundColor": "#ffffff",
-		"backgroundColor": "#f2f3f5"
+		"navigationBarBackgroundColor": "#f5f5f7",
+		"backgroundColor": "#f5f5f7"
 	},
 	"tabBar": {
-		"color": "#909399",
+		"color": "#7a7a7a",
 		"selectedColor": "#409eff",
 		"backgroundColor": "#ffffff",
 		"list": [
@@ -62,7 +67,8 @@
 				"iconPath": "static/tabbar/mine.png",
 				"selectedIconPath": "static/tabbar/mine-active.png"
 			}
-		]
+		],
+		"borderStyle": "white"
 	},
 	"uniIdRouter": {}
 }

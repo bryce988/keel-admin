@@ -20,8 +20,13 @@
 <style>
 	/* 颜色令牌：页面样式只用这里定义的变量，规则见文件头注释 */
 	@import './common/theme.css';
+	/* 大标题、分组列表、按钮这些几页共用的零件 */
+	@import './common/ui.css';
 
 	page {
+		font-family: var(--keel-font-family);
+		color: var(--keel-text-color-primary);
 		background-color: var(--keel-bg-color-page);
+		-webkit-font-smoothing: antialiased;
 	}
 </style>

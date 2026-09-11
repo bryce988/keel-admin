@@ -1,39 +1,52 @@
 <template>
-	<view class="page">
-		<view class="bar">
-			<text class="bar-text">{{ unread > 0 ? `${unread} 条未读` : '没有未读消息' }}</text>
-			<text v-if="unread > 0" class="bar-action" @click="markAll">全部已读</text>
+	<view class="screen">
+		<view class="head">
+			<view class="head-text">
+				<text class="large-title">消息</text>
+				<text class="large-title-sub">{{ unread > 0 ? `${unread} 条未读` : '没有未读消息' }}</text>
+			</view>
+			<text v-if="unread > 0" class="text-link head-action" @click="markAll">全部标为已读</text>
 		</view>
 
-		<view v-if="loading && list.length === 0" class="hint">
-			<text class="hint-text">加载中…</text>
+		<view v-if="loading && list.length === 0" class="group state">
+			<text class="state-text">正在加载消息</text>
 		</view>
 
 		<!-- 空态要说清楚「是真没有」而不是「加载失败」，并且不给一个点了没反应的按钮 -->
 		<view v-else-if="list.length === 0" class="empty">
 			<text class="empty-title">还没有公告</text>
-			<text class="empty-desc">系统发布公告后会出现在这里，并在下方标签上显示未读角标。</text>
+			<text class="empty-desc">系统发布公告后会出现在这里，底部「消息」上会显示未读数。</text>
 		</view>
 
-		<view v-else>
-			<view class="item" v-for="item in list" :key="item.id" @click="open(item)">
-				<view class="item-head">
-					<!-- 未读用圆点而不是整条变色：整条变色在长列表里会糊成一片 -->
-					<view v-if="!item.is_read" class="dot"></view>
-					<text class="item-title" :class="{ unread: !item.is_read }">{{ item.title }}</text>
-					<text class="tag" :class="'tag-' + item.type">{{ typeText(item.type) }}</text>
-				</view>
-				<text class="item-summary">{{ item.summary }}</text>
-				<view class="item-foot">
-					<text class="item-meta">{{ item.publisher_name }}</text>
-					<text class="item-meta">{{ item.published_at }}</text>
+		<block v-else>
+			<view class="group list">
+				<view
+					v-for="item in list"
+					:key="item.id"
+					class="row notice"
+					hover-class="row-pressed"
+					@click="open(item)"
+				>
+					<!-- 圆点列常驻占位：有没有未读，标题都从同一条竖线开始 -->
+					<view class="dot-col">
+						<view v-if="!item.is_read" class="dot"></view>
+					</view>
+					<view class="notice-main">
+						<view class="notice-top">
+							<text class="notice-title" :class="{ unread: !item.is_read }">{{ item.title }}</text>
+							<text class="notice-time">{{ shortTime(item.published_at) }}</text>
+						</view>
+						<text class="notice-summary">{{ item.summary }}</text>
+						<view class="notice-meta">
+							<text class="notice-type" :class="{ urgent: item.type === 'urgent' }">{{ typeText(item.type) }}</text>
+							<text class="notice-from">{{ item.publisher_name }}</text>
+						</view>
+					</view>
 				</view>
 			</view>
 
-			<view class="more">
-				<text class="more-text">{{ finished ? '没有更多了' : '加载中…' }}</text>
-			</view>
-		</view>
+			<text class="fine-print more">{{ finished ? '没有更多了' : '正在加载更多' }}</text>
+		</block>
 	</view>
 </template>
 
@@ -51,6 +64,21 @@
 
 	const TYPE_TEXT = { notice: '通知', announcement: '公告', urgent: '紧急' }
 	const typeText = (t) => TYPE_TEXT[t] || '通知'
+
+	/*
+	 * 列表里的时间只给「够用」的精度：今天的显示时刻，今年的显示月日，更早的显示完整日期。
+	 * 完整时间在详情页里
+	 */
+	function shortTime(value) {
+		if (!value) return ''
+		const [date, time = ''] = String(value).split(' ')
+		const now = new Date()
+		const pad = (n) => String(n).padStart(2, '0')
+		const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+		if (date === todayStr) return time.slice(0, 5)
+		if (date.startsWith(String(now.getFullYear()))) return date.slice(5)
+		return date
+	}
 
 	async function load(reset = false) {
 		if (loading.value) return
@@ -84,7 +112,7 @@
 		try {
 			await readAllNotices()
 			await load(true)
-			uni.showToast({ title: '已全部标记为已读', icon: 'none' })
+			uni.showToast({ title: '已全部标为已读', icon: 'none' })
 		} catch (e) {
 			uni.showToast({ title: e.message, icon: 'none' })
 		}
@@ -110,118 +138,142 @@
 	})
 </script>
 
-<style>
-	.page {
-		flex: 1;
-		padding: 12px 16px 24px;
-		background-color: var(--keel-bg-color-page);
-	}
-
-	.bar {
+<style scoped>
+	.head {
 		display: flex;
 		flex-direction: row;
-		align-items: center;
+		align-items: flex-end;
 		justify-content: space-between;
-		padding: 4px 2px 10px;
+		margin-bottom: 20px;
 	}
 
-	.bar-text {
-		font-size: 13px;
-		color: var(--keel-text-color-secondary);
+	.head-text {
+		flex: 1;
+		min-width: 0;
 	}
 
-	.bar-action {
-		font-size: 13px;
-		color: var(--keel-color-primary);
+	.head-action {
+		padding-bottom: 2px;
 	}
 
-	.item {
-		padding: 14px;
-		margin-bottom: 10px;
-		border-radius: 10px;
-		background-color: var(--keel-bg-color);
+	/* ---------- 列表行 ---------- */
+
+	/* 多行内容顶对齐；.row 默认是居中对齐的单行 */
+	.notice {
+		align-items: flex-start;
+		padding-top: 14px;
+		padding-bottom: 14px;
+		padding-left: 8px;
 	}
 
-	.item-head {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
+	/* 分隔线从标题起点开始，与圆点列之后的文字对齐 */
+	.list .notice + .notice::before {
+		left: 24px;
+	}
+
+	.dot-col {
+		width: 16px;
+		flex-shrink: 0;
+		padding-top: 8px;
 	}
 
 	.dot {
-		width: 7px;
-		height: 7px;
+		width: 8px;
+		height: 8px;
 		border-radius: 4px;
-		margin-right: 6px;
-		background-color: var(--keel-color-danger);
+		margin-left: 4px;
+		background-color: var(--keel-color-primary);
 	}
 
-	.item-title {
+	.notice-main {
 		flex: 1;
-		font-size: 15px;
-		color: var(--keel-text-color-primary);
+		min-width: 0;
 	}
 
-	.item-title.unread {
-		font-weight: bold;
-	}
-
-	.tag {
-		margin-left: 8px;
-		padding: 1px 6px;
-		border-radius: 4px;
-		font-size: 11px;
-		color: var(--keel-color-info);
-		background-color: var(--keel-color-info-light-9);
-	}
-
-	.tag-urgent {
-		color: var(--keel-color-danger);
-		background-color: var(--keel-color-danger-light-9);
-	}
-
-	.tag-announcement {
-		color: var(--keel-color-primary);
-		background-color: var(--keel-color-primary-light-9);
-	}
-
-	.item-summary {
-		display: block;
-		margin-top: 6px;
-		font-size: 13px;
-		color: var(--keel-text-color-secondary);
-		line-height: 19px;
-	}
-
-	.item-foot {
+	.notice-top {
 		display: flex;
 		flex-direction: row;
-		justify-content: space-between;
-		margin-top: 10px;
+		align-items: baseline;
 	}
 
-	.item-meta {
-		font-size: 11px;
+	.notice-title {
+		flex: 1;
+		min-width: 0;
+		font-size: 17px;
+		line-height: 1.35;
+		color: var(--keel-text-color-primary);
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	.notice-title.unread {
+		font-weight: 600;
+	}
+
+	.notice-time {
+		margin-left: 12px;
+		flex-shrink: 0;
+		font-size: 14px;
+		font-variant-numeric: tabular-nums;
+		color: var(--keel-text-color-secondary);
+	}
+
+	.notice-summary {
+		display: -webkit-box;
+		margin-top: 4px;
+		font-size: 15px;
+		line-height: 1.4;
+		color: var(--keel-text-color-secondary);
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+	}
+
+	.notice-meta {
+		display: flex;
+		flex-direction: row;
+		margin-top: 6px;
+	}
+
+	.notice-type,
+	.notice-from {
+		font-size: 12px;
 		color: var(--keel-text-color-placeholder);
 	}
 
-	.hint, .more {
+	.notice-from {
+		margin-left: 8px;
+	}
+
+	/* 紧急是唯一需要被一眼看到的类型，只有它上色 */
+	.notice-type.urgent {
+		font-weight: 600;
+		color: var(--keel-color-danger);
+	}
+
+	/* ---------- 加载 / 空态 / 页脚 ---------- */
+
+	.state {
 		padding: 20px;
 	}
 
-	.hint-text, .more-text {
-		font-size: 12px;
-		color: var(--keel-text-color-placeholder);
+	.state-text {
+		display: block;
+		font-size: 15px;
+		color: var(--keel-text-color-secondary);
 		text-align: center;
 	}
 
 	.empty {
-		margin-top: 60px;
-		padding: 0 32px;
+		margin-top: 72px;
+		padding: 0 24px;
 	}
 
 	.empty-title {
-		font-size: 16px;
+		display: block;
+		font-size: 21px;
+		font-weight: 600;
 		color: var(--keel-text-color-primary);
 		text-align: center;
 	}
@@ -229,9 +281,14 @@
 	.empty-desc {
 		display: block;
 		margin-top: 8px;
-		font-size: 12px;
+		font-size: 15px;
+		line-height: 1.47;
 		color: var(--keel-text-color-secondary);
-		line-height: 19px;
+		text-align: center;
+	}
+
+	.more {
+		margin-top: 16px;
 		text-align: center;
 	}
 </style>

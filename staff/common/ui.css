@@ -1,0 +1,165 @@
+/*
+ * 通用界面零件：几个页面共用的结构，由 App.vue 全局引入
+ *
+ * 设计依据 staff/docs/DESIGN.md，落到手机上是 iOS 原生应用的语法：
+ *   - 大标题：tab 页不用原生导航栏的小标题，改为内容顶部的 34px 大标题
+ *   - 内嵌分组列表（.group + .row）：一整块白底圆角面板，行间用缩进的细线分隔，
+ *     不把内容切成一张张独立小卡片
+ *   - 不加阴影：层次靠 parchment 底 ↔ 白面板的底色切换
+ *   - 按下反馈：按钮缩放、列表行变灰，都走 uni-app 的 hover-class（App/H5/小程序通用）
+ */
+
+/* ---------- 页面骨架 ---------- */
+
+/* tab 页用自定义导航（pages.json 的 navigationStyle: custom），顶部要自己让出状态栏 */
+.screen {
+	padding: calc(var(--status-bar-height) + 12px) 16px 32px;
+	box-sizing: border-box;
+	background-color: var(--keel-bg-color-page);
+}
+
+.large-title {
+	display: block;
+	font-size: 34px;
+	font-weight: 600;
+	line-height: 1.2;
+	letter-spacing: -0.374px;
+	color: var(--keel-text-color-primary);
+}
+
+.large-title-sub {
+	display: block;
+	margin-top: 2px;
+	font-size: 15px;
+	line-height: 1.4;
+	color: var(--keel-text-color-secondary);
+}
+
+/* 分区标题 + 右侧文字动作 */
+.section-head {
+	display: flex;
+	flex-direction: row;
+	align-items: baseline;
+	justify-content: space-between;
+	margin: 28px 4px 10px;
+}
+
+.section-title {
+	font-size: 21px;
+	font-weight: 600;
+	line-height: 1.19;
+	color: var(--keel-text-color-primary);
+}
+
+.text-link {
+	font-size: 15px;
+	color: var(--keel-color-primary);
+}
+
+/* ---------- 分组列表 ---------- */
+
+.group {
+	border-radius: var(--keel-radius-lg);
+	background-color: var(--keel-bg-color);
+	overflow: hidden;
+}
+
+.row {
+	position: relative;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	min-height: 50px;
+	padding: 0 16px;
+}
+
+/* 行间细线从文字起点开始，左边留出缩进（iOS 的做法）；0.5px 在高分屏上才是真正的发丝线 */
+.row + .row::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 16px;
+	right: 0;
+	height: 1px;
+	background-color: var(--keel-border-color-lighter);
+	transform: scaleY(0.5);
+	transform-origin: 0 0;
+}
+
+.row-pressed {
+	background-color: var(--keel-pressed-bg);
+}
+
+.row-label {
+	width: 80px;
+	flex-shrink: 0;
+	font-size: 17px;
+	color: var(--keel-text-color-primary);
+}
+
+.row-input,
+.row-value {
+	flex: 1;
+	min-width: 0;
+	font-size: 17px;
+	color: var(--keel-text-color-primary);
+}
+
+.row-value {
+	color: var(--keel-text-color-secondary);
+}
+
+.row-placeholder {
+	color: var(--keel-text-color-placeholder);
+}
+
+/* ---------- 按钮 ---------- */
+
+/* uni 的 button 自带边框（::after）、外边距和灰底，先全部抹掉 */
+.btn {
+	margin: 0;
+	padding: 0;
+	height: 50px;
+	line-height: 50px;
+	border-radius: var(--keel-radius-pill);
+	font-size: 17px;
+	font-weight: 400;
+	transition: transform 0.12s ease-out, opacity 0.12s;
+}
+
+.btn::after {
+	border: none;
+}
+
+.btn-primary {
+	color: #fff;
+	background-color: var(--keel-color-primary);
+}
+
+.btn-pressed {
+	transform: scale(var(--keel-press-scale));
+}
+
+/*
+ * 忙碌态用类名而不是 disabled 属性：uni 给 button[disabled] 的内置灰底选择器
+ * （uni-button[disabled]:not([type])）特异度比页面类高，覆盖不掉。
+ * 防重复提交由页面的 loading 判断负责，按钮只管看起来「正在处理」
+ */
+.is-busy {
+	opacity: 0.6;
+}
+
+/* ---------- 文字 ---------- */
+
+.fine-print {
+	display: block;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--keel-text-color-placeholder);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.btn {
+		transition: none;
+	}
+}

@@ -1,42 +1,39 @@
 <template>
-	<view class="page">
+	<view class="login">
 		<view class="brand">
-			<text class="brand-mark">Keel</text>
-			<text class="brand-sub">龙骨 · 移动工作台</text>
+			<image class="brand-logo" src="/static/logo.png" mode="aspectFit" />
+			<text class="brand-name">Keel</text>
+			<text class="brand-sub">移动工作台</text>
 		</view>
 
-		<view class="card">
-			<view class="field">
-				<text class="label">账号</text>
-				<input class="input" placeholder="请输入账号" v-model="username" />
+		<view class="group">
+			<view class="row">
+				<text class="row-label">账号</text>
+				<input class="row-input" placeholder="后台登录账号" placeholder-class="row-placeholder" v-model="username" />
 			</view>
-
-			<view class="field">
-				<text class="label">密码</text>
-				<input class="input" password placeholder="请输入密码" v-model="password" />
+			<view class="row">
+				<text class="row-label">密码</text>
+				<input class="row-input" password placeholder="登录密码" placeholder-class="row-placeholder" v-model="password" />
 			</view>
-
-			<view class="field">
-				<text class="label">验证码</text>
-				<view class="captcha-row">
-					<input class="input captcha-input" placeholder="四位验证码" v-model="captchaCode" />
-					<!-- 点图换一张：看不清是常态，不给刷新入口只能退出重进 -->
-					<image v-if="captchaImage" class="captcha-img" :src="captchaImage" mode="aspectFit" @click="loadCaptcha" />
-					<view v-else class="captcha-img captcha-loading" @click="loadCaptcha">
-						<text class="captcha-loading-text">点击加载</text>
-					</view>
+			<view class="row">
+				<text class="row-label">验证码</text>
+				<input class="row-input" placeholder="右侧四位字符" placeholder-class="row-placeholder" v-model="captchaCode" />
+				<!-- 点图换一张：看不清是常态，不给刷新入口只能退出重进 -->
+				<image v-if="captchaImage" class="captcha" :src="captchaImage" mode="aspectFit" @click="loadCaptcha" />
+				<view v-else class="captcha captcha-empty" @click="loadCaptcha">
+					<text class="captcha-empty-text">点击加载</text>
 				</view>
 			</view>
-
-			<!-- 错误就地展示，不用 toast：toast 一闪而过，而登录失败的人要盯着那句话改输入 -->
-			<text v-if="error" class="error">{{ error }}</text>
-
-			<button class="submit" :disabled="loading" @click="submit">
-				{{ loading ? '登录中…' : '登 录' }}
-			</button>
-
-			<text class="hint">用后台同一套账号登录 · 演示 admin / admin123</text>
 		</view>
+
+		<!-- 错误就地展示，不用 toast：toast 一闪而过，而登录失败的人要盯着那句话改输入 -->
+		<text v-if="error" class="error">{{ error }}</text>
+
+		<button class="btn btn-primary submit" :class="{ 'is-busy': loading }" hover-class="btn-pressed" @click="submit">
+			{{ loading ? '正在登录' : '登录' }}
+		</button>
+
+		<text class="fine-print hint">使用后台的账号登录。演示账号 admin，密码 admin123，看不清验证码点图片换一张。</text>
 	</view>
 </template>
 
@@ -83,7 +80,7 @@
 
 		// 前端先挡一道空值：不为了安全（后端一样会校验），是为了省一次往返
 		if (!username.value || !password.value || !captchaCode.value) {
-			error.value = '账号、密码、验证码都要填'
+			error.value = '请填写账号、密码和验证码'
 			return
 		}
 
@@ -107,107 +104,75 @@
 	}
 </script>
 
-<style>
-	.page {
-		flex: 1;
-		padding: 48px 28px;
+<style scoped>
+	/* 登录页也是自定义导航（pages.json），顶部自己让出状态栏 */
+	.login {
+		padding: calc(var(--status-bar-height) + 72px) 20px 40px;
 		background-color: var(--keel-bg-color-page);
 	}
 
 	.brand {
-		margin-top: 40px;
 		margin-bottom: 36px;
+		padding: 0 4px;
 	}
 
-	.brand-mark {
+	.brand-logo {
+		display: block;
+		width: 56px;
+		height: 56px;
+	}
+
+	.brand-name {
+		display: block;
+		margin-top: 20px;
 		font-size: 34px;
-		font-weight: bold;
+		font-weight: 600;
+		line-height: 1.1;
+		letter-spacing: -0.374px;
 		color: var(--keel-text-color-primary);
 	}
 
 	.brand-sub {
 		display: block;
 		margin-top: 6px;
-		font-size: 14px;
+		font-size: 17px;
 		color: var(--keel-text-color-secondary);
 	}
 
-	.card {
-		padding: 20px;
-		border-radius: 12px;
-		background-color: var(--keel-bg-color);
-	}
-
-	.field {
-		margin-bottom: 16px;
-	}
-
-	.label {
-		display: block;
-		font-size: 13px;
-		color: var(--keel-text-color-secondary);
-		margin-bottom: 6px;
-	}
-
-	.input {
-		height: 44px;
-		padding: 0 12px;
-		font-size: 16px;
-		color: var(--keel-text-color-primary);
-		border-radius: 8px;
+	.captcha {
+		width: 96px;
+		height: 36px;
+		margin-left: 8px;
+		flex-shrink: 0;
+		border-radius: var(--keel-radius-sm);
 		background-color: var(--keel-fill-color-light);
 	}
 
-	.captcha-row {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-	}
-
-	.captcha-input {
-		flex: 1;
-		margin-right: 10px;
-	}
-
-	.captcha-img {
-		width: 110px;
-		height: 44px;
-		border-radius: 8px;
-		background-color: var(--keel-fill-color-light);
-	}
-
-	.captcha-loading {
+	.captcha-empty {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
 
-	.captcha-loading-text {
+	.captcha-empty-text {
 		font-size: 12px;
 		color: var(--keel-text-color-secondary);
 	}
 
 	.error {
 		display: block;
-		font-size: 13px;
+		margin: 12px 4px 0;
+		font-size: 14px;
+		line-height: 1.43;
 		color: var(--keel-color-danger);
-		margin-bottom: 12px;
 	}
 
 	.submit {
-		height: 46px;
-		line-height: 46px;
-		border-radius: 8px;
-		font-size: 16px;
-		color: #fff;
-		background-color: var(--keel-color-primary);
+		margin-top: 24px;
 	}
 
+	/* 与品牌区同为左对齐：整页只有一条左边线 */
 	.hint {
-		display: block;
-		margin-top: 14px;
-		font-size: 12px;
-		color: var(--keel-text-color-placeholder);
-		text-align: center;
+		margin: 16px 4px 0;
 	}
 </style>

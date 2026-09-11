@@ -42,10 +42,13 @@ staff/
 ├── pages.json         页面注册与 tabBar（第一项 login 是启动页）
 ├── App.vue            启动时按有没有令牌决定进哪一页
 ├── common/
-│   ├── theme.css      颜色令牌（与后台同一套 EP 色板，见「颜色」）
+│   ├── theme.css      设计令牌：颜色、圆角、字体（见「界面规范」）
+│   ├── ui.css         通用界面零件：大标题、分组列表、按钮、按下态
 │   ├── config.js      后端地址、客户端版本号
 │   ├── request.js     请求层：令牌、401 统一踢回登录、权限判断、文件上传
 │   └── api.js         接口定义，只放请求不放业务判断
+├── docs/
+│   └── DESIGN.md      移动端界面设计依据（Apple 设计语言分析；仓库根的 DESIGN.md 是后台的）
 ├── pages/
 │   ├── login/         登录（账号 + 密码 + 图形验证码）
 │   ├── index/         首页：工作台概览
@@ -91,7 +94,7 @@ staff/
 
 图标与 tabBar 图标都是纯几何图形，用脚本画而不是丢一堆 png 进来：二进制进了仓库就没人知道它从哪来，
 改颜色或尺寸时只能重新找设计稿。tabBar 图标的颜色与 `pages.json` 的
-`tabBar.color` / `selectedColor` 对齐，改了要一起改（完整的同步清单见下一节「颜色」）。重生成：
+`tabBar.color` / `selectedColor` 对齐，改了要一起改（完整的同步清单见下一节「界面规范」）。重生成：
 
 ```bash
 python3 scripts/make-app-icon.py       # static/icons/*
@@ -101,17 +104,28 @@ python3 scripts/make-tabbar-icons.py   # static/tabbar/*
 两个脚本都只用标准库（本机没有 PIL / rsvg / magick）：按 PNG 规范拼字节，
 App 图标用距离场算覆盖率抗锯齿，tabBar 图标用超采样。
 
-## 颜色
+## 界面规范
 
-与后台同一套：**Element Plus 官方浅色色板**，主色 `#409eff`。同一个账号在后台和 App 上
-看到的应该是同一种蓝。
+依据 `docs/DESIGN.md`（Apple 设计语言分析），落到手机上是 iOS 原生应用的语法。
+**品牌色例外**：仍用后台的 `#409eff`，同一个账号在两端看到同一种蓝；中性色、字体、圆角、层次按这份设计稿。
 
-- 页面样式只用 `common/theme.css` 的 CSS 变量（`--keel-color-primary`、
-  `--keel-text-color-secondary` ……，名字照搬 EP 的 `--el-*`），不写十六进制；
+- **令牌**在 `common/theme.css`：页面样式只用它的 CSS 变量，不写十六进制；
   唯一例外是实色底上的纯白前景可以写 `#fff`，与后台 `DESIGN.md` 同一条规则
-- CSS 变量管不到的有三处，只接受字面色值，**改主色时要一起改**：
-  `uni.scss` 的 `$uni-*`（给插件市场的三方组件）、`pages.json` 的导航栏与 tabBar、
-  `scripts/make-tabbar-icons.py`（改完重跑生成图标）
+- **通用零件**在 `common/ui.css`（App.vue 全局引入），新页面优先复用：
+  `.screen` + `.large-title`（tab 页骨架与大标题）、`.group` + `.row`（内嵌分组列表）、
+  `.btn .btn-primary`（胶囊按钮）、`hover-class="row-pressed"` / `"btn-pressed"`（按下反馈）
+- **页面样式一律 `<style scoped>`**：H5 下页面样式是全局的，两个页面各有一个 `.meta`
+  就会互相污染（实际发生过：「我的」的 `.meta { margin-left }` 把公告详情的发布人一行推歪了）
+- **只有一种强调色**：可点的东西用品牌蓝，其余一律中性色。语义色只在状态需要被看见时出现
+  （登录失败数、紧急公告、退出登录），不给数字、标签做装饰性上色
+- **不加阴影**：层次靠 parchment 底（`#f5f5f7`）↔ 白色面板的底色切换；
+  全 App 只有首页问候区一处深色面
+- tab 页是自定义导航（`navigationStyle: custom`），大标题写在页面里；**tabBar 仍是原生的**——
+  在 App 上它不在 WebView 里，不受页面卡顿影响，也不会被键盘顶起
+
+CSS 变量管不到的有三处，只接受字面色值，**改色时要一起改**：
+`uni.scss` 的 `$uni-*`（给插件市场的三方组件）、`pages.json` 的导航栏与 tabBar、
+`scripts/make-tabbar-icons.py`（改完重跑生成图标）。
 
 App 图标与 favicon 的底色是品牌标记色 `#3986ff`，不属于界面令牌，不跟着这里改。
 

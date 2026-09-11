@@ -1,43 +1,53 @@
 <template>
-	<view class="page">
-		<view class="hero">
-			<text class="hello">{{ greeting }}</text>
-			<text class="hero-sub">{{ deptLine }}</text>
+	<view class="screen">
+		<text class="large-title">工作台</text>
+		<text class="large-title-sub">{{ today }}</text>
+
+		<!-- 全 App 唯一的深色面：设计稿的明暗区块交替，这里只用一次，让「这是谁的工作台」最先被看到 -->
+		<view class="welcome">
+			<text class="welcome-name">{{ greeting }}</text>
+			<view class="welcome-meta">
+				<text class="welcome-dept">{{ deptName }}</text>
+				<text v-if="isSuper" class="welcome-badge">超级管理员</text>
+			</view>
 		</view>
 
 		<!-- 有 sys:dashboard:view 才显示工作台。没有的人看到的是下面那块说明，
 		     而不是一片空白或者一个红色报错——他没权限不是出错 -->
 		<block v-if="canDashboard">
-			<view class="section-title">
-				<text class="section-text">工作台</text>
-				<text class="section-more" @click="load">刷新</text>
+			<view class="section-head">
+				<text class="section-title">概览</text>
+				<text class="text-link" @click="load">刷新</text>
 			</view>
 
-			<view v-if="loading" class="placeholder">
-				<text class="placeholder-text">加载中…</text>
+			<view v-if="loading && stats.length === 0" class="group state">
+				<text class="state-text">正在加载概览</text>
 			</view>
 
-			<view v-else class="grid">
-				<view class="tile" v-for="item in stats" :key="item.key">
-					<text class="tile-label">{{ item.label }}</text>
-					<view class="tile-value-row">
-						<text class="tile-value" :class="'tone-' + item.tone">{{ item.value }}</text>
-						<text class="tile-unit">{{ item.unit }}</text>
+			<!-- 四格同在一块面板里，用细线分隔，而不是四张独立卡片 -->
+			<view v-else class="group stats">
+				<view
+					v-for="(item, i) in stats"
+					:key="item.key"
+					class="stat"
+					:class="{ 'stat-right': i % 2 === 1, 'stat-lower': i >= 2 }"
+				>
+					<text class="stat-label">{{ item.label }}</text>
+					<view class="stat-value-row">
+						<text class="stat-value">{{ item.value }}</text>
+						<text class="stat-unit">{{ item.unit }}</text>
 					</view>
-					<text class="tile-hint">{{ item.hint }}</text>
+					<text class="stat-hint" :class="{ 'is-alert': item.tone === 'danger' }">{{ item.hint }}</text>
 				</view>
 			</view>
 		</block>
 
-		<view v-else class="card">
-			<text class="card-title">没有工作台权限</text>
-			<text class="card-body">你的账号没有 sys:dashboard:view 权限点，所以看不到概览数据。这不是出错——权限由后台的角色授权决定，找管理员开通即可。</text>
+		<view v-else class="group state">
+			<text class="state-title">没有工作台权限</text>
+			<text class="state-body">概览需要 sys:dashboard:view 权限点。这不是出错——权限由后台的角色授权决定，找管理员开通即可。</text>
 		</view>
 
-		<view class="card">
-			<text class="card-title">这个 App 是什么</text>
-			<text class="card-body">Keel 的移动工作台，给系统人员用：登的是后台同一套账号（sys_users），同一套权限点、同一份数据权限。但接口是员工移动端自己的一套 /staff/v1/*，不直接调后台接口——身份共用，接口不共用。</text>
-		</view>
+		<text class="fine-print about">Keel 移动工作台与后台共用账号、权限点和数据权限，接口是移动端独立的一套 /staff/v1/*。</text>
 	</view>
 </template>
 
@@ -48,10 +58,21 @@
 	import { getCachedUser } from '@/common/request.js'
 
 	const greeting = ref('你好')
-	const deptLine = ref('')
+	const deptName = ref('')
+	const isSuper = ref(false)
 	const stats = ref([])
 	const loading = ref(false)
 	const canDashboard = ref(false)
+
+	const WEEKDAYS = '日一二三四五六'
+	const now = new Date()
+	const today = `${now.getMonth() + 1}月${now.getDate()}日 星期${WEEKDAYS[now.getDay()]}`
+
+	function applyUser(user) {
+		greeting.value = '你好，' + (user.real_name || user.username)
+		deptName.value = user.dept_name || '未分配部门'
+		isSuper.value = !!user.is_super
+	}
 
 	/**
 	 * 一个请求把首页要的都拿回来
@@ -63,9 +84,7 @@
 		loading.value = true
 		try {
 			const res = await fetchWorkbench()
-			const user = res.user || {}
-			greeting.value = '你好，' + (user.real_name || user.username)
-			deptLine.value = (user.dept_name || '未分配部门') + (user.is_super ? ' · 超级管理员' : '')
+			applyUser(res.user || {})
 
 			// 能不能看概览由服务端说了算，不看本地缓存的权限点
 			canDashboard.value = !!(res.dashboard && res.dashboard.visible)
@@ -93,146 +112,179 @@
 		// 先用缓存把问候语顶上，避免请求回来之前是一片空白；随后 load() 会覆盖成最新的
 		const user = getCachedUser()
 		if (user) {
-			greeting.value = '你好，' + (user.real_name || user.username)
-			deptLine.value = (user.dept_name || '未分配部门') + (user.is_super ? ' · 超级管理员' : '')
+			applyUser(user)
 		}
 		load()
 	})
 </script>
 
-<style>
-	.page {
-		flex: 1;
-		padding: 20px;
-		background-color: var(--keel-bg-color-page);
+<style scoped>
+	/* ---------- 问候区：深色面 ---------- */
+
+	.welcome {
+		margin-top: 20px;
+		padding: 24px 20px;
+		border-radius: var(--keel-radius-lg);
+		background-color: var(--keel-surface-dark);
 	}
 
-	.hero {
-		padding: 20px;
-		border-radius: 12px;
-		background-color: var(--keel-color-primary);
-		margin-bottom: 18px;
-	}
-
-	.hello {
-		font-size: 22px;
-		font-weight: bold;
-		color: #fff;
-	}
-
-	.hero-sub {
+	.welcome-name {
 		display: block;
-		margin-top: 8px;
-		font-size: 13px;
+		font-size: 28px;
+		font-weight: 600;
+		line-height: 1.14;
+		letter-spacing: -0.28px;
 		color: #fff;
-		opacity: 0.85;
 	}
 
-	.section-title {
+	.welcome-meta {
 		display: flex;
 		flex-direction: row;
 		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 10px;
+		flex-wrap: wrap;
+		margin-top: 10px;
 	}
 
-	.section-text {
+	.welcome-dept {
 		font-size: 15px;
-		font-weight: bold;
+		color: var(--keel-text-on-dark-muted);
+	}
+
+	/* 深色面上的胶囊：白色低透明度，不引入第二种颜色 */
+	.welcome-badge {
+		margin-left: 10px;
+		padding: 2px 10px;
+		border-radius: var(--keel-radius-pill);
+		font-size: 12px;
+		line-height: 18px;
+		color: #fff;
+		background-color: rgba(255, 255, 255, 0.14);
+	}
+
+	/* ---------- 概览：一块面板里的 2×2 ---------- */
+
+	.stats {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.stat {
+		position: relative;
+		width: 50%;
+		padding: 16px;
+		box-sizing: border-box;
+	}
+
+	/* 分隔线用伪元素画 0.5px：直接 border 在高分屏上是 2~3 个物理像素，显粗 */
+	.stat-right::before,
+	.stat-lower::after {
+		content: '';
+		position: absolute;
+		background-color: var(--keel-border-color-lighter);
+	}
+
+	.stat-right::before {
+		top: 16px;
+		bottom: 16px;
+		left: 0;
+		width: 1px;
+		transform: scaleX(0.5);
+	}
+
+	/* 横线两格拼成一条：左格从 16px 缩进画到右边界，右格从左边界画到 16px 缩进 */
+	.stat-lower::after {
+		top: 0;
+		left: 16px;
+		right: 0;
+		height: 1px;
+		transform: scaleY(0.5);
+	}
+
+	.stat-lower.stat-right::after {
+		left: 0;
+		right: 16px;
+	}
+
+	.stat-label {
+		display: block;
+		font-size: 14px;
+		color: var(--keel-text-color-secondary);
+	}
+
+	.stat-value-row {
+		display: flex;
+		flex-direction: row;
+		align-items: baseline;
+		margin-top: 6px;
+	}
+
+	.stat-value {
+		font-size: 34px;
+		font-weight: 600;
+		line-height: 1.1;
+		letter-spacing: -0.374px;
+		font-variant-numeric: tabular-nums;
 		color: var(--keel-text-color-primary);
 	}
 
-	.section-more {
-		font-size: 13px;
-		color: var(--keel-color-primary);
+	.stat-unit {
+		margin-left: 4px;
+		font-size: 14px;
+		color: var(--keel-text-color-secondary);
 	}
 
-	.placeholder {
-		padding: 28px;
-		border-radius: 10px;
-		background-color: var(--keel-bg-color);
-		margin-bottom: 12px;
+	.stat-hint {
+		display: block;
+		margin-top: 6px;
+		font-size: 12px;
+		line-height: 1.4;
+		color: var(--keel-text-color-placeholder);
 	}
 
-	.placeholder-text {
-		font-size: 13px;
+	/*
+	 * 只有告警上色：后端的 tone 前三张是固定的卡片配色（primary/success/warning），
+	 * 不代表状态；真正的信号只有「今日登录失败 > 0」时的 danger。
+	 * 数字本身一律用墨色——单一强调色的规则下，彩色数字只是装饰
+	 */
+	.stat-hint.is-alert {
+		color: var(--keel-color-danger);
+	}
+
+	/* ---------- 加载 / 无权限 ---------- */
+
+	.state {
+		padding: 20px;
+	}
+
+	.state-text {
+		display: block;
+		font-size: 15px;
 		color: var(--keel-text-color-secondary);
 		text-align: center;
 	}
 
-	/* 两列用 space-between 分，不给每块加右外边距：48% + 4% 会让一行超过 100% 直接塌成一列 */
-	.grid {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		justify-content: space-between;
-	}
-
-	.tile {
-		width: 48%;
-		margin-bottom: 12px;
-		padding: 14px;
-		border-radius: 10px;
-		background-color: var(--keel-bg-color);
-		box-sizing: border-box;
-	}
-
-	.tile-label {
-		font-size: 13px;
-		color: var(--keel-text-color-secondary);
-	}
-
-	.tile-value-row {
-		display: flex;
-		flex-direction: row;
-		align-items: baseline;
-		margin-top: 4px;
-	}
-
-	.tile-value {
-		font-size: 26px;
-		font-weight: bold;
-		color: var(--keel-text-color-primary);
-	}
-
-	.tile-unit {
-		margin-left: 4px;
-		font-size: 12px;
-		color: var(--keel-text-color-secondary);
-	}
-
-	.tile-hint {
+	.state-title {
 		display: block;
-		margin-top: 4px;
-		font-size: 11px;
-		color: var(--keel-text-color-placeholder);
-	}
-
-	/* 与后台的语义色对齐，别在这里另起一套配色 */
-	.tone-primary { color: var(--keel-color-primary); }
-	.tone-success { color: var(--keel-color-success); }
-	.tone-warning { color: var(--keel-color-warning); }
-	.tone-info    { color: var(--keel-color-info); }
-	.tone-danger  { color: var(--keel-color-danger); }
-
-	.card {
-		padding: 16px;
-		border-radius: 10px;
-		background-color: var(--keel-bg-color);
-		margin-bottom: 12px;
-	}
-
-	.card-title {
-		font-size: 15px;
-		font-weight: bold;
+		font-size: 17px;
+		font-weight: 600;
 		color: var(--keel-text-color-primary);
 	}
 
-	.card-body {
+	.state-body {
 		display: block;
 		margin-top: 6px;
-		font-size: 12px;
+		font-size: 14px;
+		line-height: 1.47;
 		color: var(--keel-text-color-secondary);
-		line-height: 20px;
+	}
+
+	/* 没权限时这块紧跟在问候区下面，要和上面拉开距离 */
+	.welcome + .state {
+		margin-top: 20px;
+	}
+
+	.about {
+		margin: 28px 4px 0;
 	}
 </style>
