@@ -17,8 +17,8 @@ import struct
 
 SIZE, SS = 81, 4          # uni-app 建议 81×81；SS 是超采样倍数
 
-NORMAL = (0x8A, 0x8F, 0x99)   # = pages.json 的 tabBar.color
-ACTIVE = (0x2B, 0x6C, 0xF6)   # = pages.json 的 tabBar.selectedColor
+NORMAL = (0x90, 0x93, 0x99)   # = pages.json 的 tabBar.color
+ACTIVE = (0x40, 0x9E, 0xFF)   # = pages.json 的 tabBar.selectedColor
 
 
 def tri(px, py, a, b, c):

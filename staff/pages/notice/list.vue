@@ -114,7 +114,7 @@
 	.page {
 		flex: 1;
 		padding: 12px 16px 24px;
-		background-color: #F5F6F8;
+		background-color: var(--keel-bg-color-page);
 	}
 
 	.bar {
@@ -127,19 +127,19 @@
 
 	.bar-text {
 		font-size: 13px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.bar-action {
 		font-size: 13px;
-		color: #2B6CF6;
+		color: var(--keel-color-primary);
 	}
 
 	.item {
 		padding: 14px;
 		margin-bottom: 10px;
 		border-radius: 10px;
-		background-color: #FFFFFF;
+		background-color: var(--keel-bg-color);
 	}
 
 	.item-head {
@@ -153,13 +153,13 @@
 		height: 7px;
 		border-radius: 4px;
 		margin-right: 6px;
-		background-color: #E54545;
+		background-color: var(--keel-color-danger);
 	}
 
 	.item-title {
 		flex: 1;
 		font-size: 15px;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.item-title.unread {
@@ -171,25 +171,25 @@
 		padding: 1px 6px;
 		border-radius: 4px;
 		font-size: 11px;
-		color: #64748B;
-		background-color: #EFF1F4;
+		color: var(--keel-color-info);
+		background-color: var(--keel-color-info-light-9);
 	}
 
 	.tag-urgent {
-		color: #E54545;
-		background-color: #FDECEC;
+		color: var(--keel-color-danger);
+		background-color: var(--keel-color-danger-light-9);
 	}
 
 	.tag-announcement {
-		color: #2B6CF6;
-		background-color: #EAF1FE;
+		color: var(--keel-color-primary);
+		background-color: var(--keel-color-primary-light-9);
 	}
 
 	.item-summary {
 		display: block;
 		margin-top: 6px;
 		font-size: 13px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 		line-height: 19px;
 	}
 
@@ -202,7 +202,7 @@
 
 	.item-meta {
 		font-size: 11px;
-		color: #A8ADB5;
+		color: var(--keel-text-color-placeholder);
 	}
 
 	.hint, .more {
@@ -211,7 +211,7 @@
 
 	.hint-text, .more-text {
 		font-size: 12px;
-		color: #A8ADB5;
+		color: var(--keel-text-color-placeholder);
 		text-align: center;
 	}
 
@@ -222,7 +222,7 @@
 
 	.empty-title {
 		font-size: 16px;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 		text-align: center;
 	}
 
@@ -230,7 +230,7 @@
 		display: block;
 		margin-top: 8px;
 		font-size: 12px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 		line-height: 19px;
 		text-align: center;
 	}

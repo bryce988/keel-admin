@@ -53,19 +53,19 @@
 	.page {
 		flex: 1;
 		padding: 16px;
-		background-color: #F5F6F8;
+		background-color: var(--keel-bg-color-page);
 	}
 
 	.card {
 		padding: 18px 16px;
 		border-radius: 12px;
-		background-color: #FFFFFF;
+		background-color: var(--keel-bg-color);
 	}
 
 	.title {
 		font-size: 19px;
 		font-weight: bold;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 		line-height: 27px;
 	}
 
@@ -74,20 +74,20 @@
 		flex-direction: row;
 		margin-top: 10px;
 		padding-bottom: 14px;
-		border-bottom: 1px solid #EFF1F4;
+		border-bottom: 1px solid var(--keel-border-color-lighter);
 	}
 
 	.meta-text {
 		margin-right: 12px;
 		font-size: 12px;
-		color: #A8ADB5;
+		color: var(--keel-text-color-placeholder);
 	}
 
 	.content {
 		display: block;
 		margin-top: 14px;
 		font-size: 15px;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 		line-height: 25px;
 	}
 
@@ -97,7 +97,7 @@
 
 	.hint-text {
 		font-size: 13px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 		text-align: center;
 	}
 </style>

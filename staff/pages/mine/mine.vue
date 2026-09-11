@@ -158,14 +158,14 @@
 	.page {
 		flex: 1;
 		padding: 16px;
-		background-color: #F5F6F8;
+		background-color: var(--keel-bg-color-page);
 	}
 
 	.card {
 		padding: 16px;
 		margin-bottom: 12px;
 		border-radius: 12px;
-		background-color: #FFFFFF;
+		background-color: var(--keel-bg-color);
 	}
 
 	.profile {
@@ -190,18 +190,18 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background-color: #2B6CF6;
+		background-color: var(--keel-color-primary);
 	}
 
 	.avatar-text {
 		font-size: 26px;
-		color: #FFFFFF;
+		color: #fff;
 	}
 
 	.avatar-tip {
 		margin-top: 6px;
 		font-size: 11px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.meta {
@@ -212,14 +212,14 @@
 	.name {
 		font-size: 18px;
 		font-weight: bold;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.sub {
 		display: block;
 		margin-top: 6px;
 		font-size: 13px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.tags {
@@ -235,8 +235,8 @@
 		padding: 2px 8px;
 		border-radius: 4px;
 		font-size: 11px;
-		color: #2B6CF6;
-		background-color: #EAF1FE;
+		color: var(--keel-color-primary);
+		background-color: var(--keel-color-primary-light-9);
 	}
 
 	.row {
@@ -244,7 +244,7 @@
 		flex-direction: row;
 		align-items: center;
 		height: 44px;
-		border-bottom: 1px solid #EFF1F4;
+		border-bottom: 1px solid var(--keel-border-color-lighter);
 	}
 
 	.row-last {
@@ -254,19 +254,19 @@
 	.row-label {
 		width: 76px;
 		font-size: 14px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.row-input {
 		flex: 1;
 		font-size: 15px;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.row-value {
 		flex: 1;
 		font-size: 14px;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.save {
@@ -275,8 +275,8 @@
 		line-height: 42px;
 		border-radius: 8px;
 		font-size: 15px;
-		color: #FFFFFF;
-		background-color: #2B6CF6;
+		color: #fff;
+		background-color: var(--keel-color-primary);
 	}
 
 	.logout {
@@ -284,15 +284,15 @@
 		line-height: 44px;
 		border-radius: 10px;
 		font-size: 15px;
-		color: #E54545;
-		background-color: #FFFFFF;
+		color: var(--keel-color-danger);
+		background-color: var(--keel-bg-color);
 	}
 
 	.version {
 		display: block;
 		margin-top: 16px;
 		font-size: 11px;
-		color: #A8ADB5;
+		color: var(--keel-text-color-placeholder);
 		text-align: center;
 	}
 </style>

@@ -16,6 +16,10 @@
   避免浅色覆盖深色时出现硬切线。仍走 View Transitions（只栅格化前后两次，
   不让页面里几百个元素各自重绘），`prefers-reduced-motion` 与不支持的浏览器降级为瞬变；
   动画未结束时忽略连点，避免两组快照争用同一套圆心变量
+- **员工移动端配色与后台统一**：`staff/` 此前有三种蓝（tabBar `#2B6CF6`、`uni.scss` 模板默认
+  `#007aff`、后台 `#409eff`），同一个账号在两端看到的品牌色不一样。现在全部对齐
+  Element Plus 官方浅色色板，页面样式改用 `common/theme.css` 的颜色令牌，
+  不再写十六进制；tabBar 图标按新色重新生成。已安装的 App 要重新打包才会换色
 - 顶栏、页签栏、内容区改用三级表面令牌（`--keel-topbar-bg` / `--keel-tags-bg` /
   `--keel-content-bg`），三块 chrome 不再连成一片
 - 用户管理去掉「部门筛选」折叠按钮，左侧部门树常驻

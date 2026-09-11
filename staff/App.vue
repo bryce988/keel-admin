@@ -18,8 +18,10 @@
 </script>
 
 <style>
-	/* 每个页面公共 css */
+	/* 颜色令牌：页面样式只用这里定义的变量，规则见文件头注释 */
+	@import './common/theme.css';
+
 	page {
-		background-color: #F5F6F8;
+		background-color: var(--keel-bg-color-page);
 	}
 </style>

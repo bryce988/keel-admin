@@ -104,27 +104,28 @@
 	.page {
 		flex: 1;
 		padding: 20px;
-		background-color: #F5F6F8;
+		background-color: var(--keel-bg-color-page);
 	}
 
 	.hero {
 		padding: 20px;
 		border-radius: 12px;
-		background-color: #2B6CF6;
+		background-color: var(--keel-color-primary);
 		margin-bottom: 18px;
 	}
 
 	.hello {
 		font-size: 22px;
 		font-weight: bold;
-		color: #FFFFFF;
+		color: #fff;
 	}
 
 	.hero-sub {
 		display: block;
 		margin-top: 8px;
 		font-size: 13px;
-		color: #DCE6FF;
+		color: #fff;
+		opacity: 0.85;
 	}
 
 	.section-title {
@@ -138,24 +139,24 @@
 	.section-text {
 		font-size: 15px;
 		font-weight: bold;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.section-more {
 		font-size: 13px;
-		color: #2B6CF6;
+		color: var(--keel-color-primary);
 	}
 
 	.placeholder {
 		padding: 28px;
 		border-radius: 10px;
-		background-color: #FFFFFF;
+		background-color: var(--keel-bg-color);
 		margin-bottom: 12px;
 	}
 
 	.placeholder-text {
 		font-size: 13px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 		text-align: center;
 	}
 
@@ -172,13 +173,13 @@
 		margin-bottom: 12px;
 		padding: 14px;
 		border-radius: 10px;
-		background-color: #FFFFFF;
+		background-color: var(--keel-bg-color);
 		box-sizing: border-box;
 	}
 
 	.tile-label {
 		font-size: 13px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.tile-value-row {
@@ -191,47 +192,47 @@
 	.tile-value {
 		font-size: 26px;
 		font-weight: bold;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.tile-unit {
 		margin-left: 4px;
 		font-size: 12px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.tile-hint {
 		display: block;
 		margin-top: 4px;
 		font-size: 11px;
-		color: #A8ADB5;
+		color: var(--keel-text-color-placeholder);
 	}
 
 	/* 与后台的语义色对齐，别在这里另起一套配色 */
-	.tone-primary { color: #2B6CF6; }
-	.tone-success { color: #16A34A; }
-	.tone-warning { color: #D97706; }
-	.tone-info    { color: #64748B; }
-	.tone-danger  { color: #E54545; }
+	.tone-primary { color: var(--keel-color-primary); }
+	.tone-success { color: var(--keel-color-success); }
+	.tone-warning { color: var(--keel-color-warning); }
+	.tone-info    { color: var(--keel-color-info); }
+	.tone-danger  { color: var(--keel-color-danger); }
 
 	.card {
 		padding: 16px;
 		border-radius: 10px;
-		background-color: #FFFFFF;
+		background-color: var(--keel-bg-color);
 		margin-bottom: 12px;
 	}
 
 	.card-title {
 		font-size: 15px;
 		font-weight: bold;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.card-body {
 		display: block;
 		margin-top: 6px;
 		font-size: 12px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 		line-height: 20px;
 	}
 </style>

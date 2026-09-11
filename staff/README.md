@@ -42,6 +42,7 @@ staff/
 ├── pages.json         页面注册与 tabBar（第一项 login 是启动页）
 ├── App.vue            启动时按有没有令牌决定进哪一页
 ├── common/
+│   ├── theme.css      颜色令牌（与后台同一套 EP 色板，见「颜色」）
 │   ├── config.js      后端地址、客户端版本号
 │   ├── request.js     请求层：令牌、401 统一踢回登录、权限判断、文件上传
 │   └── api.js         接口定义，只放请求不放业务判断
@@ -90,7 +91,7 @@ staff/
 
 图标与 tabBar 图标都是纯几何图形，用脚本画而不是丢一堆 png 进来：二进制进了仓库就没人知道它从哪来，
 改颜色或尺寸时只能重新找设计稿。tabBar 图标的颜色与 `pages.json` 的
-`tabBar.color` / `selectedColor` 对齐，改了要一起改。重生成：
+`tabBar.color` / `selectedColor` 对齐，改了要一起改（完整的同步清单见下一节「颜色」）。重生成：
 
 ```bash
 python3 scripts/make-app-icon.py       # static/icons/*
@@ -99,6 +100,20 @@ python3 scripts/make-tabbar-icons.py   # static/tabbar/*
 
 两个脚本都只用标准库（本机没有 PIL / rsvg / magick）：按 PNG 规范拼字节，
 App 图标用距离场算覆盖率抗锯齿，tabBar 图标用超采样。
+
+## 颜色
+
+与后台同一套：**Element Plus 官方浅色色板**，主色 `#409eff`。同一个账号在后台和 App 上
+看到的应该是同一种蓝。
+
+- 页面样式只用 `common/theme.css` 的 CSS 变量（`--keel-color-primary`、
+  `--keel-text-color-secondary` ……，名字照搬 EP 的 `--el-*`），不写十六进制；
+  唯一例外是实色底上的纯白前景可以写 `#fff`，与后台 `DESIGN.md` 同一条规则
+- CSS 变量管不到的有三处，只接受字面色值，**改主色时要一起改**：
+  `uni.scss` 的 `$uni-*`（给插件市场的三方组件）、`pages.json` 的导航栏与 tabBar、
+  `scripts/make-tabbar-icons.py`（改完重跑生成图标）
+
+App 图标与 favicon 的底色是品牌标记色 `#3986ff`，不属于界面令牌，不跟着这里改。
 
 ## 四条必须知道的
 

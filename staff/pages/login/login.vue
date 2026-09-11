@@ -111,7 +111,7 @@
 	.page {
 		flex: 1;
 		padding: 48px 28px;
-		background-color: #F5F6F8;
+		background-color: var(--keel-bg-color-page);
 	}
 
 	.brand {
@@ -122,20 +122,20 @@
 	.brand-mark {
 		font-size: 34px;
 		font-weight: bold;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 	}
 
 	.brand-sub {
 		display: block;
 		margin-top: 6px;
 		font-size: 14px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.card {
 		padding: 20px;
 		border-radius: 12px;
-		background-color: #FFFFFF;
+		background-color: var(--keel-bg-color);
 	}
 
 	.field {
@@ -145,7 +145,7 @@
 	.label {
 		display: block;
 		font-size: 13px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 		margin-bottom: 6px;
 	}
 
@@ -153,9 +153,9 @@
 		height: 44px;
 		padding: 0 12px;
 		font-size: 16px;
-		color: #1F2329;
+		color: var(--keel-text-color-primary);
 		border-radius: 8px;
-		background-color: #F5F6F8;
+		background-color: var(--keel-fill-color-light);
 	}
 
 	.captcha-row {
@@ -173,7 +173,7 @@
 		width: 110px;
 		height: 44px;
 		border-radius: 8px;
-		background-color: #F5F6F8;
+		background-color: var(--keel-fill-color-light);
 	}
 
 	.captcha-loading {
@@ -184,13 +184,13 @@
 
 	.captcha-loading-text {
 		font-size: 12px;
-		color: #8A8F99;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.error {
 		display: block;
 		font-size: 13px;
-		color: #E54545;
+		color: var(--keel-color-danger);
 		margin-bottom: 12px;
 	}
 
@@ -199,15 +199,15 @@
 		line-height: 46px;
 		border-radius: 8px;
 		font-size: 16px;
-		color: #FFFFFF;
-		background-color: #2B6CF6;
+		color: #fff;
+		background-color: var(--keel-color-primary);
 	}
 
 	.hint {
 		display: block;
 		margin-top: 14px;
 		font-size: 12px;
-		color: #A8ADB5;
+		color: var(--keel-text-color-placeholder);
 		text-align: center;
 	}
 </style>

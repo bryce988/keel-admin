@@ -1,0 +1,44 @@
+/*
+ * 员工移动端的颜色令牌
+ *
+ * 取值与后台 web/ 同源：Element Plus 官方浅色色板（web/src/styles/design.css 的基色、
+ * node_modules/element-plus/theme-chalk/base.css 的派生色）。同一个账号在后台和 App 上
+ * 看到的应该是同一种蓝，所以这里不另起一套，令牌名也照搬 EP 的 `--el-*`，只换前缀。
+ *
+ * 页面样式只准用这里的变量；唯一例外是实色底上的纯白前景可以直接写 #fff（与后台同一条规则）。
+ *
+ * ⚠️ CSS 变量管不到的地方要手动同步，改主色时四处一起改：
+ *   - 本文件
+ *   - uni.scss 的 $uni-* 变量（给插件市场的三方组件用）
+ *   - pages.json 的 navigationBar / tabBar / backgroundColor（只接受字面色值）
+ *   - scripts/make-tabbar-icons.py 的 NORMAL / ACTIVE，改完重跑脚本生成图标
+ *
+ * 为什么是 `:root, page` 而不是只写 `page`：H5 编译会把 `page` 转成 `uni-page-body`，
+ * 变量就只挂在那个元素上；而 App.vue 的 `page { background }` 会被额外转出一条
+ * `body { ... }`——body 是 uni-page-body 的父元素，继承不到变量，背景色 var() 落空成透明，
+ * 内容不满一屏时底部露出一大块白。挂到 :root 上，html 往下全都能继承。
+ */
+:root,
+page {
+	/* 品牌与语义色 */
+	--keel-color-primary: #409eff;
+	--keel-color-primary-light-9: #ecf5ff;
+	--keel-color-success: #67c23a;
+	--keel-color-warning: #e6a23c;
+	--keel-color-danger: #f56c6c;
+	--keel-color-danger-light-9: #fef0f0;
+	--keel-color-info: #909399;
+	--keel-color-info-light-9: #f4f4f5;
+
+	/* 文字：主要 → 常规 → 次要 → 占位（也用于最弱一级的说明文字） */
+	--keel-text-color-primary: #303133;
+	--keel-text-color-regular: #606266;
+	--keel-text-color-secondary: #909399;
+	--keel-text-color-placeholder: #a8abb2;
+
+	/* 表面：页面底 → 卡片；输入框这类嵌在卡片里的控件用 fill */
+	--keel-bg-color-page: #f2f3f5;
+	--keel-bg-color: #ffffff;
+	--keel-fill-color-light: #f5f7fa;
+	--keel-border-color-lighter: #ebeef5;
+}

@@ -36,13 +36,13 @@
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "Keel",
-		"navigationBarBackgroundColor": "#FFFFFF",
-		"backgroundColor": "#F5F6F8"
+		"navigationBarBackgroundColor": "#ffffff",
+		"backgroundColor": "#f2f3f5"
 	},
 	"tabBar": {
-		"color": "#8A8F99",
-		"selectedColor": "#2B6CF6",
-		"backgroundColor": "#FFFFFF",
+		"color": "#909399",
+		"selectedColor": "#409eff",
+		"backgroundColor": "#ffffff",
 		"list": [
 			{
 				"pagePath": "pages/index/index",
