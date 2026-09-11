@@ -232,7 +232,7 @@ onUnmounted(() => {
   /* 页签栏是顶栏与内容画布之间的过渡层，避免三块 chrome 连成一片。 */
   background: var(--keel-tags-bg);
   border-bottom: 1px solid var(--el-border-color-light);
-  /* 阴影令牌在设计层里已经归零（DESIGN.md：chrome 一律扁平，分隔靠发丝线）。
+  /* 阴影令牌在设计层里已经归零（web/docs/DESIGN.md：chrome 一律扁平，分隔靠发丝线）。
      这一行保留是为了让「页签条要不要浮起」跟着令牌走，而不是散落在这里 */
   box-shadow: var(--el-box-shadow-lighter);
 }
@@ -264,7 +264,7 @@ onUnmounted(() => {
   /*
    * 控件档（8px），不用胶囊
    *
-   * 试过胶囊，理由是 DESIGN.md 里「当前的、可点的」多是胶囊形。但页签只有 30px 高，
+   * 试过胶囊，理由是 web/docs/DESIGN.md 里「当前的、可点的」多是胶囊形。但页签只有 30px 高，
    * 圆角占到高度的一半，一条页签栏排下来是一串药丸——与按钮那处是同一个毛病：
    * 胶囊是给 44px 级别的大控件定的，尺寸降一半之后比例就不对了。
    */

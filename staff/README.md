@@ -48,7 +48,7 @@ staff/
 │   ├── request.js     请求层：令牌、401 统一踢回登录、权限判断、文件上传
 │   └── api.js         接口定义，只放请求不放业务判断
 ├── docs/
-│   └── DESIGN.md      移动端设计规范（仓库根的 DESIGN.md 是后台的）
+│   └── DESIGN.md      移动端设计规范（后台的在 web/docs/DESIGN.md）
 ├── pages/
 │   ├── login/         登录（账号 + 密码 + 图形验证码）
 │   ├── index/         首页：工作台概览
@@ -110,7 +110,7 @@ App 图标用距离场算覆盖率抗锯齿，tabBar 图标用超采样。
 **品牌色例外**：仍用后台的 `#409eff`，同一个账号在两端看到同一种蓝；中性色、字体、圆角、层次按这份规范。
 
 - **令牌**在 `common/theme.css`：页面样式只用它的 CSS 变量，不写十六进制；
-  唯一例外是实色底上的纯白前景可以写 `#fff`，与后台 `DESIGN.md` 同一条规则
+  唯一例外是实色底上的纯白前景可以写 `#fff`，与后台 `web/docs/DESIGN.md` 同一条规则
 - **通用零件**在 `common/ui.css`（App.vue 全局引入），新页面优先复用：
   `.screen` + `.large-title`（tab 页骨架与大标题）、`.group` + `.row`（内嵌分组列表）、
   `.btn .btn-primary`（胶囊按钮）、`hover-class="row-pressed"` / `"btn-pressed"`（按下反馈）

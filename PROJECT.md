@@ -69,7 +69,7 @@ Keel 是船体最底层的那根主梁，整艘船的结构都搭在它上面。
 | 定时任务 | `workerman/crontab` ^1.0 | `app/process/TaskProcess`，**count 必须为 1**，见 §14.7 |
 | 队列 | `webman/redis-queue` ^2.1 | 耗时任务异步化；消费进程见 `app/queue/`，配置在 `config/plugin/` |
 | 接口文档 | `docs/api.md`（手写契约）+ 控制器 docblock 的 `@url` / `@perm` / `@error` | 与前端联调的唯一依据。⚠️ **没有**接了 OpenAPI 生成器，注解只给人看 |
-| 界面规范 | `DESIGN.md` | 颜色、字号、间距、组件默认值与新页面检查清单。`web/src/styles/design.css` 是它的落地实现，`npm run check-css` 守住其中两条硬约束 |
+| 界面规范 | `web/docs/DESIGN.md` | 颜色、字号、间距、组件默认值与新页面检查清单。`web/src/styles/design.css` 是它的落地实现，`npm run check-css` 守住其中两条硬约束 |
 
 **为什么选 webman**：常驻内存带来的性能收益（相比 FPM 提升数倍），且天然适合长连接与定时任务。代价是编程模型与 FPM 不同，全局状态会跨请求存活，**所有开发人员上手前必须先读 §14**。
 
@@ -83,19 +83,22 @@ Keel 是船体最底层的那根主梁，整艘船的结构都搭在它上面。
 
 ```
 keel-admin/
-├── web/                  # 管理后台前端 · Vue 3 + Element Plus（对应 server/app/admin）
-├── staff/                # 员工移动端 · uni-app + Vue 3（对应 server/app/staff）
+├── web/                  # 管理后台前端 · Vue 3 + Element Plus（对应 server/app/admin）；docs/DESIGN.md 是后台界面规范
+├── staff/                # 员工移动端 · uni-app + Vue 3（对应 server/app/staff）；docs/DESIGN.md 是移动端界面规范
 ├── server/               # 后端 · webman 多应用
-├── docs/                 # 文档站源文件（本文件亦在此）
+├── docs/                 # 跨项目共用的文档：api.md（三端契约）、database.md（表结构，全链路同名）、实施记录
 ├── docker/               # 一键启动：nginx + php + mysql + redis
 ├── scripts/              # 仓库级脚本：deploy / acceptance / check-bizcode / bench-workers
 ├── .github/workflows/    # CI
-├── DESIGN.md             # 界面规范：颜色、字号、间距、组件默认值与新页面检查清单
 ├── README.md             # 英文 + 中文双语说明
 ├── CONTRIBUTING.md       # 贡献指南与提交规范
 ├── CHANGELOG.md          # 按语义化版本记录
 └── LICENSE               # MIT
 ```
+
+**文档放哪**：只有一个项目用的放 `<项目>/docs/`（如 `web/docs/DESIGN.md`、`staff/docs/DESIGN.md`）；
+两个以上项目共用的放根 `docs/`。`api.md` 是三端契约、`database.md` 的字段名全链路同名，所以都在根目录。
+和 service 的分目录规则同一个思路：一端专有放 `app/<端>/service`，两端以上才下沉 `common`。
 
 **命名**：`staff/` 跟着端名走（对应 `app/staff`、`/staff/v1/*`）；`web/` 是历史命名，
 指管理后台前端（对应 `app/admin`）。两者不一致但都不产生歧义，改 `web/` 要动 CI、

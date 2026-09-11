@@ -15,7 +15,7 @@
 [![webman](https://img.shields.io/badge/webman-2.x-42b983.svg)](https://www.workerman.net/webman)
 [![Vue](https://img.shields.io/badge/Vue-3.x-42b883.svg)](https://vuejs.org/)
 
-[在线预览](http://43.143.249.52:8080) · [快速开始](#快速开始) · [核心能力](#核心能力) · [项目文档](PROJECT.md) · [设计规范](DESIGN.md)
+[在线预览](http://43.143.249.52:8080) · [快速开始](#快速开始) · [核心能力](#核心能力) · [项目文档](PROJECT.md) · [设计规范](web/docs/DESIGN.md)
 
 [GitHub](https://github.com/bryce988/keel-admin) · [Gitee](https://gitee.com/yewang_top/keel-admin)
 
@@ -143,8 +143,8 @@ C 端应用 client  ─┼─→ common 共享能力 ─→ MySQL / Redis / Queu
 
 ```text
 keel-admin/
-├── web/                 管理后台前端
-├── staff/               员工移动端，详见 staff/README.md
+├── web/                 管理后台前端（docs/DESIGN.md 界面规范）
+├── staff/               员工移动端，详见 staff/README.md（docs/DESIGN.md 界面规范）
 ├── server/              webman 后端
 │   └── app/
 │       ├── admin/       管理后台接口
@@ -156,9 +156,8 @@ keel-admin/
 │       ├── middleware/  静态资源中间件
 │       ├── process/     HTTP 与定时任务进程
 │       └── queue/       异步任务消费者
-├── docs/                数据库、接口与实施记录
+├── docs/                跨项目共用的文档：接口契约、数据库设计、实施记录
 ├── docker/              开发与生产容器配置
-├── DESIGN.md            界面规范
 └── PROJECT.md           完整项目文档
 ```
 
@@ -171,7 +170,8 @@ keel-admin/
 | 文档 | 内容 |
 |---|---|
 | [PROJECT.md](PROJECT.md) | 架构、权限、多端划分、页型规范、开发红线与里程碑 |
-| [DESIGN.md](DESIGN.md) | 颜色、排版、间距、组件和页面设计规范 |
+| [web/docs/DESIGN.md](web/docs/DESIGN.md) | 后台界面规范：颜色、排版、间距、组件和页面设计 |
+| [staff/docs/DESIGN.md](staff/docs/DESIGN.md) | 移动端界面规范：令牌、组件、交互与文案 |
 | [docs/api.md](docs/api.md) | 接口契约、状态码与错误响应 |
 | [docs/database.md](docs/database.md) | 表结构与数据关系 |
 | [staff/README.md](staff/README.md) | 员工移动端运行与打包 |
