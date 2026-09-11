@@ -154,7 +154,7 @@ function onCreate(parentId = 0, type: MenuType = TYPE_MENU) {
   editingId.value = 0
   formType.value = type
   drawerRef.value?.open({
-    title: parentId ? '新增下级节点' : '新增顶级节点',
+    title: '新增权限点',
     data: blank(parentId, type)
   })
 }
@@ -227,7 +227,7 @@ onMounted(() => {
           :icon="Plus"
           @click="onCreate(0, 1)"
         >
-          新增顶级目录
+          新增权限点
         </el-button>
       </template>
 
