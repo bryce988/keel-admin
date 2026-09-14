@@ -23,4 +23,4 @@ export const BASE_URL = 'http://43.143.249.52:8080'
 export const CHANNEL = 'app-android'
 
 /** 也显示在「我的」页底部，出问题时让人一眼看出手上装的是哪一版 */
-export const APP_VERSION = '1.0.0'
+export const APP_VERSION = '1.1.0'
