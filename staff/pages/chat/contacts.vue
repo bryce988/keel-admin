@@ -2,8 +2,8 @@
 	<!-- iOS 式大标题 + 内嵌分组列表（staff/docs/DESIGN.md） -->
 	<view class="page">
 		<view class="hero">
-			<text class="hero-title">发起会话</text>
-			<text class="hero-sub">选择一位同事</text>
+			<text class="hero-title">通讯录</text>
+			<text class="hero-sub">点击同事发起对话</text>
 		</view>
 
 		<view class="search">
@@ -44,7 +44,7 @@
 
 <script setup>
 	import { ref } from 'vue'
-	import { onShow } from '@dcloudio/uni-app'
+	import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 	import { fetchChatContacts, openChatConversation } from '@/common/api.js'
 	import { absUrl } from '@/common/request.js'
 
@@ -75,9 +75,14 @@
 	async function open(contact) {
 		try {
 			const conv = await openChatConversation(contact.id)
-			// redirectTo 而不是 navigateTo：从聊天室返回时应该回到会话列表，
-			// 中间不该再夹一页通讯录——用户已经选完人了
-			uni.redirectTo({
+			/*
+			 * 必须 navigateTo，不能 redirectTo
+			 *
+			 * 通讯录现在是 tabBar 页，而 redirectTo 的语义是「关掉当前页再打开新的」——
+			 * tab 页关不掉。用 navigateTo 压栈，返回时回到通讯录，这也符合
+			 * 「我在翻通讯录，聊两句再接着翻」的实际用法。
+			 */
+			uni.navigateTo({
 				url: `/pages/chat/room?id=${conv.id}&name=${encodeURIComponent(conv.name)}`
 			})
 		} catch (e) {
@@ -85,8 +90,9 @@
 		}
 	}
 
-	// onShow 而不是 onLoad：从聊天室返回时要刷新（将来这里会变成带未读数的会话列表）
+	// onShow 而不是 onLoad：它是 tab 页，切回来时人员可能已经变了（有人入职/离职）
 	onShow(load)
+	onPullDownRefresh(load)
 </script>
 
 <style scoped>

@@ -43,7 +43,7 @@
 			</view>
 		</view>
 
-		<text v-else class="hint">{{ loading ? '正在加载' : (error || '还没有会话，点右上角「发起」找个同事聊聊') }}</text>
+		<text v-else class="hint">{{ loading ? '正在加载' : (error || '还没有会话，去底部「通讯录」找个同事聊聊') }}</text>
 	</view>
 </template>
 
@@ -81,8 +81,9 @@
 		}
 	}
 
+	/** 通讯录已经是 tab 页，只能用 switchTab——navigateTo 打不开 tabBar 里的页面 */
 	function toContacts() {
-		uni.navigateTo({ url: '/pages/chat/contacts' })
+		uni.switchTab({ url: '/pages/chat/contacts' })
 	}
 
 	function openRoom(c) {

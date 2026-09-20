@@ -17,9 +17,10 @@
 		{
 			"path": "pages/notice/list",
 			"style": {
-				"navigationBarTitleText": "消息",
+				"navigationBarTitleText": "公告",
 				"enablePullDownRefresh": true,
-				"navigationStyle": "custom"
+				"navigationBarBackgroundColor": "#ffffff",
+				"backgroundColor": "#ffffff"
 			}
 		},
 		{
@@ -41,8 +42,9 @@
 		{
 			"path": "pages/chat/contacts",
 			"style": {
-				"navigationBarTitleText": "发起会话",
-				"navigationStyle": "custom"
+				"navigationBarTitleText": "通讯录",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true
 			}
 		},
 		{
@@ -72,16 +74,22 @@
 		"backgroundColor": "#ffffff",
 		"list": [
 			{
-				"pagePath": "pages/index/index",
-				"text": "首页",
-				"iconPath": "static/tabbar/home.png",
-				"selectedIconPath": "static/tabbar/home-active.png"
-			},
-			{
-				"pagePath": "pages/notice/list",
+				"pagePath": "pages/chat/list",
 				"text": "消息",
 				"iconPath": "static/tabbar/message.png",
 				"selectedIconPath": "static/tabbar/message-active.png"
+			},
+			{
+				"pagePath": "pages/chat/contacts",
+				"text": "通讯录",
+				"iconPath": "static/tabbar/contacts.png",
+				"selectedIconPath": "static/tabbar/contacts-active.png"
+			},
+			{
+				"pagePath": "pages/index/index",
+				"text": "工作台",
+				"iconPath": "static/tabbar/workbench.png",
+				"selectedIconPath": "static/tabbar/workbench-active.png"
 			},
 			{
 				"pagePath": "pages/mine/mine",

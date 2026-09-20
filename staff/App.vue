@@ -12,7 +12,7 @@
 	 */
 	onLaunch(() => {
 		if (getToken()) {
-			uni.switchTab({ url: '/pages/index/index' })
+			uni.switchTab({ url: '/pages/chat/list' })
 		}
 	})
 </script>

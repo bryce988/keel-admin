@@ -12,15 +12,21 @@
 			</view>
 		</view>
 
-		<!-- 聊天入口。不加第四个 tabBar 项是有意的：那要配套图标，
-		     等第 ③ 批做出会话列表（带未读角标）再一起改，现在加了还得再改一次 -->
+		<!--
+			工作台是入口聚合页：聊天与通讯录已经是 tabBar 项，不在这里重复；
+			公告从 tab 降级到这里——它是「一天几条、看完就走」的东西，占一个 tab 位不值，
+			而聊天是每天要回好几次的
+		-->
 		<view class="section-head">
-			<text class="section-title">协同</text>
+			<text class="section-title">常用</text>
 		</view>
 		<view class="group">
-			<view class="entry" hover-class="entry--hover" @click="toChat">
-				<text class="entry-name">聊天</text>
-				<text class="entry-arrow">›</text>
+			<view class="entry" hover-class="entry--hover" @click="toNotice">
+				<text class="entry-name">公告</text>
+				<view class="entry-right">
+					<text v-if="noticeUnread > 0" class="entry-badge">{{ noticeUnread > 99 ? '99+' : noticeUnread }}</text>
+					<text class="entry-arrow">›</text>
+				</view>
 			</view>
 		</view>
 
@@ -75,6 +81,8 @@
 	const stats = ref([])
 	const loading = ref(false)
 	const canDashboard = ref(false)
+	/** 公告未读数，同时用于入口右侧的角标与 tabBar 角标 */
+	const noticeUnread = ref(0)
 
 	const WEEKDAYS = '日一二三四五六'
 	const now = new Date()
@@ -92,8 +100,9 @@
 	 * 身份、权限点、概览数字都在 /staff/v1/workbench 里。后台那边这是三个接口，
 	 * 在宽屏上无所谓，在手机上每多一次往返就多一次转圈。
 	 */
-	function toChat() {
-		uni.navigateTo({ url: '/pages/chat/list' })
+	/** 公告不是 tab 页，用 navigateTo 压栈，返回时回到工作台 */
+	function toNotice() {
+		uni.navigateTo({ url: '/pages/notice/list' })
 	}
 
 	async function load() {
@@ -107,7 +116,8 @@
 			stats.value = (res.dashboard && res.dashboard.stats) || []
 
 			// 工作台顺带把未读数带回来了，省掉一次单独的角标请求
-			setNoticeBadge(res.unread_notice || 0)
+			noticeUnread.value = res.unread_notice || 0
+			setNoticeBadge(noticeUnread.value)
 		} catch (e) {
 			// 401 已经在 request 层踢回登录页了，这里只处理别的错
 			if (e.code !== 401) {
@@ -318,6 +328,24 @@
 	.entry-name {
 		font-size: 16px;
 		color: #1d1d1f;
+	}
+
+	.entry-right {
+		display: flex;
+		align-items: center;
+	}
+
+	.entry-badge {
+		margin-right: 8px;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: 9px;
+		background: #f56c6c;
+		color: #ffffff;
+		font-size: 11px;
+		line-height: 18px;
+		text-align: center;
 	}
 
 	.entry-arrow {

@@ -36,6 +36,18 @@ def circle(px, py, cx, cy, r):
     return (px - cx) ** 2 + (py - cy) ** 2 <= r * r
 
 
+def rrect(px, py, x0, y0, x1, y1, r):
+    """圆角矩形。四角用同一半径；落在角落方格外的点按普通矩形判"""
+    if not rect(px, py, x0, y0, x1, y1):
+        return False
+    for cx, cy in ((x0 + r, y0 + r), (x1 - r, y0 + r), (x1 - r, y1 - r), (x0 + r, y1 - r)):
+        out_x = px < cx if cx == x0 + r else px > cx
+        out_y = py < cy if cy == y0 + r else py > cy
+        if out_x and out_y and not circle(px, py, cx, cy, r):
+            return False
+    return True
+
+
 def home(x, y):
     """房子：屋顶三角 + 身体方块 − 门（挖空，所以判断放在最前面）"""
     if rect(x, y, 33.5, 48, 47.5, 68):
@@ -73,6 +85,28 @@ def mine(x, y):
     return head or shoulder
 
 
+def workbench(x, y):
+    """2×2 宫格：工作台的通用画法。
+    不用「房子」——房子是「首页」的语义，而这一格现在的职责是入口聚合"""
+    return any(
+        rrect(x, y, x0, y0, x0 + 24, y0 + 24, 5)
+        for x0, y0 in ((12, 12), (45, 12), (12, 45), (45, 45))
+    )
+
+
+def contacts(x, y):
+    """通讯录：卡片外框 + 里面一个人 + 左侧三道书脊。
+    只画一个人不画两个：两个人是「群组」的语义，通讯录是「按名册找人」"""
+    card = rrect(x, y, 20, 11, 70, 69, 7) and not rrect(x, y, 25, 16, 65, 64, 3)
+    spine = any(rrect(x, y, 8, y0, 17, y0 + 6, 3) for y0 in (21, 38, 55))
+    head = circle(x, y, 45, 32, 8)
+    # 肩：上圆下平，才像人不像方块
+    shoulder = (rect(x, y, 32, 49, 58, 58)
+                or rrect(x, y, 32, 44, 58, 58, 11) and y <= 55)
+
+    return card or spine or head or shoulder
+
+
 def render(shape, rgb, path):
     r, g, b = rgb
     rows = []
@@ -101,7 +135,10 @@ def render(shape, rgb, path):
 
 
 if __name__ == '__main__':
-    for name, shape in (('home', home), ('message', message), ('mine', mine)):
+    # home 与 message 目前不在 tabBar 里（首页改成工作台、系统公告降级为工作台入口），
+    # 但图形留着：删掉的话将来想换回来又得重画一遍
+    for name, shape in (('home', home), ('message', message), ('mine', mine),
+                        ('workbench', workbench), ('contacts', contacts)):
         for suffix, color in (('', NORMAL), ('-active', ACTIVE)):
             p = f'static/tabbar/{name}{suffix}.png'
             print(p, render(shape, color, p), 'bytes')

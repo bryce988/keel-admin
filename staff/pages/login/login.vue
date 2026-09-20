@@ -89,7 +89,7 @@
 
 		try {
 			await login(username.value, password.value, captchaKey.value, captchaCode.value)
-			uni.switchTab({ url: '/pages/index/index' })
+			uni.switchTab({ url: '/pages/chat/list' })
 		} catch (e) {
 			error.value = e.message
 			/*

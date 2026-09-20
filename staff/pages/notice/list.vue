@@ -1,10 +1,12 @@
 <template>
 	<view class="screen">
+		<!--
+			不再是 tab 页（公告已降级为工作台里的入口），所以用的是原生导航栏——
+			导航栏已经写着「公告」，页内再放一个大标题就是同一句话说两遍。
+			这里只留状态行与操作
+		-->
 		<view class="head">
-			<view class="head-text">
-				<text class="large-title">消息</text>
-				<text class="large-title-sub">{{ unread > 0 ? `${unread} 条未读` : '没有未读消息' }}</text>
-			</view>
+			<text class="head-text">{{ unread > 0 ? `${unread} 条未读` : '没有未读消息' }}</text>
 			<text v-if="unread > 0" class="text-link head-action" @click="markAll">全部标为已读</text>
 		</view>
 
@@ -15,7 +17,7 @@
 		<!-- 空态要说清楚「是真没有」而不是「加载失败」，并且不给一个点了没反应的按钮 -->
 		<view v-else-if="list.length === 0" class="empty">
 			<text class="empty-title">还没有公告</text>
-			<text class="empty-desc">系统发布公告后会出现在这里，底部「消息」上会显示未读数。</text>
+			<text class="empty-desc">系统发布公告后会出现在这里，工作台上会显示未读数。</text>
 		</view>
 
 		<block v-else>
@@ -139,17 +141,30 @@
 </script>
 
 <style scoped>
+	/*
+	 * ⚠️ 覆盖 ui.css 里 .screen 的上内边距
+	 *
+	 * 那一条是 `calc(var(--status-bar-height) + 12px)`，给**自定义导航栏**的页面留状态栏。
+	 * 这一页改用原生导航栏之后，状态栏已经被导航栏占掉了，再留一次就是白白顶下去一截。
+	 * 这个坑在 H5 上看不出来（H5 的 --status-bar-height 是 0），只有真机才露。
+	 */
+	.screen {
+		padding-top: 12px;
+	}
+
 	.head {
 		display: flex;
 		flex-direction: row;
-		align-items: flex-end;
+		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 20px;
+		margin-bottom: 16px;
 	}
 
 	.head-text {
 		flex: 1;
 		min-width: 0;
+		font-size: 15px;
+		color: var(--keel-text-color-secondary);
 	}
 
 	.head-action {
