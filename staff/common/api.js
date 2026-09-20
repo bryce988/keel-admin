@@ -104,3 +104,45 @@ export function updateProfile(data) {
 export function uploadAvatar(filePath) {
 	return upload('/staff/v1/profile/avatar', filePath)
 }
+
+// ---------------------------------------------------------------- 即时通讯
+//
+// 打的是 /staff/v1/chat/*，但服务端调的是**与后台同一份** ChatService
+// （PROJECT.md §8.2「一个业务规则只有一份实现」）。所以手机发的消息，
+// 电脑端能实时收到，两边的顺序、幂等、可见性判定完全一致。
+//
+// 发消息走 HTTP，长连接只负责收（见 chatSocket.js）。
+
+/** 可发起会话的在职员工 */
+export function fetchChatContacts(keyword = '') {
+	return request(`/staff/v1/chat/contacts?keyword=${encodeURIComponent(keyword)}&limit=30`)
+}
+
+/** 打开与某人的单聊。已存在就返回已有的，不会重复创建 */
+export function openChatConversation(userId) {
+	return request('/staff/v1/chat/conversations', 'POST', { user_id: userId })
+}
+
+/**
+ * 历史消息，返回永远按 seq 正序
+ *
+ * before_seq 向上翻历史，after_seq 断线重连后补空洞。
+ * 用游标不用页码：消息表会很大，深页 offset 要扫过前面所有行。
+ */
+export function fetchChatMessages(convId, params = {}) {
+	const qs = Object.entries(params)
+		.filter(([, v]) => v !== undefined && v !== null)
+		.map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+		.join('&')
+
+	return request(`/staff/v1/chat/conversations/${convId}/messages${qs ? '?' + qs : ''}`)
+}
+
+/** 发消息。client_msg_id 用于幂等——超时重发不会产生两条 */
+export function sendChatMessage(convId, payload) {
+	return request(`/staff/v1/chat/conversations/${convId}/messages`, 'POST', payload)
+}
+
+export function markChatRead(convId, lastReadSeq) {
+	return request(`/staff/v1/chat/conversations/${convId}/read`, 'POST', { last_read_seq: lastReadSeq })
+}

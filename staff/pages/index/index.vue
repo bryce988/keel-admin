@@ -12,6 +12,18 @@
 			</view>
 		</view>
 
+		<!-- 聊天入口。不加第四个 tabBar 项是有意的：那要配套图标，
+		     等第 ③ 批做出会话列表（带未读角标）再一起改，现在加了还得再改一次 -->
+		<view class="section-head">
+			<text class="section-title">协同</text>
+		</view>
+		<view class="group">
+			<view class="entry" hover-class="entry--hover" @click="toChat">
+				<text class="entry-name">聊天</text>
+				<text class="entry-arrow">›</text>
+			</view>
+		</view>
+
 		<!-- 有 sys:dashboard:view 才显示工作台。没有的人看到的是下面那块说明，
 		     而不是一片空白或者一个红色报错——他没权限不是出错 -->
 		<block v-if="canDashboard">
@@ -80,6 +92,10 @@
 	 * 身份、权限点、概览数字都在 /staff/v1/workbench 里。后台那边这是三个接口，
 	 * 在宽屏上无所谓，在手机上每多一次往返就多一次转圈。
 	 */
+	function toChat() {
+		uni.navigateTo({ url: '/pages/chat/list' })
+	}
+
 	async function load() {
 		loading.value = true
 		try {
@@ -286,5 +302,26 @@
 
 	.about {
 		margin: 28px 4px 0;
+	}
+
+	.entry {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 14px 16px;
+	}
+
+	.entry--hover {
+		background: #f5f5f7;
+	}
+
+	.entry-name {
+		font-size: 16px;
+		color: #1d1d1f;
+	}
+
+	.entry-arrow {
+		font-size: 20px;
+		color: #c7c7cc;
 	}
 </style>

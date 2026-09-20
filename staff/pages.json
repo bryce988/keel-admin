@@ -31,6 +31,20 @@
 			}
 		},
 		{
+			"path": "pages/chat/list",
+			"style": {
+				"navigationBarTitleText": "聊天",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/chat/room",
+			"style": {
+				"navigationBarTitleText": "聊天",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
 			"path": "pages/mine/mine",
 			"style": {
 				"navigationBarTitleText": "我的",
