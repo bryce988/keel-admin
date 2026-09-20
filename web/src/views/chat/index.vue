@@ -15,13 +15,13 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Bell, Delete, Plus, Promotion, Top } from '@element-plus/icons-vue'
+import { Bell, Delete, Promotion, Top } from '@element-plus/icons-vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { chatSocket } from '@/utils/chatSocket'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { getContactDepts, getContacts as getContactPage, type ContactDept, type ContactPerson } from '@/api/contact'
 import {
-  getContacts,
   getConversations,
   getMessages,
   markRead,
@@ -29,7 +29,6 @@ import {
   removeConversation,
   sendMessage,
   updateSettings,
-  type ChatContact,
   type ChatConversation,
   type ChatConversationRow,
   type ChatMessage,
@@ -48,11 +47,21 @@ const myId = computed(() => Number(userStore.profile?.user.id ?? 0))
 const conversations = ref<ChatConversationRow[]>([])
 const loadingList = ref(false)
 
-/** 发起会话的弹窗：通讯录 */
-const pickerVisible = ref(false)
-const contacts = ref<ChatContact[]>([])
+/**
+ * 左栏页签
+ *
+ * 通讯录与会话列表**并列在同一个界面里**，不是独立菜单——
+ * 想给同事发条消息不该先去别的页面找人再跳回来，找人和聊天是连着的。
+ * 这也是钉钉桌面端的做法。
+ */
+const sideTab = ref<'chat' | 'contact'>('chat')
+
+/** 通讯录：组织架构树 + 搜索 */
+const depts = ref<ContactDept[]>([])
+const contacts = ref<ContactPerson[]>([])
 const keyword = ref('')
 const loadingContacts = ref(false)
+const activeDeptId = ref(0)
 
 const conversation = ref<ChatConversation | null>(null)
 const messages = ref<LocalMessage[]>([])
@@ -65,13 +74,48 @@ const listRef = ref<HTMLElement>()
 
 // ---------------------------------------------------------------- 通讯录
 
+/**
+ * 通讯录取数
+ *
+ * 有关键词时**跨部门搜全公司**，忽略当前选中的部门——用户打字就是因为
+ * 不知道人在哪个部门，这时候还按部门过滤等于帮倒忙。
+ */
 async function loadContacts() {
   loadingContacts.value = true
   try {
-    contacts.value = await getContacts(keyword.value.trim())
+    const kw = keyword.value.trim()
+    const res = await getContactPage({
+      keyword: kw,
+      dept_id: kw ? 0 : activeDeptId.value,
+      // 选中某个部门时含子部门：点「技术部」要看到底下所有小组的人
+      include_children: true,
+      page_size: 100,
+    })
+    contacts.value = res.list
   } finally {
     loadingContacts.value = false
   }
+}
+
+/** 部门树只在第一次切到通讯录时拉，之后不会变 */
+async function ensureDepts() {
+  if (depts.value.length) return
+  depts.value = await getContactDepts()
+}
+
+async function switchTab(tab: 'chat' | 'contact') {
+  sideTab.value = tab
+  if (tab !== 'contact') return
+
+  await ensureDepts()
+  if (!contacts.value.length) await loadContacts()
+}
+
+function pickDept(node: ContactDept) {
+  // 再点一次选中的部门 = 取消筛选，回到全公司
+  activeDeptId.value = activeDeptId.value === node.id ? 0 : node.id
+  keyword.value = ''
+  void loadContacts()
 }
 
 let searchTimer: number | undefined
@@ -79,12 +123,6 @@ watch(keyword, () => {
   clearTimeout(searchTimer)
   searchTimer = window.setTimeout(loadContacts, 300)
 })
-
-function openPicker() {
-  pickerVisible.value = true
-  keyword.value = ''
-  void loadContacts()
-}
 
 // ---------------------------------------------------------------- 会话列表
 
@@ -166,8 +204,9 @@ function listTime(at: string | null): string {
 
 // ---------------------------------------------------------------- 会话
 
-async function openWith(contact: ChatContact) {
-  pickerVisible.value = false
+async function openWith(contact: ContactPerson) {
+  // 选完人自动切回消息：用户的意图是「跟这个人说话」，不是「继续浏览通讯录」
+  sideTab.value = 'chat'
 
   const conv = await openConversation(contact.id)
 
@@ -394,12 +433,28 @@ function timeOf(m: LocalMessage) {
   <div class="chat">
     <!-- 左栏：会话列表 -->
     <aside class="chat__side">
-      <div class="chat__side-head">
-        <span class="chat__side-title">消息</span>
-        <el-button type="primary" link :icon="Plus" @click="openPicker">发起</el-button>
+      <!-- 页签：通讯录与会话列表并列，切换而不是跳页面 -->
+      <div class="chat__tabs">
+        <button
+          type="button"
+          class="chat__tab"
+          :class="{ 'chat__tab--on': sideTab === 'chat' }"
+          @click="switchTab('chat')"
+        >
+          消息
+          <span v-if="chatStore.total > 0" class="chat__tab-dot" />
+        </button>
+        <button
+          type="button"
+          class="chat__tab"
+          :class="{ 'chat__tab--on': sideTab === 'contact' }"
+          @click="switchTab('contact')"
+        >
+          通讯录
+        </button>
       </div>
 
-      <div v-loading="loadingList" class="chat__list">
+      <div v-show="sideTab === 'chat'" v-loading="loadingList" class="chat__list">
         <div
           v-for="row in conversations"
           :key="row.id"
@@ -447,10 +502,68 @@ function timeOf(m: LocalMessage) {
         <EmptyState
           v-if="!loadingList && !conversations.length"
           scene="empty"
-          description="还没有会话，点「发起」找个同事聊聊"
+          description="还没有会话，去通讯录找个同事聊聊"
           :action="false"
           :size="70"
         />
+      </div>
+
+      <!-- 通讯录：部门树 + 人员。点人直接开会话并切回消息 -->
+      <div v-show="sideTab === 'contact'" class="chat__contact">
+        <div class="chat__search">
+          <el-input v-model="keyword" placeholder="搜索同事" clearable size="small" />
+        </div>
+
+        <!-- 搜索时跨部门搜全公司，部门筛选就不该再干扰，所以藏起来 -->
+        <div v-if="!keyword.trim() && depts.length" class="dept">
+          <button
+            type="button"
+            class="dept__item"
+            :class="{ 'dept__item--on': activeDeptId === 0 }"
+            @click="pickDept({ id: 0, name: '', children: [] })"
+          >
+            全部
+          </button>
+          <template v-for="d in depts" :key="d.id">
+            <button
+              type="button"
+              class="dept__item"
+              :class="{ 'dept__item--on': activeDeptId === d.id }"
+              @click="pickDept(d)"
+            >
+              {{ d.name }}
+            </button>
+            <button
+              v-for="c in d.children"
+              :key="c.id"
+              type="button"
+              class="dept__item dept__item--sub"
+              :class="{ 'dept__item--on': activeDeptId === c.id }"
+              @click="pickDept(c)"
+            >
+              {{ c.name }}
+            </button>
+          </template>
+        </div>
+
+        <div v-loading="loadingContacts" class="chat__people">
+          <button v-for="c in contacts" :key="c.id" class="contact" type="button" @click="openWith(c)">
+            <el-avatar :size="36" :src="c.avatar || undefined">{{ c.real_name.slice(0, 1) }}</el-avatar>
+            <div class="contact__body">
+              <div class="contact__name">{{ c.real_name }}</div>
+              <!-- 手机号无权限时是掩码，直接显示即可，不用判断 -->
+              <div class="contact__sub">{{ c.post_name || c.dept_name }}{{ c.phone ? ' · ' + c.phone : '' }}</div>
+            </div>
+          </button>
+
+          <EmptyState
+            v-if="!loadingContacts && !contacts.length"
+            scene="search"
+            :keyword="keyword"
+            :action="false"
+            :size="60"
+          />
+        </div>
       </div>
     </aside>
 
@@ -504,29 +617,6 @@ function timeOf(m: LocalMessage) {
       <EmptyState v-else scene="empty" description="选择左侧任意同事，开始对话" :action="false" />
     </section>
 
-    <!-- 发起会话：通讯录。做成弹窗而不是常驻左栏——
-         用户绝大多数时间是回既有会话，找人是低频动作 -->
-    <el-dialog v-model="pickerVisible" title="发起会话" width="420px" top="12vh">
-      <el-input v-model="keyword" placeholder="搜索同事" clearable />
-
-      <div v-loading="loadingContacts" class="picker">
-        <button v-for="c in contacts" :key="c.id" class="contact" type="button" @click="openWith(c)">
-          <el-avatar :size="36" :src="c.avatar || undefined">{{ c.real_name.slice(0, 1) }}</el-avatar>
-          <div class="contact__body">
-            <div class="contact__name">{{ c.real_name }}</div>
-            <div class="contact__sub">{{ c.username }}</div>
-          </div>
-        </button>
-
-        <EmptyState
-          v-if="!loadingContacts && !contacts.length"
-          scene="search"
-          :keyword="keyword"
-          :action="false"
-          :size="60"
-        />
-      </div>
-    </el-dialog>
   </div>
 </template>
 
@@ -549,18 +639,105 @@ function timeOf(m: LocalMessage) {
   border-right: 1px solid var(--el-border-color-lighter);
 }
 
-.chat__side-head {
+/* 页签：两个等宽按钮 + 底部指示条，比 el-tabs 轻，也不会带进它的默认边距 */
+.chat__tabs {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px 10px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
-.chat__side-title {
-  font-size: 15px;
-  font-weight: 600;
+.chat__tab {
+  position: relative;
+  flex: 1;
+  padding: 11px 0;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+}
+
+.chat__tab:hover {
   color: var(--el-text-color-primary);
+}
+
+.chat__tab--on {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.chat__tab--on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 28px;
+  height: 2px;
+  margin-left: -14px;
+  border-radius: 1px;
+  background: var(--el-color-primary);
+}
+
+/* 页签上的小红点：切到通讯录时仍然看得见「有未读」，不用切回去确认 */
+.chat__tab-dot {
+  position: absolute;
+  top: 8px;
+  margin-left: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--el-color-danger);
+}
+
+.chat__contact {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat__search {
+  padding: 10px 12px 8px;
+}
+
+/* 部门筛选：两级平铺成一列，子部门缩进。
+   280px 的栏里放 el-tree 的展开箭头太挤，而部门通常只有两级 */
+.dept {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.dept__item {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--el-fill-color-light);
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+}
+
+.dept__item:hover {
+  background: var(--el-fill-color);
+}
+
+.dept__item--sub::before {
+  content: '·';
+  margin-right: 3px;
+  color: var(--el-text-color-placeholder);
+}
+
+.dept__item--on {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.chat__people {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
 }
 
 .chat__list {
@@ -687,6 +864,49 @@ function timeOf(m: LocalMessage) {
   max-height: 320px;
   margin-top: 10px;
   overflow-y: auto;
+}
+
+/*
+ * 通讯录人员行
+ *
+ * ⚠️ 这几条是补回来的：第 ③ 批把左栏从通讯录换成会话列表时，
+ * 连带删掉了 .contact*，而弹窗里的选人列表还在用它——
+ * 表现是头像和文字竖排、条目横向换行。删样式时要连它的使用点一起搜一遍。
+ */
+.contact {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.contact:hover {
+  background: var(--el-fill-color-light);
+}
+
+.contact__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.contact__name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+
+.contact__sub {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat__main {
