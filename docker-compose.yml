@@ -111,6 +111,10 @@ services:
       COMPOSER_ALLOW_SUPERUSER: 1
     ports:
       - "${PORT_SERVER:-8787}:8787"
+      # 聊天 WebSocket 网关。**只映射在开发环境**——生产走 nginx 的 /ws 反代，
+      # 公网只开 8080（宝塔占着 80，见 CLAUDE.md），不额外暴露端口。
+      # 手机连本机联调时要直连它，所以开发环境必须映射出来
+      - "${PORT_CHAT_WS:-8788}:8788"
     volumes:
       - ./server:/app
       - composer-cache:/root/.composer

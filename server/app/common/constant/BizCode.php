@@ -108,6 +108,13 @@ final class BizCode
     // 号段留着不复用——已发出去的码不改用途（见类注释），换个含义比换个值更难查
     public const POST_HAS_USERS = 20802;    // 岗位下存在用户，无法删除
 
+    // ---------------------------------------------------------------- 管理后台 · 即时通讯（212xx）
+    // 会话不存在、非会话成员、会话已解散一律复用通用的 NOT_FOUND（10404）——
+    // 它们对调用方是同一件事「这个会话你够不着」，而 404 伪装本来就是全站约定
+    public const CHAT_CONTENT_TOO_LONG = 21201;   // 消息内容超出长度限制
+    public const CHAT_PEER_DISABLED = 21205;      // 不能与已停用的员工发起会话
+    public const CHAT_SELF_CONVERSATION = 21206;  // 不能和自己发起会话
+
     // ---------------------------------------------------------------- C 端（30000-39999）
     public const CHANNEL_HEADER_MISSING = 30001;  // 缺少 X-Channel 请求头
     public const CHANNEL_UNSUPPORTED = 30002;     // 不支持的渠道标识

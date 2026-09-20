@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Webman\Route;
+use app\internal\controller\ChatStatsController as InternalChatStatsController;
 use app\internal\controller\PingController as InternalPingController;
 
 /**
@@ -17,4 +18,8 @@ use app\internal\controller\PingController as InternalPingController;
 // 只在内网可达，nginx 层应拒绝公网访问 /internal/*
 Route::group('/internal', function () {
     Route::get('/ping', [InternalPingController::class, 'index']);
+
+    // 聊天网关的连接注册表计数。验收「关掉所有客户端后归零」要靠它——
+    // 注册表在网关进程内存里，HTTP worker 读不到，只能让网关自己上报到 Redis
+    Route::get('/chat/stats', [InternalChatStatsController::class, 'index']);
 });

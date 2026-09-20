@@ -62,6 +62,26 @@ $tree = [
              'icon' => 'Odometer', 'sort' => 10],
         ],
     ],
+    /*
+     * 协同（目录）→ 消息（聊天页）
+     *
+     * 聊天**只有一个权限点** `chat:use`，不按增删改查拆。全站其他模块的边界是
+     * 「有没有这个权限点」，聊天的边界是「在不在这个会话里」——后者由
+     * im_conversation_members 决定，拆成 chat:message:add / chat:message:recall
+     * 只会造出一堆永远一起授予的权限点（见 docs/chat-tech.md §4.1）。
+     *
+     * ⚠️ 目录 code `collab` 必须一并授权，只给 chat:use 的话 buildMenuTree
+     * 从根找不到这条链，菜单会整条消失——与「首页」那条是同一个坑。
+     */
+    [
+        'name' => '协同', 'code' => 'collab', 'type' => 1,
+        'path' => '/collab', 'component' => 'Layout', 'icon' => 'ChatDotRound', 'sort' => 20,
+        'children' => [
+            ['name' => '消息', 'code' => 'chat:use', 'type' => 2,
+             'path' => '/collab/chat', 'component' => 'views/chat/index.vue',
+             'icon' => 'ChatLineRound', 'sort' => 10],
+        ],
+    ],
     [
         'name' => '系统管理', 'code' => 'sys', 'type' => 1,
         'path' => '/system', 'component' => 'Layout', 'icon' => 'Setting', 'sort' => 90,
@@ -326,12 +346,16 @@ $grants = [
         'sys:export:list', 'sys:export:delete',
         'sys:log', 'sys:log:operation:list', 'sys:log:login:list',
         'sys:field:user:phone',
+        // 聊天是全员功能，不是管理能力——主管和普通员工都要有
+        'collab', 'chat:use',
     ],
 
     // 普通员工：只有首页下的仪表盘。它是对照组——越权测试要有一个「什么都没有」的账号，
     // 才能验证 fail-closed 是真的关着，而不是碰巧没人去点。
     // 目录 code 不能漏，漏了这个账号会得到一个空侧边栏
-    '普通员工' => ['home', 'sys:dashboard:view'],
+    // 聊天给普通员工也是有意的：它验证的是「权限点之外还有一层成员校验」——
+    // 这个账号能进聊天页，但只看得到自己参与的会话，非成员的会话一律 404
+    '普通员工' => ['home', 'sys:dashboard:view', 'collab', 'chat:use'],
 ];
 
 $permIdByCode = Db::table('sys_permissions')->pluck('id', 'perm_code')->all();
@@ -445,6 +469,13 @@ $dicts = [
         ['登录日志', 'log_login', 'info'],
     ]],
     'notice_status' => ['公告状态', [['草稿', '0', 'info'], ['已发布', '1', 'success']]],
+    'im_conv_type'  => ['会话类型', [['单聊', '1', 'primary'], ['群聊', '2', 'success']]],
+    'im_msg_type'   => ['消息类型', [
+        ['文本', 'text', 'primary'], ['图片', 'image', 'success'],
+        ['文件', 'file', 'warning'], ['系统', 'system', 'info'],
+    ]],
+    // 撤回不是「失败」而是一次正常操作，所以给 info 不给 danger
+    'im_msg_status' => ['消息状态', [['正常', '1', 'success'], ['已撤回', '2', 'info']]],
     'yes_no'        => ['是否', [['是', '1', 'success'], ['否', '0', 'info']]],
     'gender'        => ['性别', [['男', '1', 'primary'], ['女', '2', 'danger'], ['未知', '0', 'info']]],
 ];
@@ -525,6 +556,18 @@ $params = [
     // 改大了占磁盘——runtime/exports 没有容量上限，只有这一个阈值管着
     ['sys.export.retainDays', '3',          'advanced', 'int',    '导出文件保留天数'],
     ['sys.log.retainDays',   '180',        'advanced', 'int',    '日志保留天数'],
+    /*
+     * 聊天（docs/chat-tech.md §3.5）
+     *
+     * 留存天数与日志用同一套清理机制（TaskProcess 投递 → 队列分批删），
+     * 但单开一个键：聊天记录的保留期通常比系统日志长，绑在一起改不动其中一个。
+     * 发送频率是防误操作与防脚本刷，不是反垃圾——内部系统没有陌生人，
+     * 所以 20 条/分钟对正常打字绰绰有余；置 0 关闭（压测时会用到）。
+     */
+    ['chat.message.retainDays', '365',     'advanced', 'int',    '聊天记录保留天数'],
+    ['chat.message.maxLength',  '5000',    'advanced', 'int',    '单条文本消息最大字数'],
+    ['chat.group.maxMembers',   '200',     'advanced', 'int',    '群成员数量上限'],
+    ['chat.rateLimit.perMinute','20',      'advanced', 'int',    '每人每分钟发送消息上限，0=不限'],
     ['sys.cache.ttl',        '300',        'advanced', 'int',    '字典缓存秒数'],
     ['sys.role.maxPerUser',  '5',          'security', 'int',    '单账号最多可持有的角色数'],
     ['sys.pwd.minLength',    '8',          'security', 'int',    '密码最小长度'],

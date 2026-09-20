@@ -350,6 +350,85 @@ CREATE TABLE IF NOT EXISTS `sys_task_logs` (
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务执行日志';
 
+-- ---------------------------------------------------------------- 即时通讯
+-- 设计说明见 docs/chat-tech.md §3。三条与系统表不同的约定：
+--   1. 表名前缀 im_ 而不是 sys_（sys_ 只给框架自己的表，业务表用自己的前缀）
+--   2. 不挂数据权限：会话不属于任何部门，按部门过滤会让跨部门聊天直接断掉。
+--      可见性由 im_conversation_members 决定，与 sys_notices 是同一个理由
+--   3. 不用软删：解散群是 status=0，删会话是成员侧抬 min_seq，撤回是 status=2。
+--      真正的物理删除只发生在留存期清理
+
+CREATE TABLE IF NOT EXISTS `im_conversations` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `type`          TINYINT         NOT NULL                COMMENT '1单聊 2群聊',
+  -- 群聊必须是 NULL 不能是空串：唯一索引对 NULL 不去重（正是群聊要的），
+  -- 而空串只能存在一个，第二个群就会撞 uk_peer
+  `peer_key`      VARCHAR(48)     NULL DEFAULT NULL       COMMENT '单聊唯一键 min(uid):max(uid)，群聊为 NULL',
+  `name`          VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '群名称，单聊为空（展示用对方昵称）',
+  `avatar`        VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '群头像',
+  `owner_id`      BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '群主，单聊为 0',
+  `member_count`  INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '成员数，冗余',
+  `max_seq`       BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '会话内最大消息序号，发消息时行锁自增',
+  `last_msg_id`   BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '最后一条消息 ID',
+  `last_msg_at`   DATETIME        NULL                    COMMENT '最后一条消息时间，列表排序用',
+  `last_msg_text` VARCHAR(128)    NOT NULL DEFAULT ''     COMMENT '最后一条消息摘要，冗余，避免会话列表 N+1',
+  `status`        TINYINT         NOT NULL DEFAULT 1      COMMENT '0已解散 1正常',
+  `creator_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '创建人',
+  `updater_id`    BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '最后修改人',
+  `created_at`    DATETIME        NOT NULL                COMMENT '创建时间',
+  `updated_at`    DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  -- 「一对人只有一个单聊」的保证，不是靠先查后插——两个人互相同时点「发消息」真会发生
+  UNIQUE KEY `uk_peer` (`peer_key`),
+  KEY `idx_owner` (`owner_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话';
+
+CREATE TABLE IF NOT EXISTS `im_conversation_members` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `conv_id`       BIGINT UNSIGNED NOT NULL                COMMENT '会话 ID',
+  `user_id`       BIGINT UNSIGNED NOT NULL                COMMENT '成员 ID（sys_users）',
+  `role`          TINYINT         NOT NULL DEFAULT 0      COMMENT '0成员 1群主',
+  `last_read_seq` BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '已读水位，未读数 = conv.max_seq - 它，算出来不存',
+  `min_seq`       BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '可见起始序号，删除会话/清空记录时抬高',
+  `join_seq`      BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '入群时的序号，预留「只看入群后消息」策略',
+  `is_pinned`     TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '置顶',
+  `is_muted`      TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '免打扰',
+  `is_visible`    TINYINT(1)      NOT NULL DEFAULT 1      COMMENT '是否出现在会话列表（删除会话置 0，来新消息自动置 1）',
+  `at_seq`        BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '最近一次被 @ 的序号，> last_read_seq 时列表显示「@」',
+  `quit_at`       DATETIME        NULL                    COMMENT '退群/被踢时间，非空表示已不是成员',
+  `created_at`    DATETIME        NOT NULL                COMMENT '入会话时间',
+  `updated_at`    DATETIME        NOT NULL                COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  -- 既防重复入群，也是「这个人在不在这个会话里」那次鉴权查询的索引（与 uk_notice_user 同形）
+  UNIQUE KEY `uk_conv_user` (`conv_id`, `user_id`),
+  KEY `idx_user_visible` (`user_id`, `is_visible`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话成员';
+
+CREATE TABLE IF NOT EXISTS `im_messages` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `conv_id`       BIGINT UNSIGNED NOT NULL                COMMENT '会话 ID',
+  `seq`           BIGINT UNSIGNED NOT NULL                COMMENT '会话内序号，从 1 连续递增',
+  `sender_id`     BIGINT UNSIGNED NOT NULL                COMMENT '发送人，系统消息为 0',
+  `sender_name`   VARCHAR(64)     NOT NULL DEFAULT ''     COMMENT '冗余，发送人改名/离职后历史仍可读',
+  `type`          VARCHAR(16)     NOT NULL DEFAULT 'text' COMMENT 'text/image/file/system，字典 im_msg_type',
+  `content`       TEXT            NOT NULL                COMMENT '文本内容；图片文件类型存展示文本',
+  `extra`         JSON            NULL                    COMMENT '附件与扩展 {url,size,name,at_user_ids}。JSON 列建不了普通索引，要查的字段必须提成独立列',
+  -- 系统消息也要填一个服务端生成的 UUID：sender_id=0 且留空的话，
+  -- 多条系统消息的 (0,'') 会全部撞 uk_client_msg
+  `client_msg_id` CHAR(36)        NOT NULL DEFAULT ''     COMMENT '客户端幂等 ID（UUID）',
+  `status`        TINYINT         NOT NULL DEFAULT 1      COMMENT '1正常 2已撤回',
+  `recalled_by`   BIGINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '撤回人，区分本人撤回与群主撤回',
+  `recalled_at`   DATETIME        NULL                    COMMENT '撤回时间',
+  `created_at`    DATETIME        NOT NULL                COMMENT '发送时间',
+  PRIMARY KEY (`id`),
+  -- 硬兜底：即使发号逻辑哪天被改错，数据库也不让重号落地。
+  -- 表现为一次 500 而不是静默的消息错乱，后者排查起来要命
+  UNIQUE KEY `uk_conv_seq` (`conv_id`, `seq`),
+  -- 「点了发送但响应超时，用户又点一次」的去重
+  UNIQUE KEY `uk_client_msg` (`sender_id`, `client_msg_id`),
+  KEY `idx_conv_created` (`conv_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息';
+
 -- ---------------------------------------------------------------- 基础数据
 -- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）
 INSERT INTO `sys_depts` (`id`,`parent_id`,`ancestors`,`name`,`code`,`sort`,`created_at`,`updated_at`) VALUES

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Webman\Route;
 use app\admin\controller\AuthController;
+use app\admin\controller\ChatController;
 use app\admin\controller\DashboardController;
 use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
@@ -82,6 +83,24 @@ Route::group('/admin', function () {
      * 限流在 UploadService 里自己做：admin 端没挂 RateLimitMiddleware（那是 C 端的）。
      */
     Route::post('/upload', [UploadController::class, 'store'])->setParams(['perm' => '']);
+
+    /*
+     * 即时通讯（docs/chat-tech.md）
+     *
+     * **只有一个权限点 chat:use**，不按增删改查拆。全站其他模块的边界是
+     * 「有没有这个权限点」，聊天的边界是「在不在这个会话里」——后者由
+     * ChatService::assertMember() 统一把守，非成员一律 404。
+     * 拆成 chat:message:add / chat:message:recall 只会造出一堆永远一起授予的权限点。
+     *
+     * 不记操作日志：一次对话几十条消息，会把真正要审计的动作淹掉。
+     * 消息本身就在 im_messages 里，比操作日志更完整。
+     */
+    Route::get('/chat/contacts', [ChatController::class, 'contacts'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations', [ChatController::class, 'open'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations/{id:\d+}', [ChatController::class, 'detail'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations/{id:\d+}/messages', [ChatController::class, 'messages'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations/{id:\d+}/messages', [ChatController::class, 'send'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations/{id:\d+}/read', [ChatController::class, 'read'])->setParams(['perm' => 'chat:use']);
 
     // 系统概览：数据都受数据权限约束，部门主管看到的是他管得到的那部分
     Route::get('/dashboard/overview', [DashboardController::class, 'overview'])

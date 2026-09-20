@@ -136,6 +136,35 @@ return [
      * 队列消费进程不在这里注册——它由 `webman/redis-queue` 插件提供，
      * 配置在 `config/plugin/webman/redis-queue/process.php`。
      */
+    /**
+     * 聊天 WebSocket 网关（docs/chat-tech.md §5.4）
+     *
+     * 只做三件事：握手鉴权、维护连接注册表、把 Redis 广播推给对应连接。
+     * 不查库不写库——业务全在 ChatService，这样将来换网关实现时
+     * HTTP 侧与数据库一行都不用改。
+     *
+     * ## count 为什么不跟着核数走
+     *
+     * 长连接是 I/O 复用模型：一个进程能同时持有几千条连接，
+     * 不像 HTTP worker 那样被查库阻塞。2000 连接 / 2 进程 = 每进程 1000，
+     * 绰绰有余。加进程只会让每个进程持有的连接更零散。
+     *
+     * ⚠️ count > 1 时**每个进程只持有一部分连接**，所以广播必须走 Redis
+     * （见 app/common/support/ChatFanout.php），不能遍历进程内的注册表。
+     *
+     * ⚠️ reloadable=true 意味着 reload 会断开所有长连接。这是可接受的
+     * （客户端 30 秒内自动重连），但前端的重连退避必须带抖动，
+     * 否则几千个客户端会在同一秒重连把服务打垮。
+     *
+     * 生产不对宿主机暴露 8788，走 nginx 的 /ws 反代（docs/chat-tech.md §8.1）。
+     */
+    'chat-gateway' => [
+        'handler'    => app\process\ChatGateway::class,
+        'listen'     => 'websocket://0.0.0.0:8788',
+        'count'      => Env::int('CHAT_GATEWAY_COUNT', 2),
+        'reloadable' => true,
+    ],
+
     'task' => [
         'handler'    => app\process\TaskProcess::class,
         'count'      => 1,

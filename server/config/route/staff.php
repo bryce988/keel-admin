@@ -7,6 +7,7 @@ use app\common\middleware\AdminAuthMiddleware;
 use app\common\middleware\OperationLogMiddleware;
 use app\common\middleware\PermissionMiddleware;
 use app\staff\controller\v1\AuthController as StaffAuthController;
+use app\staff\controller\v1\ChatController as StaffChatController;
 use app\staff\controller\v1\NoticeController as StaffNoticeController;
 use app\staff\controller\v1\ProfileController as StaffProfileController;
 use app\staff\controller\v1\WorkbenchController as StaffWorkbenchController;
@@ -48,6 +49,19 @@ Route::group('/staff/v1', function () {
     Route::post('/notices/read-all', [StaffNoticeController::class, 'readAll'])->setParams(['perm' => '']);
     // {id} 放在 read-all 之后：否则 read-all 会被当成 id 匹配掉
     Route::get('/notices/{id:\d+}', [StaffNoticeController::class, 'show'])->setParams(['perm' => '']);
+
+    /*
+     * 即时通讯：与后台**同一份 ChatService**，只是接口前缀不同
+     *
+     * 这里声明 'chat:use'，和后台一致——身份与授权两端共用，
+     * 没被授予 chat:use 的人在手机上同样调不动（fail-closed）。
+     * 可见性仍由 ChatService::assertMember() 把守，非成员 404。
+     */
+    Route::get('/chat/contacts', [StaffChatController::class, 'contacts'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations', [StaffChatController::class, 'open'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'messages'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'send'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations/{id:\d+}/read', [StaffChatController::class, 'read'])->setParams(['perm' => 'chat:use']);
 
     Route::get('/profile', [StaffProfileController::class, 'index'])->setParams(['perm' => '']);
     Route::put('/profile', [StaffProfileController::class, 'update'])->setParams([
