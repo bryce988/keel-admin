@@ -16,6 +16,7 @@ use app\admin\controller\PostController;
 use app\admin\controller\ProfileController;
 use app\admin\controller\QueueController;
 use app\admin\controller\RoleController;
+use app\admin\controller\UploadController;
 use app\admin\controller\UserController;
 use app\common\middleware\AdminAuthMiddleware;
 use app\common\middleware\OperationLogMiddleware;
@@ -70,6 +71,17 @@ Route::group('/admin', function () {
         'log'  => ['module' => '个人中心', 'action' => 2, 'title' => '换绑手机号'],
     ]);
     Route::get('/profile/logins', [ProfileController::class, 'logins'])->setParams(['perm' => '']);
+
+    /*
+     * 通用文件上传：登录即可，不挂权限点、不记操作日志
+     *
+     * 不挂权限点——上传本身不敏感，边界在「文件被用在哪」（发消息要过会话成员校验、
+     * 换头像只能改自己）。挂一个 sys:upload 只会变成人人都授予的空权限点。
+     * 不记日志——一次聊天发九张图就是九条日志，会把真正要审计的动作淹掉。
+     *
+     * 限流在 UploadService 里自己做：admin 端没挂 RateLimitMiddleware（那是 C 端的）。
+     */
+    Route::post('/upload', [UploadController::class, 'store'])->setParams(['perm' => '']);
 
     // 系统概览：数据都受数据权限约束，部门主管看到的是他管得到的那部分
     Route::get('/dashboard/overview', [DashboardController::class, 'overview'])
