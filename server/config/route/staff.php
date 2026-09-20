@@ -58,10 +58,15 @@ Route::group('/staff/v1', function () {
      * 可见性仍由 ChatService::assertMember() 把守，非成员 404。
      */
     Route::get('/chat/contacts', [StaffChatController::class, 'contacts'])->setParams(['perm' => 'chat:use']);
+    // 固定路径排在 {id} 之前
+    Route::get('/chat/unread', [StaffChatController::class, 'unread'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations', [StaffChatController::class, 'conversations'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations', [StaffChatController::class, 'open'])->setParams(['perm' => 'chat:use']);
     Route::get('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'messages'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'send'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/read', [StaffChatController::class, 'read'])->setParams(['perm' => 'chat:use']);
+    Route::put('/chat/conversations/{id:\d+}/settings', [StaffChatController::class, 'settings'])->setParams(['perm' => 'chat:use']);
+    Route::delete('/chat/conversations/{id:\d+}', [StaffChatController::class, 'remove'])->setParams(['perm' => 'chat:use']);
 
     Route::get('/profile', [StaffProfileController::class, 'index'])->setParams(['perm' => '']);
     Route::put('/profile', [StaffProfileController::class, 'update'])->setParams([

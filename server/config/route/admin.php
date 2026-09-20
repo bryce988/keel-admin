@@ -96,11 +96,16 @@ Route::group('/admin', function () {
      * 消息本身就在 im_messages 里，比操作日志更完整。
      */
     Route::get('/chat/contacts', [ChatController::class, 'contacts'])->setParams(['perm' => 'chat:use']);
+    // 固定路径要排在 {id} 之前，否则 unread 会被当成会话 id 匹配掉
+    Route::get('/chat/unread', [ChatController::class, 'unread'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations', [ChatController::class, 'conversations'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations', [ChatController::class, 'open'])->setParams(['perm' => 'chat:use']);
     Route::get('/chat/conversations/{id:\d+}', [ChatController::class, 'detail'])->setParams(['perm' => 'chat:use']);
     Route::get('/chat/conversations/{id:\d+}/messages', [ChatController::class, 'messages'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/messages', [ChatController::class, 'send'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/read', [ChatController::class, 'read'])->setParams(['perm' => 'chat:use']);
+    Route::put('/chat/conversations/{id:\d+}/settings', [ChatController::class, 'settings'])->setParams(['perm' => 'chat:use']);
+    Route::delete('/chat/conversations/{id:\d+}', [ChatController::class, 'remove'])->setParams(['perm' => 'chat:use']);
 
     // 系统概览：数据都受数据权限约束，部门主管看到的是他管得到的那部分
     Route::get('/dashboard/overview', [DashboardController::class, 'overview'])

@@ -46,6 +46,69 @@ class ChatController
         ));
     }
 
+/**
+     * 我的会话列表
+     * @url GET /staff/v1/chat/conversations
+     * @perm 登录即可
+     * @description 置顶在前，其余按最后消息时间倒序。每条带 `unread` / `has_at` /
+     * `is_pinned` / `is_muted`。**未读数是算出来的**（会话最大序号 − 我的已读水位），
+     * 不存计数字段——存了就要在每次发消息时给每个成员 +1，写入量随群规模线性增长，
+     * 而且多设备一旦对不上就再也修不回来。
+     */
+    public function conversations(Request $request): Response
+    {
+        return Result::ok(ChatService::conversations(self::uid()));
+    }
+
+    /**
+     * 全局未读汇总
+     * @url GET /staff/v1/chat/unread
+     * @perm 登录即可
+     * @description 顶栏红点用，刻意做成轻量接口——红点要在每个页面上都对，
+     * 而会话列表只有聊天页才拉。**免打扰的会话不计入 `total`**，
+     * 计进去的话「免打扰」就只剩个名字。
+     */
+    public function unread(Request $request): Response
+    {
+        return Result::ok(ChatService::unreadSummary(self::uid()));
+    }
+
+    /**
+     * 会话设置
+     * @url PUT /staff/v1/chat/conversations/{id}/settings
+     * @perm 登录即可
+     * @description `{is_pinned?, is_muted?}`。两个都是**每个人自己的**，
+     * 存在成员行上——我置顶了不该影响对方。
+     * @error 404 会话不存在，或你不是它的成员
+     */
+    public function settings(Request $request, int $id): Response
+    {
+        $data = [];
+        foreach (['is_pinned', 'is_muted'] as $k) {
+            $v = $request->post($k);
+            if ($v !== null) {
+                $data[$k] = filter_var($v, FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        return Result::ok(ChatService::updateSettings($id, self::uid(), $data));
+    }
+
+    /**
+     * 删除会话
+     * @url DELETE /staff/v1/chat/conversations/{id}
+     * @perm 登录即可
+     * @description **只从我的列表移除，不删消息**，对方完全不受影响。
+     * 对方再发一条时会话会带着新消息重新出现，但删除之前的历史我看不到了。
+     * @error 404 会话不存在，或你不是它的成员
+     */
+    public function remove(Request $request, int $id): Response
+    {
+        ChatService::removeConversation($id, self::uid());
+
+        return Result::noContent();
+    }
+
     /**
      * 打开单聊
      * @url POST /staff/v1/chat/conversations

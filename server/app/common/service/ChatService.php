@@ -157,6 +157,173 @@ class ChatService
             ->update(['is_visible' => 1, 'updated_at' => date('Y-m-d H:i:s')]);
     }
 
+    /**
+     * 我的会话列表
+     *
+     * 一次查询拿全：会话 + 我的成员行，`unread` 与 `has_at` 在内存里算。
+     * **未读数不存字段，永远算出来**（`conv.max_seq - member.last_read_seq`）——
+     * 与 M2 系统公告「只记已读不记未读」是同一套思路：
+     * 存计数就要在每次发消息时给每个成员 +1，写入量随群规模线性增长，
+     * 而且多设备之间一旦对不上就再也修不回来。算出来的天然一致。
+     *
+     * 排序：置顶在前，其余按最后一条消息时间倒序。
+     * 排序放数据库做而不是取回来再排——会话数会随工龄增长，
+     * 而「最近聊过的那几个」是唯一高频访问的部分。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function conversations(int $userId): array
+    {
+        $members = ImConversationMemberModel::query()
+            ->where('user_id', $userId)
+            ->whereNull('quit_at')
+            ->where('is_visible', 1)
+            ->get()
+            ->keyBy('conv_id');
+
+        if ($members->isEmpty()) {
+            return [];
+        }
+
+        $convs = ImConversationModel::query()
+            ->whereIn('id', $members->keys()->all())
+            ->where('status', ImConversationModel::STATUS_NORMAL)
+            ->orderByDesc('last_msg_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $rows = [];
+
+        foreach ($convs as $conv) {
+            /** @var ImConversationMemberModel $m */
+            $m = $members[$conv->id];
+
+            $rows[] = self::presentConversation($conv, $userId) + [
+                // 从来没发过消息的会话（刚建就没说话）不该显示未读
+                'unread'    => max(0, (int) $conv->max_seq - (int) $m->last_read_seq),
+                // 被 @ 的序号比已读水位高 = 有没读到的 @
+                'has_at'    => (int) $m->at_seq > (int) $m->last_read_seq,
+                'is_pinned' => (bool) $m->is_pinned,
+                'is_muted'  => (bool) $m->is_muted,
+                'last_read_seq' => (int) $m->last_read_seq,
+            ];
+        }
+
+        // 置顶排到最前。放内存里做是因为它依赖成员行（每个人的置顶不一样），
+        // 而上面那次查询是按会话表排的——要在 SQL 里做就得 JOIN，得不偿失
+        usort($rows, static fn (array $a, array $b) => ($b['is_pinned'] <=> $a['is_pinned']));
+
+        return $rows;
+    }
+
+    /**
+     * 全局未读汇总（顶栏红点用）
+     *
+     * 刻意做成一个轻量接口而不是让前端拿会话列表去加总：
+     * 红点要在**每个页面**上都对，而会话列表只有聊天页才拉。
+     *
+     * ⚠️ 免打扰的会话**不计入数字**，只在列表里显示小圆点。
+     * 计进去的话「免打扰」就只剩个名字——用户设它就是为了红点别跳。
+     */
+    public static function unreadSummary(int $userId): array
+    {
+        $rows = Db::table('im_conversation_members as m')
+            ->join('im_conversations as c', 'c.id', '=', 'm.conv_id')
+            ->where('m.user_id', $userId)
+            ->whereNull('m.quit_at')
+            ->where('m.is_visible', 1)
+            ->where('c.status', ImConversationModel::STATUS_NORMAL)
+            ->whereColumn('c.max_seq', '>', 'm.last_read_seq')
+            ->get(['c.max_seq', 'm.last_read_seq', 'm.is_muted', 'm.at_seq']);
+
+        $total = 0;
+        $convs = 0;
+        $hasAt = false;
+
+        foreach ($rows as $r) {
+            $diff = (int) $r->max_seq - (int) $r->last_read_seq;
+            if ($diff <= 0) {
+                continue;
+            }
+
+            $convs++;
+            if (!$r->is_muted) {
+                $total += $diff;
+            }
+            if ((int) $r->at_seq > (int) $r->last_read_seq) {
+                $hasAt = true;
+            }
+        }
+
+        return [
+            // 红点上的数字：不含免打扰
+            'total' => $total,
+            // 有未读的会话数：含免打扰，用于「有消息但不弹数字」的小圆点
+            'conversations' => $convs,
+            'has_at' => $hasAt,
+        ];
+    }
+
+    /**
+     * 会话设置：置顶 / 免打扰
+     *
+     * 这两个是**每个人自己的**，存在成员行上而不是会话上——
+     * 我置顶了不该影响对方。
+     */
+    public static function updateSettings(int $convId, int $userId, array $data): array
+    {
+        $member = self::assertMember($convId, $userId);
+
+        $patch = [];
+        if (array_key_exists('is_pinned', $data)) {
+            $patch['is_pinned'] = (int) (bool) $data['is_pinned'];
+        }
+        if (array_key_exists('is_muted', $data)) {
+            $patch['is_muted'] = (int) (bool) $data['is_muted'];
+        }
+
+        if ($patch) {
+            $patch['updated_at'] = date('Y-m-d H:i:s');
+            ImConversationMemberModel::query()->where('id', $member->id)->update($patch);
+        }
+
+        $fresh = ImConversationMemberModel::query()->find($member->id);
+
+        return [
+            'conv_id'   => $convId,
+            'is_pinned' => (bool) $fresh->is_pinned,
+            'is_muted'  => (bool) $fresh->is_muted,
+        ];
+    }
+
+    /**
+     * 删除会话 —— **只从我的列表移除，不删消息**
+     *
+     * 对方那边完全不受影响，这是钉钉、微信的一致行为，用户预期如此。
+     * 做法是两步：`is_visible=0` 让它从列表消失，`min_seq` 抬到当前最大序号
+     * 让之前的消息对我不可见。对方再发一条时会话会带着新消息重新出现
+     * （send() 里会把 is_visible 拉回 1），但删除之前的历史我看不到了。
+     *
+     * 不动消息表是关键：删会话是个高频误操作，真删了就找不回来，
+     * 而抬水位只是一次 UPDATE，代价是查询多带一个 `seq > min_seq` 条件。
+     */
+    public static function removeConversation(int $convId, int $userId): void
+    {
+        $member = self::assertMember($convId, $userId);
+
+        /** @var ImConversationModel|null $conv */
+        $conv = ImConversationModel::query()->find($convId);
+
+        ImConversationMemberModel::query()->where('id', $member->id)->update([
+            'is_visible'    => 0,
+            'min_seq'       => (int) ($conv->max_seq ?? 0),
+            // 一起把已读水位推到底：否则下次会话重新出现时，
+            // 那些已经被 min_seq 隐藏掉的消息还算在未读里，红点显示一个看不到的数字
+            'last_read_seq' => (int) ($conv->max_seq ?? 0),
+            'updated_at'    => date('Y-m-d H:i:s'),
+        ]);
+    }
+
     /** 会话详情，带上「对方是谁」——单聊的标题和头像都来自这里 */
     public static function detail(int $convId, int $userId): array
     {
@@ -441,8 +608,24 @@ class ChatService
             ]);
 
         $fresh = ImConversationMemberModel::query()->find($member->id);
+        $seq   = (int) $fresh->last_read_seq;
 
-        return ['conv_id' => $convId, 'last_read_seq' => (int) $fresh->last_read_seq];
+        $payload = ['conv_id' => $convId, 'user_id' => $userId, 'last_read_seq' => $seq];
+
+        /*
+         * 水位真变了才广播
+         *
+         * 前端每收一条消息、每次窗口回到前台都会调一次标已读，其中大部分是重复的
+         * （水位没动）。不加这个判断的话，一次对话会产生几十条无用广播，
+         * 而每条都要扇出给全部成员。
+         *
+         * 广播给**所有成员**而不只是对方：我自己的其他设备也要跟着把红点清掉。
+         */
+        if ($seq > (int) $member->last_read_seq) {
+            ChatFanout::conversationRead($convId, self::memberIds($convId), $payload);
+        }
+
+        return ['conv_id' => $convId, 'last_read_seq' => $seq];
     }
 
     // ================================================================ 通讯录
