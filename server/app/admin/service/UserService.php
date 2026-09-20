@@ -98,7 +98,7 @@ class UserService
             'real_name'     => $row->real_name,
             'avatar'        => $row->avatar,
             'phone'         => $allowed['phone'] ? $row->phone : Arr::mask((string) $row->phone),
-            'email'         => $allowed['email'] ? $row->email : self::maskEmail((string) $row->email),
+            'email'         => $allowed['email'] ? $row->email : Arr::maskEmail((string) $row->email),
             'dept_id'       => $row->dept_id,
             'dept_name'     => $row->dept?->name ?? '',
             'post_name'     => $row->post?->name ?? '',
@@ -107,16 +107,6 @@ class UserService
             'last_login_at' => $row->last_login_at?->format('Y-m-d H:i:s'),
             'created_at'    => $row->created_at?->format('Y-m-d H:i:s'),
         ];
-    }
-
-    private static function maskEmail(string $email): string
-    {
-        if ($email === '' || !str_contains($email, '@')) {
-            return $email;
-        }
-        [$name, $domain] = explode('@', $email, 2);
-
-        return Arr::mask($name, 1, 0) . '@' . $domain;
     }
 
     // ================================================================ 详情

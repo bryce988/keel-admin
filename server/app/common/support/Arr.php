@@ -20,6 +20,27 @@ final class Arr
     }
 
     /** 手机号 138****8000 / 身份证 保留首尾 */
+    /**
+     * 邮箱脱敏
+     *
+     * 只打用户名部分，域名留着：`z****@example.com`。域名不是敏感信息，
+     * 打掉反而让人认不出这是公司邮箱还是私人邮箱。
+     *
+     * ⚠️ `mask($name, 1, 0)` 的 tail 必须是 0 而不是留默认的 4——
+     * `mb_substr($s, -0)` 返回整串，会得到 `m******manager@example.com` 这种
+     * 半脱敏结果（Arr::mask 内部已处理，这里保留说明免得有人来「优化」掉）。
+     */
+    public static function maskEmail(string $email): string
+    {
+        if ($email === '' || !str_contains($email, '@')) {
+            return $email;
+        }
+
+        [$name, $domain] = explode('@', $email, 2);
+
+        return self::mask($name, 1, 0) . '@' . $domain;
+    }
+
     public static function mask(string $value, int $head = 3, int $tail = 4): string
     {
         $len = mb_strlen($value);
