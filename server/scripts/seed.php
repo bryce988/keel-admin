@@ -80,6 +80,22 @@ $tree = [
             ['name' => '消息', 'code' => 'chat:use', 'type' => 2,
              'path' => '/collab/chat', 'component' => 'views/chat/index.vue',
              'icon' => 'ChatLineRound', 'sort' => 10],
+            /*
+             * 通讯录是**消息页内的一个页签**，不是独立菜单
+             *
+             * 左栏在「会话列表」与「通讯录」之间切换，跟钉钉桌面端一样。
+             * 独立成菜单的话，想给同事发条消息要先去通讯录找人、再跳回消息页，
+             * 平白多一次页面切换；而常驻在左栏里，找人和聊天是连着的。
+             *
+             * 所以 type=3（功能点）而不是 type=2（菜单）——它要能被授权，
+             * 但不该在侧边栏里占一行。⚠️ type=3 没有 path/component，
+             * 写了也不会生成路由，别照着菜单的写法填。
+             *
+             * 权限点单开 contact:view 而不复用 chat:use：
+             * 「能看组织架构」和「能发消息」是两件事，可能只给前者
+             * （比如外包人员能找到人报事，但不给他发起会话）。
+             */
+            ['name' => '通讯录', 'code' => 'contact:view', 'type' => 3, 'sort' => 20],
         ],
     ],
     [
@@ -346,8 +362,8 @@ $grants = [
         'sys:export:list', 'sys:export:delete',
         'sys:log', 'sys:log:operation:list', 'sys:log:login:list',
         'sys:field:user:phone',
-        // 聊天是全员功能，不是管理能力——主管和普通员工都要有
-        'collab', 'chat:use',
+        // 聊天与通讯录都是全员功能，不是管理能力——主管和普通员工都要有
+        'collab', 'chat:use', 'contact:view',
     ],
 
     // 普通员工：只有首页下的仪表盘。它是对照组——越权测试要有一个「什么都没有」的账号，
@@ -355,7 +371,7 @@ $grants = [
     // 目录 code 不能漏，漏了这个账号会得到一个空侧边栏
     // 聊天给普通员工也是有意的：它验证的是「权限点之外还有一层成员校验」——
     // 这个账号能进聊天页，但只看得到自己参与的会话，非成员的会话一律 404
-    '普通员工' => ['home', 'sys:dashboard:view', 'collab', 'chat:use'],
+    '普通员工' => ['home', 'sys:dashboard:view', 'collab', 'chat:use', 'contact:view'],
 ];
 
 $permIdByCode = Db::table('sys_permissions')->pluck('id', 'perm_code')->all();

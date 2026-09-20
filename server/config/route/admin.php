@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Webman\Route;
 use app\admin\controller\AuthController;
 use app\admin\controller\ChatController;
+use app\admin\controller\ContactController;
 use app\admin\controller\DashboardController;
 use app\admin\controller\DeptController;
 use app\admin\controller\DictController;
@@ -83,6 +84,21 @@ Route::group('/admin', function () {
      * 限流在 UploadService 里自己做：admin 端没挂 RateLimitMiddleware（那是 C 端的）。
      */
     Route::post('/upload', [UploadController::class, 'store'])->setParams(['perm' => '']);
+
+    /*
+     * 通讯录：全员可见的组织架构只读视图
+     *
+     * 与 /admin/users 是两套：那边挂 sys:user:* 且受数据权限约束（管理能力），
+     * 这边挂 contact:view 且**绕开数据权限**（找人）。普通员工没有 sys:user:list，
+     * 却必须能查到别的部门同事的分机号——授权面本来就不同。
+     *
+     * 数据范围放开不等于字段放开：手机号邮箱仍受 sys:field:user:* 管。
+     *
+     * 固定路径 /contacts/depts 要排在 {id} 之前，否则 depts 会被当成 id 匹配掉。
+     */
+    Route::get('/contacts/depts', [ContactController::class, 'depts'])->setParams(['perm' => 'contact:view']);
+    Route::get('/contacts', [ContactController::class, 'index'])->setParams(['perm' => 'contact:view']);
+    Route::get('/contacts/{id:\d+}', [ContactController::class, 'show'])->setParams(['perm' => 'contact:view']);
 
     /*
      * 即时通讯（docs/chat-tech.md）
