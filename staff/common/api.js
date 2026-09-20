@@ -118,6 +118,31 @@ export function fetchChatContacts(keyword = '') {
 	return request(`/staff/v1/chat/contacts?keyword=${encodeURIComponent(keyword)}&limit=30`)
 }
 
+/**
+ * 我的会话列表
+ *
+ * 置顶在前，其余按最后消息时间倒序。每条带 unread / has_at / is_pinned / is_muted。
+ * 未读数是**算出来的**（会话最大序号 − 我的已读水位），不存计数字段。
+ */
+export function fetchChatConversations() {
+	return request('/staff/v1/chat/conversations')
+}
+
+/** 全局未读汇总。免打扰的会话不计入 total */
+export function fetchChatUnread() {
+	return request('/staff/v1/chat/unread')
+}
+
+/** 置顶 / 免打扰。两个都是每个人自己的，我置顶了不影响对方 */
+export function updateChatSettings(convId, data) {
+	return request(`/staff/v1/chat/conversations/${convId}/settings`, 'PUT', data)
+}
+
+/** 删除会话：只从我的列表移除，不删消息，对方不受影响 */
+export function removeChatConversation(convId) {
+	return request(`/staff/v1/chat/conversations/${convId}`, 'DELETE')
+}
+
 /** 打开与某人的单聊。已存在就返回已有的，不会重复创建 */
 export function openChatConversation(userId) {
 	return request('/staff/v1/chat/conversations', 'POST', { user_id: userId })

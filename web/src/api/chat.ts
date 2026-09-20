@@ -61,6 +61,46 @@ export function openConversation(userId: number) {
   return request.post<unknown, ChatConversation>('/admin/chat/conversations', { user_id: userId })
 }
 
+export interface ChatConversationRow extends ChatConversation {
+  /** 算出来的，不是存的：会话最大序号 − 我的已读水位 */
+  unread: number
+  /** 有没读到的 @ */
+  has_at: boolean
+  is_pinned: boolean
+  is_muted: boolean
+  last_read_seq: number
+}
+
+/** 我的会话列表。置顶在前，其余按最后消息时间倒序 */
+export function getConversations() {
+  return request.get<unknown, ChatConversationRow[]>('/admin/chat/conversations')
+}
+
+export interface ChatUnread {
+  /** 红点上的数字，**不含免打扰** */
+  total: number
+  /** 有未读的会话数，含免打扰——用于「有消息但不弹数字」的小圆点 */
+  conversations: number
+  has_at: boolean
+}
+
+export function getUnread() {
+  return request.get<unknown, ChatUnread>('/admin/chat/unread')
+}
+
+/** 置顶 / 免打扰。两个都是每个人自己的，我置顶了不影响对方 */
+export function updateSettings(convId: number, data: { is_pinned?: boolean; is_muted?: boolean }) {
+  return request.put<unknown, { conv_id: number; is_pinned: boolean; is_muted: boolean }>(
+    `/admin/chat/conversations/${convId}/settings`,
+    data,
+  )
+}
+
+/** 删除会话：只从我的列表移除，不删消息，对方不受影响 */
+export function removeConversation(convId: number) {
+  return request.delete<unknown, void>(`/admin/chat/conversations/${convId}`)
+}
+
 export function getConversation(id: number) {
   return request.get<unknown, ChatConversation>(`/admin/chat/conversations/${id}`)
 }

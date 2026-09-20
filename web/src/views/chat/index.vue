@@ -14,19 +14,24 @@
  * - **发消息走 HTTP**，长连接只负责收
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Promotion } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Bell, Delete, Plus, Promotion, Top } from '@element-plus/icons-vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { chatSocket } from '@/utils/chatSocket'
 import { useUserStore } from '@/stores/user'
+import { useChatStore } from '@/stores/chat'
 import {
   getContacts,
+  getConversations,
   getMessages,
   markRead,
   openConversation,
+  removeConversation,
   sendMessage,
+  updateSettings,
   type ChatContact,
   type ChatConversation,
+  type ChatConversationRow,
   type ChatMessage,
 } from '@/api/chat'
 
@@ -36,8 +41,15 @@ interface LocalMessage extends ChatMessage {
 }
 
 const userStore = useUserStore()
+const chatStore = useChatStore()
 const myId = computed(() => Number(userStore.profile?.user.id ?? 0))
 
+/** 左栏：会话列表 */
+const conversations = ref<ChatConversationRow[]>([])
+const loadingList = ref(false)
+
+/** 发起会话的弹窗：通讯录 */
+const pickerVisible = ref(false)
 const contacts = ref<ChatContact[]>([])
 const keyword = ref('')
 const loadingContacts = ref(false)
@@ -68,13 +80,109 @@ watch(keyword, () => {
   searchTimer = window.setTimeout(loadContacts, 300)
 })
 
+function openPicker() {
+  pickerVisible.value = true
+  keyword.value = ''
+  void loadContacts()
+}
+
+// ---------------------------------------------------------------- 会话列表
+
+async function loadList() {
+  loadingList.value = true
+  try {
+    conversations.value = await getConversations()
+  } finally {
+    loadingList.value = false
+  }
+}
+
+/** 本地把某个会话的未读清零，不等服务端往返——点进去红点要立刻消失 */
+function clearUnreadLocally(convId: number) {
+  const row = conversations.value.find((c) => c.id === convId)
+  if (row) {
+    row.unread = 0
+    row.has_at = false
+  }
+}
+
+async function selectConversation(row: ChatConversationRow) {
+  if (conversation.value?.id === row.id) return
+
+  conversation.value = row
+  chatStore.enter(row.id)
+  clearUnreadLocally(row.id)
+  await loadHistory()
+}
+
+async function togglePin(row: ChatConversationRow) {
+  const res = await updateSettings(row.id, { is_pinned: !row.is_pinned })
+  row.is_pinned = res.is_pinned
+  // 重排而不是整表重拉：置顶只影响顺序，没必要为此打一次网络
+  conversations.value.sort((a, b) => Number(b.is_pinned) - Number(a.is_pinned))
+}
+
+async function toggleMute(row: ChatConversationRow) {
+  const res = await updateSettings(row.id, { is_muted: !row.is_muted })
+  row.is_muted = res.is_muted
+  // 免打扰会影响全局数字（免打扰的不计入），所以这里要让 store 重新对一次
+  void chatStore.refresh()
+}
+
+async function removeRow(row: ChatConversationRow) {
+  await ElMessageBox.confirm(
+    '只会从你的列表移除，不会删除消息，对方也不受影响。若对方再发消息，会话会重新出现。',
+    `删除与「${row.name}」的会话`,
+    { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+  )
+
+  await removeConversation(row.id)
+  conversations.value = conversations.value.filter((c) => c.id !== row.id)
+
+  if (conversation.value?.id === row.id) {
+    conversation.value = null
+    messages.value = []
+    chatStore.leave()
+  }
+
+  void chatStore.refresh()
+}
+
+/** 相对时间。今天给时刻，昨天给「昨天」，更早给日期——列表里精确到秒没有意义 */
+function listTime(at: string | null): string {
+  if (!at) return ''
+
+  const d = at.slice(0, 10)
+  const today = new Date()
+  const ymd = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+
+  if (d === ymd(today)) return at.slice(11, 16)
+
+  const yesterday = new Date(today.getTime() - 86_400_000)
+  if (d === ymd(yesterday)) return '昨天'
+
+  return at.slice(5, 10)
+}
+
 // ---------------------------------------------------------------- 会话
 
 async function openWith(contact: ChatContact) {
-  if (conversation.value?.peer_id === contact.id) return
+  pickerVisible.value = false
 
-  conversation.value = await openConversation(contact.id)
-  await loadHistory()
+  const conv = await openConversation(contact.id)
+
+  // 服务端可能返回一个已存在的会话，列表里未必有（之前删过）。重拉一次最稳，
+  // 顺带拿到它的未读与置顶状态
+  await loadList()
+
+  const row = conversations.value.find((c) => c.id === conv.id)
+  if (row) {
+    await selectConversation(row)
+  } else {
+    conversation.value = conv
+    chatStore.enter(conv.id)
+    await loadHistory()
+  }
 }
 
 async function loadHistory() {
@@ -180,7 +288,26 @@ function upsert(msg: ChatMessage) {
  */
 async function onPush(msg: ChatMessage) {
   const conv = conversation.value
-  if (!conv || msg.conv_id !== conv.id) return
+
+  // 不是当前会话的消息：只更新左栏（摘要、时间、未读、排序），不碰消息区
+  if (!conv || msg.conv_id !== conv.id) {
+    const row = conversations.value.find((c) => c.id === msg.conv_id)
+    if (row) {
+      row.last_msg_text = msg.type === 'text' ? msg.content.slice(0, 40) : `[${msg.type}]`
+      row.last_msg_at = msg.created_at
+      row.max_seq = msg.seq
+      if (msg.sender_id !== myId.value) row.unread += 1
+      // 新消息把会话顶上去，但置顶的仍然在最前
+      conversations.value.sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return Number(b.is_pinned) - Number(a.is_pinned)
+        return (b.last_msg_at ?? '').localeCompare(a.last_msg_at ?? '')
+      })
+    } else {
+      // 列表里没有这个会话：对方刚发起，或我之前删过它。重拉一次
+      await loadList()
+    }
+    return
+  }
 
   const real = messages.value.filter((m) => m.seq !== Number.MAX_SAFE_INTEGER)
   const localMax = real.length ? real[real.length - 1].seq : 0
@@ -190,6 +317,15 @@ async function onPush(msg: ChatMessage) {
     missing.forEach(upsert)
   } else {
     upsert(msg)
+  }
+
+  // 当前会话的摘要也要更新，否则切走再回来左栏还是旧的
+  const row = conversations.value.find((c) => c.id === msg.conv_id)
+  if (row) {
+    row.last_msg_text = msg.type === 'text' ? msg.content.slice(0, 40) : `[${msg.type}]`
+    row.last_msg_at = msg.created_at
+    row.max_seq = msg.seq
+    row.unread = 0
   }
 
   await scrollToBottom()
@@ -208,7 +344,9 @@ let offReady: (() => void) | undefined
 let offMessage: (() => void) | undefined
 
 onMounted(async () => {
-  await loadContacts()
+  chatStore.bind()
+  await loadList()
+  void chatStore.refresh()
 
   /*
    * 重连后的对齐：ready 是「握手完成」的信号，每次重连都会再来一次。
@@ -217,6 +355,8 @@ onMounted(async () => {
    */
   offReady = chatSocket.on('ready', () => {
     connected.value = true
+    // 重连后左栏和消息区都要对齐：断线期间的消息推送不会重发
+    void loadList()
     if (conversation.value) void loadHistory()
   })
   offMessage = chatSocket.on('message.new', (data) => onPush(data as ChatMessage))
@@ -234,6 +374,7 @@ function onVisible() {
 }
 
 onBeforeUnmount(() => {
+  chatStore.leave()
   offReady?.()
   offMessage?.()
   document.removeEventListener('visibilitychange', onVisible)
@@ -251,34 +392,64 @@ function timeOf(m: LocalMessage) {
 
 <template>
   <div class="chat">
-    <!-- 左栏：这一版是通讯录，第 ③ 批换成会话列表 -->
+    <!-- 左栏：会话列表 -->
     <aside class="chat__side">
-      <div class="chat__search">
-        <el-input v-model="keyword" placeholder="搜索同事" clearable size="default" />
+      <div class="chat__side-head">
+        <span class="chat__side-title">消息</span>
+        <el-button type="primary" link :icon="Plus" @click="openPicker">发起</el-button>
       </div>
 
-      <div v-loading="loadingContacts" class="chat__contacts">
-        <button
-          v-for="c in contacts"
-          :key="c.id"
-          class="contact"
-          :class="{ 'contact--active': conversation?.peer_id === c.id }"
-          type="button"
-          @click="openWith(c)"
+      <div v-loading="loadingList" class="chat__list">
+        <div
+          v-for="row in conversations"
+          :key="row.id"
+          class="conv"
+          :class="{ 'conv--active': conversation?.id === row.id, 'conv--pinned': row.is_pinned }"
+          @click="selectConversation(row)"
         >
-          <el-avatar :size="36" :src="c.avatar || undefined">{{ c.real_name.slice(0, 1) }}</el-avatar>
-          <div class="contact__body">
-            <div class="contact__name">{{ c.real_name }}</div>
-            <div class="contact__sub">{{ c.username }}</div>
+          <el-avatar :size="38" :src="row.avatar || undefined">{{ row.name.slice(0, 1) }}</el-avatar>
+
+          <div class="conv__body">
+            <div class="conv__line">
+              <span class="conv__name">{{ row.name }}</span>
+              <span class="conv__time">{{ listTime(row.last_msg_at) }}</span>
+            </div>
+            <div class="conv__line">
+              <span class="conv__brief">
+                <span v-if="row.has_at" class="conv__at">[有人@我]</span>
+                {{ row.last_msg_text || '暂无消息' }}
+              </span>
+
+              <!--
+                免打扰只显示小圆点不显示数字：用户设它就是为了红点别跳。
+                数字仍然是「未读几条」，圆点只回答「有没有未读」
+              -->
+              <span v-if="row.unread > 0" class="conv__badge" :class="{ 'conv__badge--dot': row.is_muted }">
+                {{ row.is_muted ? '' : (row.unread > 99 ? '99+' : row.unread) }}
+              </span>
+            </div>
           </div>
-        </button>
+
+          <!-- 操作按钮：hover 才出现，常驻会把本来就窄的列表挤满 -->
+          <div class="conv__ops" @click.stop>
+            <el-tooltip :content="row.is_pinned ? '取消置顶' : '置顶'" placement="top">
+              <el-button text size="small" :icon="Top" :type="row.is_pinned ? 'primary' : ''" @click="togglePin(row)" />
+            </el-tooltip>
+            <el-tooltip :content="row.is_muted ? '取消免打扰' : '免打扰'" placement="top">
+              <el-button text size="small" :icon="Bell" :type="row.is_muted ? 'warning' : ''" @click="toggleMute(row)" />
+            </el-tooltip>
+            <el-tooltip content="删除会话" placement="top">
+              <el-button text size="small" :icon="Delete" @click="removeRow(row)" />
+            </el-tooltip>
+          </div>
+        </div>
 
         <EmptyState
-          v-if="!loadingContacts && !contacts.length"
-          scene="search"
-          :keyword="keyword"
+          v-if="!loadingList && !conversations.length"
+          scene="empty"
+          description="还没有会话，点「发起」找个同事聊聊"
           :action="false"
-          :size="60"
+          :size="70"
         />
       </div>
     </aside>
@@ -332,6 +503,30 @@ function timeOf(m: LocalMessage) {
 
       <EmptyState v-else scene="empty" description="选择左侧任意同事，开始对话" :action="false" />
     </section>
+
+    <!-- 发起会话：通讯录。做成弹窗而不是常驻左栏——
+         用户绝大多数时间是回既有会话，找人是低频动作 -->
+    <el-dialog v-model="pickerVisible" title="发起会话" width="420px" top="12vh">
+      <el-input v-model="keyword" placeholder="搜索同事" clearable />
+
+      <div v-loading="loadingContacts" class="picker">
+        <button v-for="c in contacts" :key="c.id" class="contact" type="button" @click="openWith(c)">
+          <el-avatar :size="36" :src="c.avatar || undefined">{{ c.real_name.slice(0, 1) }}</el-avatar>
+          <div class="contact__body">
+            <div class="contact__name">{{ c.real_name }}</div>
+            <div class="contact__sub">{{ c.username }}</div>
+          </div>
+        </button>
+
+        <EmptyState
+          v-if="!loadingContacts && !contacts.length"
+          scene="search"
+          :keyword="keyword"
+          :action="false"
+          :size="60"
+        />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -354,51 +549,144 @@ function timeOf(m: LocalMessage) {
   border-right: 1px solid var(--el-border-color-lighter);
 }
 
-.chat__search {
-  padding: 12px;
+.chat__side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 10px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
-.chat__contacts {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.contact {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  color: inherit;
-}
-
-.contact:hover {
-  background: var(--el-fill-color-light);
-}
-
-.contact--active {
-  background: var(--el-color-primary-light-9);
-}
-
-.contact__body {
-  min-width: 0;
-}
-
-.contact__name {
-  font-size: 14px;
+.chat__side-title {
+  font-size: 15px;
+  font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
-.contact__sub {
+.chat__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.conv {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.conv:hover {
+  background: var(--el-fill-color-light);
+}
+
+.conv--active {
+  background: var(--el-color-primary-light-9);
+}
+
+/* 置顶用一条左边框标记，不占额外行高——列表里每一行都很金贵 */
+.conv--pinned::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--el-color-primary);
+}
+
+.conv__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.conv__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.conv__line + .conv__line {
+  margin-top: 3px;
+}
+
+.conv__name {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv__time {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+.conv__brief {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv__at {
+  color: var(--el-color-danger);
+}
+
+.conv__badge {
+  flex: 0 0 auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--el-color-danger);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* 免打扰：只留一个小圆点，不显示数字 */
+.conv__badge--dot {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 4px;
+  background: var(--el-text-color-placeholder);
+}
+
+/* 操作按钮 hover 才出现：常驻会把本来就窄的列表挤满 */
+.conv__ops {
+  display: none;
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: var(--el-bg-color);
+  box-shadow: var(--el-box-shadow-lighter);
+}
+
+.conv:hover .conv__ops {
+  display: flex;
+}
+
+.picker {
+  max-height: 320px;
+  margin-top: 10px;
+  overflow-y: auto;
 }
 
 .chat__main {

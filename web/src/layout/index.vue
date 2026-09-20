@@ -6,6 +6,7 @@ import { Expand, Fold, FullScreen, Moon, ScaleToOriginal, Setting, Sunny } from 
 import BrandLogo from '@/components/BrandLogo.vue'
 import ColumnRail from './components/ColumnRail.vue'
 import MenuSearch from './components/MenuSearch.vue'
+import ChatEntry from './components/ChatEntry.vue'
 import NoticeBell from './components/NoticeBell.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
@@ -203,6 +204,7 @@ async function onUserCommand(cmd: string) {
       </el-tooltip>
 
       <!-- 消息铃铛排在界面设置左边：它是每天都会看的东西，设置不是 -->
+      <ChatEntry />
       <NoticeBell />
 
       <el-tooltip content="界面设置">

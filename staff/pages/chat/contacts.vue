@@ -2,8 +2,8 @@
 	<!-- iOS 式大标题 + 内嵌分组列表（staff/docs/DESIGN.md） -->
 	<view class="page">
 		<view class="hero">
-			<text class="hero-title">聊天</text>
-			<text class="hero-sub">选择同事开始对话</text>
+			<text class="hero-title">发起会话</text>
+			<text class="hero-sub">选择一位同事</text>
 		</view>
 
 		<view class="search">
@@ -75,7 +75,9 @@
 	async function open(contact) {
 		try {
 			const conv = await openChatConversation(contact.id)
-			uni.navigateTo({
+			// redirectTo 而不是 navigateTo：从聊天室返回时应该回到会话列表，
+			// 中间不该再夹一页通讯录——用户已经选完人了
+			uni.redirectTo({
 				url: `/pages/chat/room?id=${conv.id}&name=${encodeURIComponent(conv.name)}`
 			})
 		} catch (e) {

@@ -34,6 +34,14 @@
 			"path": "pages/chat/list",
 			"style": {
 				"navigationBarTitleText": "聊天",
+				"enablePullDownRefresh": true,
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/chat/contacts",
+			"style": {
+				"navigationBarTitleText": "发起会话",
 				"navigationStyle": "custom"
 			}
 		},
