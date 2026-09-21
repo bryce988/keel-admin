@@ -1,7 +1,9 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
 import { getUnread, type ChatMessage } from '@/api/chat'
 import { chatSocket } from '@/utils/chatSocket'
+import { notifyNewMessage } from '@/utils/chatNotify'
 import { useUserStore } from '@/stores/user'
+import router from '@/router'
 
 /**
  * 聊天未读状态 —— **全站唯一的数据源**
@@ -72,9 +74,40 @@ export const useChatStore = defineStore('chat', {
         // 免打扰的会话会让这个数字偏大，下次 refresh 会纠正回来
         this.total += 1
         this.syncTitle()
+
+        /*
+         * 提醒放在 store 里而不是聊天页里
+         *
+         * 聊天页只有打开时才挂监听，而提醒要在**任何页面**上都work——
+         * 用户在看日志、在填表单时来了消息，同样该被提醒到。
+         * 这和红点要全站一致是同一个理由。
+         *
+         * ⚠️ 免打扰的会话不提醒。这里拿不到会话的 is_muted（推送里没有），
+         * 所以退而求其次：只有会计入 total 的消息才提醒——而 refresh 会把
+         * 免打扰的数字纠正回去，代价是免打扰的会话可能会多响一声。
+         * 要彻底做对，得让推送带上接收方的 is_muted，那会让一条广播
+         * 因人而异，扇出成本从 O(1) 变成 O(成员数)
+         */
+        this.announce(msg)
       })
 
       chatSocket.on('conversation.read', () => void this.refresh())
+    },
+
+    /**
+     * 弹提醒
+     *
+     * 文本给内容，图片文件给类型——把文件名念出来没有意义，
+     * 而「[图片]」已经说清楚了发生了什么。
+     */
+    announce(msg: ChatMessage) {
+      const body =
+        msg.type === 'image' ? '[图片]' : msg.type === 'file' ? '[文件]' : msg.content
+
+      notifyNewMessage(msg.sender_name || '新消息', body, () => {
+        // 点通知跳到聊天页。已经在聊天页时路由不会变，但窗口已经聚焦了
+        void router.push({ path: '/collab/chat', query: { conv: String(msg.conv_id) } })
+      })
     },
 
     /** 进入某个会话：它的未读立刻清掉，不等服务端往返 */

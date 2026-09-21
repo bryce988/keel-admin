@@ -15,11 +15,13 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Bell, Delete, Document, Picture, Promotion, RefreshLeft, Top, UserFilled } from '@element-plus/icons-vue'
+import { Bell, Delete, Document, Picture, Promotion, RefreshLeft, Setting, Top, UserFilled } from '@element-plus/icons-vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { chatSocket } from '@/utils/chatSocket'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { notifyPrefs, requestPermission } from '@/utils/chatNotify'
+import { useRoute } from 'vue-router'
 import { getContactDepts, getContacts as getContactPage, type ContactDept, type ContactPerson } from '@/api/contact'
 import {
   addMembers,
@@ -105,6 +107,39 @@ const addMode = ref(false)
 const isGroup = computed(() => conversation.value?.type === 2)
 const isOwner = computed(() => !!conversation.value && conversation.value.owner_id === myId.value)
 
+/**
+ * @ 面板
+ *
+ * `mentioned` 记「我点选过谁」，发送时再拿最终文本去匹配 `@姓名`——
+ * 这样用户把 `@张明` 删掉之后，那个 id 自然就不会被带上，
+ * 不需要监听删除、也不需要维护光标位置与 id 的对应关系。
+ */
+const atVisible = ref(false)
+const atKeyword = ref('')
+const mentioned = ref(new Map<string, number>())
+const textareaRef = ref()
+
+/** 提醒开关。存 localStorage，是每个浏览器各自的偏好 */
+const prefDesktop = ref(notifyPrefs.desktop)
+const prefSound = ref(notifyPrefs.sound)
+
+const route = useRoute()
+
+/**
+ * 打开过的会话各自记一个滚动位置
+ *
+ * 只存在内存里：刷新页面就该回到底部（那是「我来看新消息」的语义），
+ * 而在会话之间来回切时，回到原来的位置才不会让人重新找。
+ */
+const scrollMemo = new Map<number, number>()
+
+const atCandidates = computed(() => {
+  const kw = atKeyword.value.trim()
+  const list = members.value.filter((m) => m.user_id !== myId.value)
+
+  return kw ? list.filter((m) => m.real_name.includes(kw)) : list
+})
+
 // ---------------------------------------------------------------- 通讯录
 
 /**
@@ -179,6 +214,11 @@ function clearUnreadLocally(convId: number) {
 
 async function selectConversation(row: ChatConversationRow) {
   if (conversation.value?.id === row.id) return
+
+  // 离开前记下当前滚动位置，切回来时还原
+  if (conversation.value && listRef.value) {
+    scrollMemo.set(conversation.value.id, listRef.value.scrollTop)
+  }
 
   conversation.value = row
   chatStore.enter(row.id)
@@ -283,6 +323,13 @@ async function loadHistory() {
     if (last && last.sender_id !== myId.value) {
       peerReadSeq.value = Math.max(peerReadSeq.value, last.seq)
     }
+
+    // 有记录就还原到上次的位置，没有就停在底部（scrollToBottom 已经做过了）
+    const memo = scrollMemo.get(conversation.value.id)
+    if (memo !== undefined) {
+      await nextTick()
+      if (listRef.value) listRef.value.scrollTop = memo
+    }
   } finally {
     loadingMessages.value = false
   }
@@ -312,8 +359,17 @@ async function send() {
   const text = draft.value.trim()
   if (!text) return
 
+  const mentions = collectMentions(text)
+
   draft.value = ''
-  await deliver({ type: 'text', content: text })
+  atVisible.value = false
+  mentioned.value.clear()
+
+  await deliver({
+    type: 'text',
+    content: text,
+    extra: mentions as ChatMessage['extra'],
+  })
 }
 
 /**
@@ -378,6 +434,108 @@ async function deliver(
 function resend(m: LocalMessage) {
   if (m._state !== 'failed') return
   void deliver({ type: m.type, content: m.content, extra: m.extra }, m.client_msg_id)
+}
+
+/**
+ * 桌面通知开关
+ *
+ * 打开时才申请权限——一进页面就弹权限框是最招人烦的做法，
+ * 而且 Chrome 会把这种请求判为 spam 并永久拒绝。
+ */
+async function toggleDesktop(value: string | number | boolean) {
+  const on = value === true
+  if (on && !(await requestPermission())) {
+    prefDesktop.value = false
+    ElMessage.warning('浏览器拒绝了通知权限，请在地址栏左侧的站点设置里开启')
+    return
+  }
+
+  notifyPrefs.desktop = on
+}
+
+function toggleSound(value: string | number | boolean) {
+  notifyPrefs.sound = value === true
+}
+
+// ---------------------------------------------------------------- @
+
+/**
+ * 输入时检测 @
+ *
+ * 只在**群聊**里触发：单聊就两个人，@ 没有意义，弹面板只会挡住输入。
+ * 触发条件是「光标前最近的 @ 之后还没有空格」——有空格说明那个 @ 已经
+ * 输完了（或者根本不是在 @ 人，比如在写邮箱）。
+ */
+function onDraftInput() {
+  if (!isGroup.value) return
+
+  const text = draft.value
+  const at = text.lastIndexOf('@')
+
+  if (at < 0 || /\s/.test(text.slice(at + 1))) {
+    atVisible.value = false
+    return
+  }
+
+  atKeyword.value = text.slice(at + 1)
+
+  // 面板第一次打开时才拉成员，之后复用
+  if (!atVisible.value && !members.value.length) void loadMembersQuietly()
+
+  atVisible.value = true
+}
+
+/** 只为 @ 面板取一次成员，不开抽屉 */
+async function loadMembersQuietly() {
+  try {
+    members.value = await getMembers(conversation.value!.id)
+  } catch {
+    /* 取不到就让面板空着，不影响打字 */
+  }
+}
+
+/** 选中某人：把 `@姓名 ` 替换进去，并记下 id */
+function pickMention(name: string, userId: number) {
+  const text = draft.value
+  const at = text.lastIndexOf('@')
+
+  draft.value = text.slice(0, at) + `@${name} `
+  mentioned.value.set(name, userId)
+  atVisible.value = false
+
+  // 焦点要还回去，否则选完人光标丢了，用户得再点一次输入框
+  void nextTick(() => textareaRef.value?.focus())
+}
+
+/** @所有人：只有群主能用，服务端也会再判一次 */
+function pickAtAll() {
+  const text = draft.value
+  const at = text.lastIndexOf('@')
+
+  draft.value = text.slice(0, at) + '@所有人 '
+  atVisible.value = false
+  void nextTick(() => textareaRef.value?.focus())
+}
+
+/**
+ * 从最终文本里解出 @ 了谁
+ *
+ * 以文本为准而不是以点选记录为准：用户点了 `@张明` 之后又把它删掉，
+ * 记录里还留着但文本里没有——按记录发就会给一个没被 @ 的人种红点。
+ */
+function collectMentions(text: string): { at_all: boolean; at_user_ids: number[] } | null {
+  if (!isGroup.value) return null
+
+  const atAll = isOwner.value && text.includes('@所有人')
+  const ids: number[] = []
+
+  mentioned.value.forEach((id, name) => {
+    if (text.includes(`@${name}`)) ids.push(id)
+  })
+
+  if (!atAll && !ids.length) return null
+
+  return { at_all: atAll, at_user_ids: ids }
 }
 
 // ---------------------------------------------------------------- 附件
@@ -699,6 +857,13 @@ onMounted(async () => {
   await loadList()
   void chatStore.refresh()
 
+  // 从桌面通知点进来会带 ?conv=，直接打开那个会话
+  const wanted = Number(route.query.conv || 0)
+  if (wanted) {
+    const row = conversations.value.find((c) => c.id === wanted)
+    if (row) await selectConversation(row)
+  }
+
   /*
    * 重连后的对齐：ready 是「握手完成」的信号，每次重连都会再来一次。
    * 收到就重拉当前会话——断线期间到达的消息靠这一步补齐，
@@ -795,6 +960,14 @@ function humanSize(bytes: number): string {
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
 
   return `${bytes} B`
+}
+
+/** 这条消息 @ 到我了吗——用于给气泡加一圈强调边框 */
+function mentionsMe(m: LocalMessage): boolean {
+  const ids = m.extra?.at_user_ids
+  if (!ids || m.sender_id === myId.value) return false
+
+  return ids.includes(myId.value)
 }
 
 function timeOf(m: LocalMessage) {
@@ -968,6 +1141,26 @@ function timeOf(m: LocalMessage) {
           </el-tag>
           <div class="chat__header-ops">
             <el-button v-if="isGroup" text :icon="UserFilled" @click="openMembers">群成员</el-button>
+
+            <el-popover placement="bottom-end" :width="220" trigger="click">
+              <template #reference>
+                <el-button text :icon="Setting" />
+              </template>
+
+              <div class="prefs">
+                <div class="prefs__row">
+                  <span>桌面通知</span>
+                  <el-switch v-model="prefDesktop" @change="toggleDesktop" />
+                </div>
+                <div class="prefs__row">
+                  <span>提示音</span>
+                  <el-switch v-model="prefSound" @change="toggleSound" />
+                </div>
+                <p class="prefs__hint">
+                  只影响这台电脑上的这个浏览器；单个会话的免打扰在左栏右键设置。
+                </p>
+              </div>
+            </el-popover>
           </div>
         </header>
 
@@ -1034,7 +1227,14 @@ function timeOf(m: LocalMessage) {
                   </span>
                 </a>
 
-                <div v-else class="msg__bubble" :class="{ 'msg__bubble--failed': m._state === 'failed' }">
+                <div
+                  v-else
+                  class="msg__bubble"
+                  :class="{
+                    'msg__bubble--failed': m._state === 'failed',
+                    'msg__bubble--at': mentionsMe(m),
+                  }"
+                >
                   {{ m.content }}
                 </div>
 
@@ -1069,13 +1269,34 @@ function timeOf(m: LocalMessage) {
           </div>
 
           <div class="chat__input-row">
+            <!-- @ 面板：浮在输入框上方。用 absolute 而不是 el-popover——
+                 popover 的定位跟着触发元素走，而这里要贴着输入框顶边 -->
+            <div v-if="atVisible && atCandidates.length" class="atpanel">
+              <button v-if="isOwner" type="button" class="atpanel__item" @click="pickAtAll">
+                <span class="atpanel__all">@所有人</span>
+              </button>
+              <button
+                v-for="m in atCandidates"
+                :key="m.user_id"
+                type="button"
+                class="atpanel__item"
+                @click="pickMention(m.real_name, m.user_id)"
+              >
+                <el-avatar :size="22" :src="m.avatar || undefined">{{ m.real_name.slice(0, 1) }}</el-avatar>
+                <span>{{ m.real_name }}</span>
+              </button>
+            </div>
+
             <el-input
+              ref="textareaRef"
               v-model="draft"
               type="textarea"
               :rows="3"
               resize="none"
-              placeholder="输入消息，Enter 发送，Shift+Enter 换行，可直接粘贴图片"
+              :placeholder="isGroup ? '输入消息，@ 提醒某人，Enter 发送' : '输入消息，Enter 发送，Shift+Enter 换行，可直接粘贴图片'"
+              @input="onDraftInput"
               @keydown.enter.exact.prevent="send"
+              @keydown.esc="atVisible = false"
               @paste="onPaste"
             />
             <el-button type="primary" :icon="Promotion" :loading="sending" @click="send">发送</el-button>
@@ -1488,6 +1709,22 @@ function timeOf(m: LocalMessage) {
   padding: 4px 0;
 }
 
+.prefs__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+}
+
+.prefs__hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
+}
+
 .member {
   position: relative;
   display: flex;
@@ -1701,10 +1938,56 @@ function timeOf(m: LocalMessage) {
   margin-bottom: 4px;
 }
 
+/* @ 面板浮在输入框上方，不挤占布局 */
+.atpanel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-bg-color-overlay);
+  box-shadow: var(--el-box-shadow-light);
+  z-index: 5;
+}
+
+.atpanel__item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.atpanel__item:hover {
+  background: var(--el-fill-color-light);
+}
+
+.atpanel__all {
+  color: var(--el-color-primary);
+}
+
 .chat__input-row {
+  position: relative;
   display: flex;
   gap: 12px;
   align-items: flex-end;
+}
+
+/* 被 @ 到的消息加一圈强调边框，别人的气泡是白底所以看得出来 */
+.msg__bubble--at {
+  border-color: var(--el-color-warning);
+  box-shadow: 0 0 0 1px var(--el-color-warning) inset;
 }
 
 .chat__input-row :deep(.el-textarea) {
