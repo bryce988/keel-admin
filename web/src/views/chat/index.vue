@@ -15,7 +15,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Bell, Delete, Promotion, Top } from '@element-plus/icons-vue'
+import { Bell, Delete, Document, Picture, Promotion, RefreshLeft, Top } from '@element-plus/icons-vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { chatSocket } from '@/utils/chatSocket'
 import { useUserStore } from '@/stores/user'
@@ -27,8 +27,10 @@ import {
   markRead,
   openConversation,
   removeConversation,
+  recallMessage,
   sendMessage,
   updateSettings,
+  uploadChatFile,
   type ChatConversation,
   type ChatConversationRow,
   type ChatMessage,
@@ -71,6 +73,17 @@ const sending = ref(false)
 const connected = ref(false)
 
 const listRef = ref<HTMLElement>()
+const fileInput = ref<HTMLInputElement>()
+const imageInput = ref<HTMLInputElement>()
+const uploading = ref(false)
+
+/**
+ * 对方读到哪条了（单聊）
+ *
+ * 只用来给**我发出的最后一条**打「已读」——逐条标已读在单聊里没有信息量，
+ * 对方读到哪条，前面的必然都读过了（chat-prd.md §5.4）。
+ */
+const peerReadSeq = ref(0)
 
 // ---------------------------------------------------------------- 通讯录
 
@@ -150,6 +163,8 @@ async function selectConversation(row: ChatConversationRow) {
   conversation.value = row
   chatStore.enter(row.id)
   clearUnreadLocally(row.id)
+  // 换会话必须清零：不清的话上一个会话的已读水位会把这个会话的消息也标成「已读」
+  peerReadSeq.value = 0
   await loadHistory()
 }
 
@@ -232,6 +247,22 @@ async function loadHistory() {
     messages.value = await getMessages(conversation.value.id, { limit: 30 })
     await scrollToBottom()
     await flushRead()
+
+    /*
+     * 初始化对方的已读水位
+     *
+     * 不做的话刷新页面后「已读」会消失，直到对方**再读一次**才重新出现——
+     * 而对方可能早就读完了，不会再触发任何事件。
+     *
+     * 这里用的是一个保守近似：会话列表里有对方的 max_seq 但没有对方的已读水位，
+     * 服务端目前也不返回它（返回它等于把「对方读到哪」暴露给一个列表接口）。
+     * 所以退而求其次——只要我不是最后一个发言的人，说明对方看过了。
+     * 这个近似在「对方发过消息之后」总是对的，而那是绝大多数情况。
+     */
+    const last = messages.value[messages.value.length - 1]
+    if (last && last.sender_id !== myId.value) {
+      peerReadSeq.value = Math.max(peerReadSeq.value, last.seq)
+    }
   } finally {
     loadingMessages.value = false
   }
@@ -259,44 +290,171 @@ async function flushRead() {
 
 async function send() {
   const text = draft.value.trim()
-  const conv = conversation.value
-  if (!text || !conv || sending.value) return
+  if (!text) return
 
-  const clientMsgId = crypto.randomUUID()
-
-  // 乐观上屏：先让消息出现，再等服务端确认。seq 暂时用一个比任何真实 seq
-  // 都大的数，保证它排在末尾；拿到响应后会被换成真实 seq
-  const optimistic: LocalMessage = {
-    id: 0,
-    conv_id: conv.id,
-    seq: Number.MAX_SAFE_INTEGER,
-    sender_id: myId.value,
-    sender_name: '我',
-    type: 'text',
-    content: text,
-    extra: null,
-    client_msg_id: clientMsgId,
-    status: 1,
-    recalled_by: 0,
-    created_at: '',
-    _state: 'sending',
-  }
-
-  messages.value.push(optimistic)
   draft.value = ''
-  await scrollToBottom()
+  await deliver({ type: 'text', content: text })
+}
+
+/**
+ * 发一条消息：乐观上屏 → 请求 → 归位
+ *
+ * 文本、图片、文件三种走同一条路径，失败重发也复用它——
+ * 三处各写一遍的话，「失败要标红」「成功要按 seq 归位」这类细节总有一处会漏。
+ */
+async function deliver(
+  payload: { type: string; content: string; extra?: ChatMessage['extra'] },
+  reuseClientMsgId?: string,
+) {
+  const conv = conversation.value
+  if (!conv) return
+
+  const clientMsgId = reuseClientMsgId ?? crypto.randomUUID()
+
+  // 重发时复用同一个 client_msg_id：服务端靠它幂等，
+  // 换一个的话「超时但其实成功了」的那条会变成两条
+  if (reuseClientMsgId) {
+    const existing = messages.value.find((m) => m.client_msg_id === clientMsgId)
+    if (existing) existing._state = 'sending'
+  } else {
+    messages.value.push({
+      id: 0,
+      conv_id: conv.id,
+      // 比任何真实 seq 都大，保证排在末尾；拿到响应后换成真实 seq
+      seq: Number.MAX_SAFE_INTEGER,
+      sender_id: myId.value,
+      sender_name: '我',
+      type: payload.type as ChatMessage['type'],
+      content: payload.content,
+      extra: payload.extra ?? null,
+      client_msg_id: clientMsgId,
+      status: 1,
+      recalled_by: 0,
+      created_at: '',
+      _state: 'sending',
+    })
+    await scrollToBottom()
+  }
 
   sending.value = true
   try {
-    const saved = await sendMessage(conv.id, { client_msg_id: clientMsgId, type: 'text', content: text })
+    const saved = await sendMessage(conv.id, {
+      client_msg_id: clientMsgId,
+      type: payload.type,
+      content: payload.content,
+      extra: payload.extra ?? null,
+    })
     replaceOptimistic(clientMsgId, saved)
   } catch (e) {
-    const idx = messages.value.findIndex((m) => m.client_msg_id === clientMsgId)
-    if (idx >= 0) messages.value[idx]._state = 'failed'
+    const target = messages.value.find((m) => m.client_msg_id === clientMsgId)
+    if (target) target._state = 'failed'
     ElMessage.error(e instanceof Error ? e.message : '发送失败')
   } finally {
     sending.value = false
   }
+}
+
+/** 点击重发。用原来那条的内容与 client_msg_id，不新建一条 */
+function resend(m: LocalMessage) {
+  if (m._state !== 'failed') return
+  void deliver({ type: m.type, content: m.content, extra: m.extra }, m.client_msg_id)
+}
+
+// ---------------------------------------------------------------- 附件
+
+function pickImage() {
+  imageInput.value?.click()
+}
+
+function pickFile() {
+  fileInput.value?.click()
+}
+
+/**
+ * 选中文件后：先传，再发一条附件消息
+ *
+ * 两步而不是一步：上传走的是通用接口（`/admin/upload`），它不知道聊天的存在；
+ * 发消息才是聊天的事。中间失败的话只留下一个孤儿文件，由留存清理带走——
+ * 比做成一步到位然后在聊天接口里处理 multipart 要干净得多。
+ */
+async function onFilePicked(e: Event, type: 'image' | 'file') {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  // 立刻清空，否则连续选同一个文件不会再触发 change
+  input.value = ''
+  if (!file) return
+
+  uploading.value = true
+  try {
+    const up = await uploadChatFile(file)
+    const extra: ChatMessage['extra'] = { url: up.url, name: up.name, size: up.size, ext: up.ext }
+
+    // 图片带上原始宽高：不给的话图片加载完成的瞬间整段消息会往下跳
+    if (type === 'image') {
+      const size = await imageSize(file).catch(() => null)
+      if (size) Object.assign(extra, size)
+    }
+
+    await deliver({ type, content: up.name, extra })
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : '上传失败')
+  } finally {
+    uploading.value = false
+  }
+}
+
+function imageSize(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('读不出图片尺寸'))
+    }
+    img.src = url
+  })
+}
+
+/** 粘贴图片直接发——截图后 Ctrl+V 是最高频的发图方式 */
+async function onPaste(e: ClipboardEvent) {
+  const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith('image/'))
+  if (!item) return
+
+  const file = item.getAsFile()
+  if (!file) return
+
+  e.preventDefault()
+  await onFilePicked({ target: { files: [file], value: '' } } as unknown as Event, 'image')
+}
+
+// ---------------------------------------------------------------- 撤回
+
+/** 2 分钟内、且是自己发的，才显示撤回按钮。服务端仍会再判一次 */
+function canRecall(m: LocalMessage): boolean {
+  if (m.sender_id !== myId.value || m.status !== 1 || !m.created_at || m._state) return false
+
+  return Date.now() - new Date(m.created_at.replace(/-/g, '/')).getTime() < 120_000
+}
+
+async function recall(m: LocalMessage) {
+  try {
+    const updated = await recallMessage(m.id)
+    applyRecall(updated)
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '撤回失败')
+  }
+}
+
+function applyRecall(updated: ChatMessage) {
+  const idx = messages.value.findIndex((m) => m.id === updated.id)
+  if (idx >= 0) messages.value[idx] = { ...messages.value[idx], ...updated }
+
+  const row = conversations.value.find((c) => c.id === updated.conv_id)
+  if (row && row.max_seq === updated.seq) row.last_msg_text = '撤回了一条消息'
 }
 
 /**
@@ -381,6 +539,8 @@ async function scrollToBottom() {
 
 let offReady: (() => void) | undefined
 let offMessage: (() => void) | undefined
+let offRecalled: (() => void) | undefined
+let offRead: (() => void) | undefined
 
 onMounted(async () => {
   chatStore.bind()
@@ -399,6 +559,19 @@ onMounted(async () => {
     if (conversation.value) void loadHistory()
   })
   offMessage = chatSocket.on('message.new', (data) => onPush(data as ChatMessage))
+  offRecalled = chatSocket.on('message.recalled', (data) => applyRecall(data as ChatMessage))
+
+  /*
+   * 对方已读：把水位记下来，用于给我最后一条消息打「已读」
+   *
+   * 要排掉自己的回执——我在别的标签页标已读时，这个事件也会推给我，
+   * 不排的话「对方已读」会在我自己读消息时亮起来
+   */
+  offRead = chatSocket.on('conversation.read', (data) => {
+    const d = data as { conv_id: number; user_id: number; last_read_seq: number }
+    if (d.conv_id !== conversation.value?.id || d.user_id === myId.value) return
+    peerReadSeq.value = Math.max(peerReadSeq.value, d.last_read_seq)
+  })
 
   chatSocket.connect()
 
@@ -416,12 +589,60 @@ onBeforeUnmount(() => {
   chatStore.leave()
   offReady?.()
   offMessage?.()
+  offRecalled?.()
+  offRead?.()
   document.removeEventListener('visibilitychange', onVisible)
   // 不 close()：socket 是全局单例，别的地方（顶栏红点）还要用它
 })
 
 function isMine(m: LocalMessage) {
   return m.sender_id === myId.value
+}
+
+/**
+ * 我发出的最后一条消息的 seq
+ *
+ * 「已读」只标这一条。逐条标在单聊里没有信息量——对方读到哪条，
+ * 前面的必然都读过了，每条都挂个「已读」只是视觉噪音。
+ */
+const myLastSeq = computed(() => {
+  const mine = messages.value.filter((m) => m.sender_id === myId.value && !m._state)
+  return mine.length ? mine[mine.length - 1].seq : 0
+})
+
+/** 只在单聊、且是我最后一条、且对方水位够到了，才显示 */
+function readHintOf(m: LocalMessage): string {
+  if (conversation.value?.type !== 1 || m.sender_id !== myId.value || m.seq !== myLastSeq.value) return ''
+
+  return peerReadSeq.value >= m.seq ? '已读' : '未读'
+}
+
+/**
+ * 图片占位尺寸
+ *
+ * 用服务端存的原始宽高按比例缩到上限内。**必须在图片加载前就占住位置**，
+ * 否则图片到达的瞬间整段消息会往下跳一大截，用户正在看的那条被顶走。
+ * 没有宽高信息（老消息、或取尺寸失败）就退回一个固定方块。
+ */
+function imageStyle(m: LocalMessage): Record<string, string> {
+  const MAX_W = 220
+  const MAX_H = 260
+  const w = m.extra?.width ?? 0
+  const h = m.extra?.height ?? 0
+
+  if (!w || !h) return { width: '160px', height: '160px' }
+
+  const scale = Math.min(MAX_W / w, MAX_H / h, 1)
+
+  return { width: `${Math.round(w * scale)}px`, height: `${Math.round(h * scale)}px` }
+}
+
+/** 文件大小说成人话。小于 1MB 用 KB——「0.0MB」谁也看不懂 */
+function humanSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
+
+  return `${bytes} B`
 }
 
 function timeOf(m: LocalMessage) {
@@ -579,18 +800,71 @@ function timeOf(m: LocalMessage) {
 
         <div ref="listRef" v-loading="loadingMessages" class="chat__messages">
           <div v-for="m in messages" :key="m.client_msg_id || m.id" class="msg" :class="{ 'msg--mine': isMine(m) }">
-            <el-avatar :size="32" class="msg__avatar">{{ m.sender_name.slice(0, 1) }}</el-avatar>
-            <div class="msg__body">
-              <div class="msg__meta">
-                <span>{{ isMine(m) ? '我' : m.sender_name }}</span>
-                <span class="msg__time">{{ timeOf(m) }}</span>
-              </div>
-              <div class="msg__bubble" :class="{ 'msg__bubble--failed': m._state === 'failed' }">
-                {{ m.content }}
-                <span v-if="m._state === 'sending'" class="msg__state">发送中…</span>
-                <span v-else-if="m._state === 'failed'" class="msg__state msg__state--failed">发送失败</span>
-              </div>
+            <!-- 撤回：整条变成一行灰字，不保留气泡。留着气泡会让人以为内容还在 -->
+            <div v-if="m.status === 2" class="msg__recalled">
+              {{ isMine(m) ? '你撤回了一条消息' : `${m.sender_name} 撤回了一条消息` }}
             </div>
+
+            <template v-else>
+              <el-avatar :size="32" class="msg__avatar">{{ m.sender_name.slice(0, 1) }}</el-avatar>
+              <div class="msg__body">
+                <div class="msg__meta">
+                  <span>{{ isMine(m) ? '我' : m.sender_name }}</span>
+                  <span class="msg__time">{{ timeOf(m) }}</span>
+                  <!-- 撤回按钮跟着 meta 行走，hover 才出现：常驻会让每条消息都挂个按钮 -->
+                  <el-button
+                    v-if="canRecall(m)"
+                    class="msg__recall"
+                    text
+                    size="small"
+                    @click="recall(m)"
+                  >
+                    撤回
+                  </el-button>
+                </div>
+
+                <!-- 图片：直接铺在气泡外，套气泡会多一圈背景色 -->
+                <el-image
+                  v-if="m.type === 'image' && m.extra"
+                  class="msg__image"
+                  :src="m.extra.url"
+                  :preview-src-list="[m.extra.url]"
+                  :initial-index="0"
+                  fit="cover"
+                  preview-teleported
+                  :style="imageStyle(m)"
+                />
+
+                <!-- 文件：可点的卡片，点了下载 -->
+                <a
+                  v-else-if="m.type === 'file' && m.extra"
+                  class="msg__file"
+                  :href="m.extra.url"
+                  :download="m.extra.name"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <el-icon class="msg__file-icon"><Document /></el-icon>
+                  <span class="msg__file-body">
+                    <span class="msg__file-name">{{ m.extra.name }}</span>
+                    <span class="msg__file-size">{{ humanSize(m.extra.size) }}</span>
+                  </span>
+                </a>
+
+                <div v-else class="msg__bubble" :class="{ 'msg__bubble--failed': m._state === 'failed' }">
+                  {{ m.content }}
+                </div>
+
+                <div v-if="m._state || readHintOf(m)" class="msg__foot">
+                  <span v-if="m._state === 'sending'" class="msg__state">发送中…</span>
+                  <template v-else-if="m._state === 'failed'">
+                    <span class="msg__state msg__state--failed">发送失败</span>
+                    <el-button text size="small" :icon="RefreshLeft" @click="resend(m)">重发</el-button>
+                  </template>
+                  <span v-else class="msg__state">{{ readHintOf(m) }}</span>
+                </div>
+              </div>
+            </template>
           </div>
 
           <EmptyState
@@ -602,15 +876,43 @@ function timeOf(m: LocalMessage) {
         </div>
 
         <footer class="chat__composer">
-          <el-input
-            v-model="draft"
-            type="textarea"
-            :rows="3"
-            resize="none"
-            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            @keydown.enter.exact.prevent="send"
+          <div class="chat__tools">
+            <el-tooltip content="发图片" placement="top">
+              <el-button text :icon="Picture" :loading="uploading" @click="pickImage" />
+            </el-tooltip>
+            <el-tooltip content="发文件" placement="top">
+              <el-button text :icon="Document" :loading="uploading" @click="pickFile" />
+            </el-tooltip>
+          </div>
+
+          <div class="chat__input-row">
+            <el-input
+              v-model="draft"
+              type="textarea"
+              :rows="3"
+              resize="none"
+              placeholder="输入消息，Enter 发送，Shift+Enter 换行，可直接粘贴图片"
+              @keydown.enter.exact.prevent="send"
+              @paste="onPaste"
+            />
+            <el-button type="primary" :icon="Promotion" :loading="sending" @click="send">发送</el-button>
+          </div>
+
+          <!-- 原生 input 藏起来，用按钮触发：el-upload 会带进它自己的列表与样式，
+               而这里只需要「选一个文件」这一件事 -->
+          <input
+            ref="imageInput"
+            type="file"
+            accept="image/*"
+            class="chat__file-input"
+            @change="onFilePicked($event, 'image')"
           />
-          <el-button type="primary" :icon="Promotion" :loading="sending" @click="send">发送</el-button>
+          <input
+            ref="fileInput"
+            type="file"
+            class="chat__file-input"
+            @change="onFilePicked($event, 'file')"
+          />
         </footer>
       </template>
 
@@ -991,25 +1293,115 @@ function timeOf(m: LocalMessage) {
   border-color: var(--el-color-danger);
 }
 
-.msg__state {
-  margin-left: 8px;
+.msg__foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
   font-size: 12px;
-  opacity: 0.75;
+}
+
+.msg--mine .msg__foot {
+  justify-content: flex-end;
+}
+
+.msg__state {
+  color: var(--el-text-color-placeholder);
 }
 
 .msg__state--failed {
   color: var(--el-color-danger);
 }
 
-.chat__composer {
+/* 撤回：整行居中的灰字，不保留气泡——留着气泡会让人以为内容还在 */
+.msg__recalled {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+/* 撤回按钮：hover 才出现，常驻会让每条消息都挂个按钮 */
+.msg__recall {
+  visibility: hidden;
+  padding: 0;
+  height: auto;
+}
+
+.msg:hover .msg__recall {
+  visibility: visible;
+}
+
+.msg__image {
+  display: block;
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
+  cursor: zoom-in;
+}
+
+.msg__file {
   display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  padding: 12px 16px;
+  gap: 10px;
+  align-items: center;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-bg-color);
+  text-decoration: none;
+  color: inherit;
+}
+
+.msg__file:hover {
+  border-color: var(--el-color-primary);
+}
+
+.msg__file-icon {
+  font-size: 24px;
+  color: var(--el-color-primary);
+}
+
+.msg__file-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.msg__file-name {
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg__file-size {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.chat__composer {
+  padding: 8px 16px 12px;
   border-top: 1px solid var(--el-border-color-lighter);
 }
 
-.chat__composer :deep(.el-textarea) {
+.chat__tools {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.chat__input-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.chat__input-row :deep(.el-textarea) {
   flex: 1;
+}
+
+.chat__file-input {
+  display: none;
 }
 </style>

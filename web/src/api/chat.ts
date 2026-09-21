@@ -43,7 +43,18 @@ export interface ChatMessage {
   sender_name: string
   type: 'text' | 'image' | 'file' | 'system'
   content: string
-  extra: Record<string, unknown> | null
+  /**
+   * 附件。服务端按白名单洗过，只会有这几个键——
+   * 客户端多传的字段进不了库（ChatService::guardAttachment）
+   */
+  extra: {
+    url: string
+    name: string
+    size: number
+    ext: string
+    width?: number
+    height?: number
+  } | null
   /** 客户端生成的幂等 ID，本地乐观上屏的消息靠它对号入座 */
   client_msg_id: string
   /** 1 正常 · 2 已撤回 */
@@ -129,9 +140,33 @@ export function sendMessage(convId: number, payload: SendPayload) {
   return request.post<unknown, ChatMessage>(`/admin/chat/conversations/${convId}/messages`, payload)
 }
 
+/** 撤回。只能撤自己的、2 分钟内的；重复调用不报错 */
+export function recallMessage(messageId: number) {
+  return request.post<unknown, ChatMessage>(`/admin/chat/messages/${messageId}/recall`)
+}
+
 export function markRead(convId: number, lastReadSeq: number) {
   return request.post<unknown, { conv_id: number; last_read_seq: number }>(
     `/admin/chat/conversations/${convId}/read`,
     { last_read_seq: lastReadSeq },
+  )
+}
+
+/**
+ * 上传聊天附件
+ *
+ * 走通用上传接口（`biz=chat`），落盘在 `/uploads/chat/年月/`。
+ * **服务端只认这个前缀**——发消息时会校验 `extra.url`，
+ * 传别处的地址会被 21209 挡掉（防止有人把别人的头像或任意路径塞进消息）。
+ */
+export async function uploadChatFile(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('biz', 'chat')
+
+  return request.post<unknown, { url: string; name: string; size: number; ext: string }>(
+    '/admin/upload',
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
   )
 }
