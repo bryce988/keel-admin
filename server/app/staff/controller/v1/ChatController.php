@@ -128,6 +128,18 @@ class ChatController
     }
 
     /**
+     * 会话详情
+     * @url GET /staff/v1/chat/conversations/{id}
+     * @perm 登录即可
+     * @description 群聊要靠它拿人数与群主 id
+     * @error 404 会话不存在、已解散，或你不是它的成员
+     */
+    public function detail(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::detail($id, self::uid()));
+    }
+
+    /**
      * 历史消息
      * @url GET /staff/v1/chat/conversations/{id}/messages
      * @perm 登录即可
@@ -165,7 +177,84 @@ class ChatController
         ]));
     }
 
-/**
+    /**
+     * 建群
+     * @url POST /staff/v1/chat/groups
+     * @perm 登录即可
+     * @description `{user_ids[], name?}`。至少选 2 人——两个人的「群」就是单聊。
+     */
+    public function createGroup(Request $request): Response
+    {
+        return Result::created(ChatService::detail(
+            (int) ChatService::createGroup(
+                self::uid(),
+                (array) $request->post('user_ids', []),
+                (string) $request->post('name', ''),
+            )->id,
+            self::uid(),
+        ));
+    }
+
+    /**
+     * 群成员列表
+     * @url GET /staff/v1/chat/conversations/{id}/members
+     * @perm 登录即可
+     */
+    public function members(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::members($id, self::uid()));
+    }
+
+    /**
+     * 添加成员（群主）
+     * @url POST /staff/v1/chat/conversations/{id}/members
+     * @perm 登录即可
+     */
+    public function addMembers(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::addMembers($id, self::uid(), (array) $request->post('user_ids', [])));
+    }
+
+    /**
+     * 移出成员 / 退群
+     * @url DELETE /staff/v1/chat/conversations/{id}/members/{uid}
+     * @perm 登录即可
+     * @description uid 是自己就是退群，是别人就是踢人（只有群主能踢）。
+     * 群主不能直接退群，必须先转让或解散。
+     */
+    public function removeMember(Request $request, int $id, int $uid): Response
+    {
+        ChatService::removeMember($id, self::uid(), $uid);
+
+        return Result::noContent();
+    }
+
+    /**
+     * 修改群资料（群主）
+     * @url PUT /staff/v1/chat/conversations/{id}/group
+     * @perm 登录即可
+     */
+    public function updateGroup(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::updateGroup($id, self::uid(), [
+            'name'   => $request->post('name'),
+            'avatar' => $request->post('avatar'),
+        ]));
+    }
+
+    /**
+     * 解散群聊（群主）
+     * @url DELETE /staff/v1/chat/conversations/{id}/group
+     * @perm 登录即可
+     */
+    public function dissolve(Request $request, int $id): Response
+    {
+        ChatService::dissolve($id, self::uid());
+
+        return Result::noContent();
+    }
+
+    /**
      * 撤回消息
      * @url POST /staff/v1/chat/messages/{id}/recall
      * @perm 登录即可

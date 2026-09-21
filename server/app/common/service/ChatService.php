@@ -23,6 +23,7 @@ declare(strict_types=1);
 namespace app\common\service;
 
 use app\common\exception\BusinessException;
+use app\common\exception\ConflictException;
 use app\common\exception\ForbiddenException;
 use app\common\exception\NotFoundException;
 use app\common\exception\RateLimitException;
@@ -81,6 +82,25 @@ class ChatService
             ->first();
 
         if (!$member) {
+            throw new NotFoundException();
+        }
+
+        /*
+         * ⚠️ 成员关系**不等于**会话可用
+         *
+         * 群解散后成员行还在（quit_at 为空，因为没人退群），只有会话的 status 变了。
+         * 只查成员表的话，解散后所有人仍然读得到、发得出——实测过：解散返回 204，
+         * 紧接着读消息仍然 200。
+         *
+         * 单聊没有解散这回事，所以这一条只对群生效；但判定放在这里而不是各调用点，
+         * 因为「可见性只有一个入口」是这个模块的地基，破一次例以后就守不住了。
+         */
+        $exists = ImConversationModel::query()
+            ->where('id', $convId)
+            ->where('status', ImConversationModel::STATUS_NORMAL)
+            ->exists();
+
+        if (!$exists) {
             throw new NotFoundException();
         }
 
@@ -337,6 +357,384 @@ class ChatService
         ]);
     }
 
+    // ================================================================ 群
+
+    /**
+     * 建群
+     *
+     * 任何有 `chat:use` 的人都能建，不需要审批——内部工具，加一道审批只会让人
+     * 回去用微信群。创建者自动成为群主。
+     *
+     * 群名留空时用前 3 个成员的姓名拼接（`张明、李华、王芳`），与钉钉一致：
+     * 大多数群是临时拉起来讨论一件事的，强制起名只会得到一堆「新建群聊」。
+     *
+     * @param int[] $userIds 除自己之外的成员
+     */
+    public static function createGroup(int $userId, array $userIds, string $name = ''): ImConversationModel
+    {
+        $userIds = array_values(array_unique(array_filter(
+            array_map('intval', $userIds),
+            static fn (int $id) => $id > 0 && $id !== $userId
+        )));
+
+        if (count($userIds) < 2) {
+            // 两个人的群没有意义——那就是单聊，而单聊有自己的去重逻辑（uk_peer）。
+            // 允许建的话会出现「我和他既有单聊又有一个双人群」，用户分不清该在哪说
+            throw new BusinessException('群聊至少需要选择 2 位同事');
+        }
+
+        $max = (int) ParamService::value('chat.group.maxMembers', 200);
+        if (count($userIds) + 1 > $max) {
+            throw new BusinessException("群成员不能超过 {$max} 人", BizCode::CHAT_GROUP_FULL);
+        }
+
+        // 停用的账号不能拉进群。放在事务外先查完，避免事务里做多次查询
+        $members = SysUserModel::withoutDataScope()
+            ->whereIn('id', $userIds)
+            ->where('status', 1)
+            ->get(['id', 'real_name', 'username']);
+
+        if ($members->count() !== count($userIds)) {
+            throw new BusinessException('选中的同事里有已停用的账号', BizCode::CHAT_PEER_DISABLED);
+        }
+
+        $owner = SysUserModel::withoutDataScope()->find($userId);
+        $title = trim($name) !== ''
+            ? mb_substr(trim($name), 0, 64)
+            : self::defaultGroupName($owner, $members);
+
+        $conv = Db::transaction(function () use ($userId, $userIds, $title) {
+            $conv = ImConversationModel::create([
+                'type'         => ImConversationModel::TYPE_GROUP,
+                // ⚠️ 必须 NULL 不能空串：uk_peer 对 NULL 不去重（正是群聊要的），
+                // 空串只能存在一个，第二个群就会撞唯一索引
+                'peer_key'     => null,
+                'name'         => $title,
+                'owner_id'     => $userId,
+                'member_count' => count($userIds) + 1,
+                'status'       => ImConversationModel::STATUS_NORMAL,
+            ]);
+
+            ImConversationMemberModel::create([
+                'conv_id' => $conv->id,
+                'user_id' => $userId,
+                'role'    => ImConversationMemberModel::ROLE_OWNER,
+            ]);
+
+            foreach ($userIds as $uid) {
+                ImConversationMemberModel::create([
+                    'conv_id' => $conv->id,
+                    'user_id' => $uid,
+                    'role'    => ImConversationMemberModel::ROLE_MEMBER,
+                ]);
+            }
+
+            return $conv;
+        });
+
+        self::systemMessage((int) $conv->id, self::displayName($userId) . ' 创建了群聊');
+
+        return $conv;
+    }
+
+    /** 默认群名：前 3 个成员的姓名，超出用「等 N 人」收尾 */
+    private static function defaultGroupName(?SysUserModel $owner, $members): string
+    {
+        $names = [self::nameOf($owner)];
+        foreach ($members as $m) {
+            $names[] = self::nameOf($m);
+        }
+
+        $total = count($names);
+        $head  = implode('、', array_slice($names, 0, 3));
+
+        return mb_substr($total > 3 ? "{$head} 等 {$total} 人" : $head, 0, 64);
+    }
+
+    private static function nameOf(?SysUserModel $u): string
+    {
+        return (string) ($u?->real_name ?: $u?->username ?: '未知用户');
+    }
+
+    /**
+     * 加人（群主）
+     *
+     * 新成员**能看到入群之前的历史**：内部群，透明优于隐私。
+     * 成员行的 `join_seq` 记下入群时的序号，将来要改成「只能看入群后的」
+     * 只需把 `min_seq` 一起设成它，不用改表结构。
+     */
+    public static function addMembers(int $convId, int $userId, array $userIds): array
+    {
+        $conv = self::assertGroupOwner($convId, $userId);
+
+        $userIds = array_values(array_unique(array_filter(
+            array_map('intval', $userIds),
+            static fn (int $id) => $id > 0
+        )));
+        if (!$userIds) {
+            throw new BusinessException('请选择要添加的同事');
+        }
+
+        // 已经在群里的（含退群后又被拉回来的）分开处理
+        $existing = ImConversationMemberModel::query()
+            ->where('conv_id', $convId)
+            ->whereIn('user_id', $userIds)
+            ->get()
+            ->keyBy('user_id');
+
+        $active = $existing->filter(static fn ($m) => $m->quit_at === null);
+        if ($active->count() === count($userIds)) {
+            throw new ConflictException('选中的同事已经在群里', BizCode::CHAT_ALREADY_MEMBER);
+        }
+
+        $max = (int) ParamService::value('chat.group.maxMembers', 200);
+        $incoming = count($userIds) - $active->count();
+        if ((int) $conv->member_count + $incoming > $max) {
+            throw new BusinessException("群成员不能超过 {$max} 人", BizCode::CHAT_GROUP_FULL);
+        }
+
+        $valid = SysUserModel::withoutDataScope()
+            ->whereIn('id', $userIds)->where('status', 1)->get(['id', 'real_name', 'username']);
+        if ($valid->count() !== count($userIds)) {
+            throw new BusinessException('选中的同事里有已停用的账号', BizCode::CHAT_PEER_DISABLED);
+        }
+
+        $added = [];
+
+        Db::transaction(function () use ($convId, $conv, $userIds, $existing, &$added) {
+            foreach ($userIds as $uid) {
+                $row = $existing[$uid] ?? null;
+
+                if ($row && $row->quit_at === null) {
+                    continue;                       // 已在群里，跳过
+                }
+
+                if ($row) {
+                    // 退过群又被拉回来：复用那一行，清掉 quit_at 并重置可见性。
+                    // 不新建行——uk_conv_user 会撞，而且历史上「他曾经在群里」这个
+                    // 事实要留着（消息里冗余的 sender_name 依赖不了它，但审计依赖）
+                    $row->update([
+                        'quit_at'    => null,
+                        'is_visible' => 1,
+                        'join_seq'   => (int) $conv->max_seq,
+                        'role'       => ImConversationMemberModel::ROLE_MEMBER,
+                    ]);
+                } else {
+                    ImConversationMemberModel::create([
+                        'conv_id'  => $convId,
+                        'user_id'  => $uid,
+                        'role'     => ImConversationMemberModel::ROLE_MEMBER,
+                        'join_seq' => (int) $conv->max_seq,
+                    ]);
+                }
+
+                $added[] = $uid;
+            }
+
+            if ($added) {
+                ImConversationModel::query()->where('id', $convId)
+                    ->update(['member_count' => Db::conn()->raw('member_count + ' . count($added))]);
+            }
+        });
+
+        if ($added) {
+            $names = $valid->whereIn('id', $added)->map(fn ($u) => self::nameOf($u))->implode('、');
+            self::systemMessage($convId, self::displayName($userId) . " 邀请 {$names} 加入群聊");
+        }
+
+        return ['added' => $added];
+    }
+
+    /**
+     * 踢人 / 退群
+     *
+     * 同一个方法：踢人是群主对别人，退群是自己对自己。判定只差一个身份检查，
+     * 拆成两个方法会让「更新成员数、发系统消息、广播」这三步各写两遍。
+     *
+     * ⚠️ **群主不能直接退群**——群会没人管。必须先转让群主，或者解散。
+     */
+    public static function removeMember(int $convId, int $operatorId, int $targetId): void
+    {
+        $conv = self::assertGroup($convId);
+        $me   = self::assertMember($convId, $operatorId);
+
+        $isSelf = $operatorId === $targetId;
+
+        if (!$isSelf && (int) $me->role !== ImConversationMemberModel::ROLE_OWNER) {
+            throw new ForbiddenException('只有群主可以移出成员', BizCode::CHAT_OWNER_ONLY);
+        }
+
+        if ($isSelf && (int) $conv->owner_id === $operatorId) {
+            throw new BusinessException(
+                '群主不能退出群聊，请先转让群主或解散群聊',
+                BizCode::CHAT_OWNER_CANNOT_QUIT
+            );
+        }
+
+        $target = self::assertMember($convId, $targetId);
+
+        Db::transaction(function () use ($convId, $target) {
+            $target->update(['quit_at' => date('Y-m-d H:i:s'), 'is_visible' => 0]);
+            ImConversationModel::query()->where('id', $convId)
+                ->update(['member_count' => Db::conn()->raw('GREATEST(member_count - 1, 0)')]);
+        });
+
+        $name = self::displayName($targetId);
+        self::systemMessage(
+            $convId,
+            $isSelf ? "{$name} 退出了群聊" : self::displayName($operatorId) . " 将 {$name} 移出群聊"
+        );
+    }
+
+    /** 改群名 / 群头像（群主） */
+    public static function updateGroup(int $convId, int $userId, array $data): array
+    {
+        $conv = self::assertGroupOwner($convId, $userId);
+
+        $patch = [];
+        if (isset($data['name'])) {
+            $name = trim((string) $data['name']);
+            if ($name === '') {
+                throw new BusinessException('群名称不能为空');
+            }
+            $patch['name'] = mb_substr($name, 0, 64);
+        }
+        if (isset($data['avatar'])) {
+            $patch['avatar'] = mb_substr((string) $data['avatar'], 0, 255);
+        }
+
+        if ($patch) {
+            $old = (string) $conv->name;
+            ImConversationModel::query()->where('id', $convId)->update($patch);
+
+            if (isset($patch['name']) && $patch['name'] !== $old) {
+                self::systemMessage($convId, self::displayName($userId) . " 把群名改为「{$patch['name']}」");
+            }
+        }
+
+        return self::detail($convId, $userId);
+    }
+
+    /**
+     * 解散（群主）
+     *
+     * 会话从所有人的列表移除，**消息保留在库里**——审计需要，而且解散是个
+     * 不可逆操作，真删了之后有人问起就什么也拿不出来。
+     */
+    public static function dissolve(int $convId, int $userId): void
+    {
+        self::assertGroupOwner($convId, $userId);
+
+        // 先发系统消息再解散：解散之后 assertGroup 会拒绝，消息就发不出去了。
+        // 顺序反了的话成员只会看到会话凭空消失
+        self::systemMessage($convId, self::displayName($userId) . ' 解散了群聊');
+
+        Db::transaction(function () use ($convId) {
+            ImConversationModel::query()->where('id', $convId)
+                ->update(['status' => ImConversationModel::STATUS_DISBANDED]);
+            ImConversationMemberModel::query()->where('conv_id', $convId)
+                ->update(['is_visible' => 0, 'updated_at' => date('Y-m-d H:i:s')]);
+        });
+    }
+
+    /** 群成员列表。带 role，前端据此显示群主标记与管理按钮 */
+    public static function members(int $convId, int $userId): array
+    {
+        self::assertMember($convId, $userId);
+
+        $rows = ImConversationMemberModel::query()
+            ->where('conv_id', $convId)
+            ->whereNull('quit_at')
+            ->orderByDesc('role')
+            ->orderBy('id')
+            ->get();
+
+        $users = SysUserModel::withoutDataScope()
+            ->whereIn('id', $rows->pluck('user_id')->all())
+            ->get()
+            ->keyBy('id');
+
+        return $rows->map(function (ImConversationMemberModel $m) use ($users) {
+            $u = $users[$m->user_id] ?? null;
+
+            return [
+                'user_id'   => (int) $m->user_id,
+                'real_name' => self::nameOf($u),
+                'avatar'    => (string) ($u?->avatar ?? ''),
+                'role'      => (int) $m->role,
+                'joined_at' => $m->created_at?->format('Y-m-d H:i:s'),
+            ];
+        })->all();
+    }
+
+    /** 必须是群，且没解散 */
+    private static function assertGroup(int $convId): ImConversationModel
+    {
+        /** @var ImConversationModel|null $conv */
+        $conv = ImConversationModel::query()->find($convId);
+
+        if (!$conv
+            || (int) $conv->type !== ImConversationModel::TYPE_GROUP
+            || (int) $conv->status !== ImConversationModel::STATUS_NORMAL) {
+            throw new NotFoundException();
+        }
+
+        return $conv;
+    }
+
+    /** 必须是群，且操作人是群主 */
+    private static function assertGroupOwner(int $convId, int $userId): ImConversationModel
+    {
+        $conv   = self::assertGroup($convId);
+        $member = self::assertMember($convId, $userId);
+
+        if ((int) $member->role !== ImConversationMemberModel::ROLE_OWNER) {
+            throw new ForbiddenException('只有群主可以执行该操作', BizCode::CHAT_OWNER_ONLY);
+        }
+
+        return $conv;
+    }
+
+    /**
+     * 系统消息
+     *
+     * 入群、退群、改群名这类事件都落成一条消息，而不是另建一张事件表：
+     * 它们本来就该按时间夹在聊天记录里，用同一套 seq 才能保证顺序一致——
+     * 另存一张表的话前端要把两条时间线归并，而归并的依据只有时间戳（会打平）。
+     *
+     * ⚠️ **必须生成 client_msg_id**。`uk_client_msg` 是 `(sender_id, client_msg_id)`，
+     * 而系统消息的 sender_id 恒为 0；留空的话多条系统消息的 `(0, '')` 会全部撞唯一索引，
+     * 表现是「建第一个群正常，第二个群 500」。
+     */
+    private static function systemMessage(int $convId, string $text): void
+    {
+        $message = Db::transaction(function () use ($convId, $text) {
+            $seq = self::nextSeq($convId);
+
+            $message = ImMessageModel::create([
+                'conv_id'       => $convId,
+                'seq'           => $seq,
+                'sender_id'     => 0,
+                'sender_name'   => '',
+                'type'          => ImMessageModel::TYPE_SYSTEM,
+                'content'       => $text,
+                'client_msg_id' => self::uuid(),
+                'status'        => ImMessageModel::STATUS_NORMAL,
+            ]);
+
+            ImConversationModel::query()->where('id', $convId)->update([
+                'last_msg_id'   => $message->id,
+                'last_msg_at'   => $message->created_at,
+                'last_msg_text' => mb_substr($text, 0, 40),
+                'updated_at'    => date('Y-m-d H:i:s'),
+            ]);
+
+            return $message;
+        });
+
+        ChatFanout::messageCreated($convId, self::memberIds($convId), self::presentMessage($message));
+    }
+
     /** 会话详情，带上「对方是谁」——单聊的标题和头像都来自这里 */
     public static function detail(int $convId, int $userId): array
     {
@@ -369,6 +767,9 @@ class ChatService
             'last_msg_text' => (string) $conv->last_msg_text,
             'peer_id'       => 0,
         ];
+
+        $data['member_count'] = (int) $conv->member_count;
+        $data['owner_id']     = (int) $conv->owner_id;
 
         if ((int) $conv->type === ImConversationModel::TYPE_SINGLE) {
             $peerId = self::peerIdOf($conv, $userId);
@@ -490,6 +891,8 @@ class ChatService
                     BizCode::CHAT_CONTENT_TOO_LONG
                 );
             }
+
+            $extra = self::guardMentions($convId, $userId, $extra);
         } elseif (in_array($type, [ImMessageModel::TYPE_IMAGE, ImMessageModel::TYPE_FILE], true)) {
             $extra = self::guardAttachment($extra);
             // 附件消息的 content 存展示用的文件名，列表摘要与搜索都靠它
@@ -553,6 +956,23 @@ class ChatService
                     ->where('user_id', $userId)
                     ->update(['last_read_seq' => $seq, 'updated_at' => date('Y-m-d H:i:s')]);
 
+                /*
+                 * 被 @ 的人：记下这一条的序号
+                 *
+                 * 只记**最近一次**被 @ 的序号，不存列表——产品只需要回答
+                 * 「有没有未读的 @」这一个问题（at_seq > last_read_seq），
+                 * 存列表的话 @ 一次写一行，而那些行没有第二个用处。
+                 *
+                 * 排掉自己：@ 自己不该让自己的会话冒红点。
+                 */
+                $atIds = array_diff((array) ($extra['at_user_ids'] ?? []), [$userId]);
+                if ($atIds) {
+                    ImConversationMemberModel::query()
+                        ->where('conv_id', $convId)
+                        ->whereIn('user_id', $atIds)
+                        ->update(['at_seq' => $seq, 'updated_at' => date('Y-m-d H:i:s')]);
+                }
+
                 return $message;
             });
         } catch (\Illuminate\Database\QueryException $e) {
@@ -610,6 +1030,46 @@ class ChatService
             ->pluck('user_id')
             ->map(fn ($v) => (int) $v)
             ->all();
+    }
+
+    /**
+     * @ 校验
+     *
+     * `at_user_ids` 来自客户端，要按**会话成员**过滤一遍：不在这个会话里的人
+     * 不该被 @ 出来——否则一条消息就能给任意用户的会话列表种一个「有人@我」，
+     * 而他连这个会话都看不见，红点永远清不掉。
+     *
+     * `@所有人` 单独一个布尔位，并且**只有群主能用**：几百人的群里谁都能全员
+     * 提醒的话，这个功能一天就会被用废。展开成全体成员 id 存进 at_user_ids，
+     * 这样下游（at_seq 更新、前端高亮）只认一种形态，不用到处判两种。
+     *
+     * @return array<string, mixed>|null 洗过的 extra；没有 @ 时返回原值
+     */
+    private static function guardMentions(int $convId, int $userId, ?array $extra): ?array
+    {
+        $atAll = (bool) ($extra['at_all'] ?? false);
+        $ids   = array_values(array_unique(array_map('intval', (array) ($extra['at_user_ids'] ?? []))));
+
+        if (!$atAll && !$ids) {
+            return $extra;
+        }
+
+        if ($atAll) {
+            $me = self::assertMember($convId, $userId);
+            if ((int) $me->role !== ImConversationMemberModel::ROLE_OWNER) {
+                throw new ForbiddenException('只有群主可以 @所有人', BizCode::CHAT_OWNER_ONLY);
+            }
+
+            $ids = self::memberIds($convId);
+        } else {
+            // 与真实成员求交集，客户端传的多余 id 直接丢掉
+            $ids = array_values(array_intersect($ids, self::memberIds($convId)));
+        }
+
+        return [
+            'at_all'       => $atAll,
+            'at_user_ids'  => $ids,
+        ];
     }
 
     /**
@@ -673,10 +1133,20 @@ class ChatService
             throw new NotFoundException();
         }
 
-        // 先确认他在这个会话里——不是成员的话连「这条消息存在」都不该知道
-        self::assertMember((int) $msg->conv_id, $userId);
+        // 成员校验在下面和角色判定一起做——不是成员的话 assertMember 会抛 404，
+        // 连「这条消息存在」都不该知道
+        /*
+         * 群主可以撤回群内任意消息，且**不受时限约束**
+         *
+         * 两条规则不一样是有意的：本人撤回的两分钟是给手滑兜底；
+         * 群主撤回是管理动作——有人发了不该发的东西，半小时后才有人举报，
+         * 这时候限时两分钟等于这个功能不存在。
+         */
+        $member  = self::assertMember((int) $msg->conv_id, $userId);
+        $isOwner = (int) $member->role === ImConversationMemberModel::ROLE_OWNER
+            && (int) $msg->sender_id !== 0;   // 系统消息谁也撤不了
 
-        if ((int) $msg->sender_id !== $userId) {
+        if ((int) $msg->sender_id !== $userId && !$isOwner) {
             throw new ForbiddenException('只能撤回自己发送的消息', BizCode::CHAT_RECALL_FORBIDDEN);
         }
 
@@ -688,7 +1158,7 @@ class ChatService
         $window = (int) ParamService::value('chat.message.recallWindow', self::RECALL_WINDOW);
         $age    = time() - ($msg->created_at?->getTimestamp() ?? 0);
 
-        if ($age > $window) {
+        if (!$isOwner && $age > $window) {
             // 别直接 intdiv($window, 60) . '分钟'：时限调成 90 秒时会说成「超过 1 分钟」，
             // 调成 30 秒更会说成「超过 0 分钟」——技术上没错，但用户不知道该怎么办。
             // 与上传接口的 humanSize 是同一类问题
@@ -703,6 +1173,8 @@ class ChatService
         }
 
         $msg->status      = ImMessageModel::STATUS_RECALLED;
+        // recalled_by 让前端能区分「你撤回了」与「消息已被群主撤回」——
+        // 两句话对读者的含义完全不同
         $msg->recalled_by = $userId;
         $msg->recalled_at = date('Y-m-d H:i:s');
         $msg->save();

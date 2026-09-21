@@ -115,6 +115,10 @@ final class BizCode
     public const CHAT_RECALL_EXPIRED = 21202;     // 消息已超过可撤回时间
     public const CHAT_RECALL_FORBIDDEN = 21208;   // 只能撤回自己发送的消息
     public const CHAT_ATTACHMENT_INVALID = 21209; // 附件地址不合法
+    public const CHAT_OWNER_ONLY = 21203;         // 只有群主可以执行该操作
+    public const CHAT_GROUP_FULL = 21204;         // 群成员数量已达上限
+    public const CHAT_ALREADY_MEMBER = 21207;     // 该成员已在群中
+    public const CHAT_OWNER_CANNOT_QUIT = 21210;  // 群主不能退出群聊
     public const CHAT_PEER_DISABLED = 21205;      // 不能与已停用的员工发起会话
     public const CHAT_SELF_CONVERSATION = 21206;  // 不能和自己发起会话
 

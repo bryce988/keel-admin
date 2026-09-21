@@ -90,6 +90,10 @@ export const BizCode = {
   CHAT_RECALL_EXPIRED: 21202,     // 消息已超过可撤回时间
   CHAT_RECALL_FORBIDDEN: 21208,   // 只能撤回自己发送的消息
   CHAT_ATTACHMENT_INVALID: 21209, // 附件地址不合法
+  CHAT_OWNER_ONLY: 21203,         // 只有群主可以执行该操作
+  CHAT_GROUP_FULL: 21204,         // 群成员数量已达上限
+  CHAT_ALREADY_MEMBER: 21207,     // 该成员已在群中
+  CHAT_OWNER_CANNOT_QUIT: 21210,  // 群主不能退出群聊
   CHAT_PEER_DISABLED: 21205,      // 不能与已停用的员工发起会话
   CHAT_SELF_CONVERSATION: 21206,  // 不能和自己发起会话
 

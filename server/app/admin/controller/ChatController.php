@@ -212,6 +212,100 @@ class ChatController
         return Result::ok(ChatService::recall($id, self::uid()));
     }
 
+/**
+     * 建群
+     * @url POST /admin/chat/groups
+     * @perm chat:use
+     * @description `{user_ids[], name?}`。任何人都能建，不需要审批。
+     * 至少选 2 人——两个人的「群」就是单聊，而单聊有自己的去重逻辑，
+     * 允许建的话会出现「我和他既有单聊又有一个双人群」。
+     * 群名留空时用前 3 个成员的姓名拼接。
+     * @error 400 人数不足 2、超过上限、含已停用账号
+     */
+    public function createGroup(Request $request): Response
+    {
+        return Result::created(ChatService::detail(
+            (int) ChatService::createGroup(
+                self::uid(),
+                (array) $request->post('user_ids', []),
+                (string) $request->post('name', ''),
+            )->id,
+            self::uid(),
+        ));
+    }
+
+    /**
+     * 群成员列表
+     * @url GET /admin/chat/conversations/{id}/members
+     * @perm chat:use
+     * @description 群主排在最前，带 `role`（0 成员 1 群主）
+     * @error 404 会话不存在，或你不是它的成员
+     */
+    public function members(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::members($id, self::uid()));
+    }
+
+    /**
+     * 添加成员（群主）
+     * @url POST /admin/chat/conversations/{id}/members
+     * @perm chat:use
+     * @description `{user_ids[]}`。新成员**能看到入群之前的历史**——内部群，
+     * 透明优于隐私。退过群又被拉回来的会复用原成员行。
+     * @error 403 不是群主
+     * @error 409 选中的人都已在群里
+     */
+    public function addMembers(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::addMembers($id, self::uid(), (array) $request->post('user_ids', [])));
+    }
+
+    /**
+     * 移出成员 / 退群
+     * @url DELETE /admin/chat/conversations/{id}/members/{uid}
+     * @perm chat:use
+     * @description `uid` 是自己就是退群，是别人就是踢人（只有群主能踢）。
+     * **群主不能直接退群**——群会没人管，必须先转让或解散。
+     * @error 400 群主退群
+     * @error 403 不是群主却要踢别人
+     */
+    public function removeMember(Request $request, int $id, int $uid): Response
+    {
+        ChatService::removeMember($id, self::uid(), $uid);
+
+        return Result::noContent();
+    }
+
+    /**
+     * 修改群资料（群主）
+     * @url PUT /admin/chat/conversations/{id}/group
+     * @perm chat:use
+     * @description `{name?, avatar?}`。改名会在群里留一条系统消息。
+     * @error 403 不是群主
+     */
+    public function updateGroup(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::updateGroup($id, self::uid(), [
+            'name'   => $request->post('name'),
+            'avatar' => $request->post('avatar'),
+        ]));
+    }
+
+    /**
+     * 解散群聊（群主）
+     * @url DELETE /admin/chat/conversations/{id}/group
+     * @perm chat:use
+     * @description 会话从所有人的列表移除，**消息保留在库里**——审计需要，
+     * 而且解散不可逆，真删了之后有人问起就什么也拿不出来。
+     * @error 403 不是群主
+     */
+    public function dissolve(Request $request, int $id): Response
+    {
+        ChatService::dissolve($id, self::uid());
+
+        return Result::noContent();
+    }
+
     /** 用户 id 只从令牌取。一旦改成从请求读，聊天立刻变成「以任意身份发消息」 */
     private static function uid(): int
     {

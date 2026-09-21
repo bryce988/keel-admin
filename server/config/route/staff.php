@@ -68,12 +68,22 @@ Route::group('/staff/v1', function () {
     Route::get('/chat/unread', [StaffChatController::class, 'unread'])->setParams(['perm' => 'chat:use']);
     Route::get('/chat/conversations', [StaffChatController::class, 'conversations'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations', [StaffChatController::class, 'open'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations/{id:\d+}', [StaffChatController::class, 'detail'])->setParams(['perm' => 'chat:use']);
     Route::get('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'messages'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'send'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/read', [StaffChatController::class, 'read'])->setParams(['perm' => 'chat:use']);
     // 撤回挂在 /chat/messages/ 下而不是会话路径下：撤回的对象是一条消息，
     // 而 id 在全表唯一，不需要再带会话 id（会话归属由 service 自己查出来校验）
     Route::post('/chat/messages/{id:\d+}/recall', [StaffChatController::class, 'recall'])->setParams(['perm' => 'chat:use']);
+
+    // 群聊。建群走 /chat/groups 而不是 /chat/conversations（后者是打开单聊）；
+    // 群资料与解散挂 /{id}/group，与 /{id}（只把会话从我的列表移除）区分开
+    Route::post('/chat/groups', [StaffChatController::class, 'createGroup'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations/{id:\d+}/members', [StaffChatController::class, 'members'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations/{id:\d+}/members', [StaffChatController::class, 'addMembers'])->setParams(['perm' => 'chat:use']);
+    Route::delete('/chat/conversations/{id:\d+}/members/{uid:\d+}', [StaffChatController::class, 'removeMember'])->setParams(['perm' => 'chat:use']);
+    Route::put('/chat/conversations/{id:\d+}/group', [StaffChatController::class, 'updateGroup'])->setParams(['perm' => 'chat:use']);
+    Route::delete('/chat/conversations/{id:\d+}/group', [StaffChatController::class, 'dissolve'])->setParams(['perm' => 'chat:use']);
     Route::put('/chat/conversations/{id:\d+}/settings', [StaffChatController::class, 'settings'])->setParams(['perm' => 'chat:use']);
     Route::delete('/chat/conversations/{id:\d+}', [StaffChatController::class, 'remove'])->setParams(['perm' => 'chat:use']);
 

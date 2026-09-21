@@ -123,6 +123,22 @@ Route::group('/admin', function () {
     // 撤回挂在 /chat/messages/ 下而不是会话路径下：撤回的对象是一条消息，
     // 而 id 在全表唯一，不需要再带会话 id（会话归属由 service 自己查出来校验）
     Route::post('/chat/messages/{id:\d+}/recall', [ChatController::class, 'recall'])->setParams(['perm' => 'chat:use']);
+
+    /*
+     * 群聊
+     *
+     * 建群走 /chat/groups 而不是 /chat/conversations：后者是「打开与某人的单聊」，
+     * 两个动作的入参和语义都不一样，挤在一个接口里就要靠字段判分支。
+     *
+     * 群资料与解散挂在 /{id}/group 下，与 /{id}（删除会话，只影响自己）区分开——
+     * 一个是「解散这个群」，一个是「把它从我的列表移除」，混了会很危险。
+     */
+    Route::post('/chat/groups', [ChatController::class, 'createGroup'])->setParams(['perm' => 'chat:use']);
+    Route::get('/chat/conversations/{id:\d+}/members', [ChatController::class, 'members'])->setParams(['perm' => 'chat:use']);
+    Route::post('/chat/conversations/{id:\d+}/members', [ChatController::class, 'addMembers'])->setParams(['perm' => 'chat:use']);
+    Route::delete('/chat/conversations/{id:\d+}/members/{uid:\d+}', [ChatController::class, 'removeMember'])->setParams(['perm' => 'chat:use']);
+    Route::put('/chat/conversations/{id:\d+}/group', [ChatController::class, 'updateGroup'])->setParams(['perm' => 'chat:use']);
+    Route::delete('/chat/conversations/{id:\d+}/group', [ChatController::class, 'dissolve'])->setParams(['perm' => 'chat:use']);
     Route::put('/chat/conversations/{id:\d+}/settings', [ChatController::class, 'settings'])->setParams(['perm' => 'chat:use']);
     Route::delete('/chat/conversations/{id:\d+}', [ChatController::class, 'remove'])->setParams(['perm' => 'chat:use']);
 
