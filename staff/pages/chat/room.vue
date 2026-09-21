@@ -81,12 +81,36 @@
 			</view>
 		</scroll-view>
 
+		<!-- @ 面板。room 不是 tabBar 页，所以自定义遮罩盖得住；
+		     换成 tab 页的话只能用 uni.showActionSheet，而它最多 6 项、装不下群成员 -->
+		<view v-if="atVisible" class="atmask" @click="atVisible = false">
+			<view class="atpanel" @click.stop>
+				<view v-if="isOwner" class="atrow" hover-class="atrow--hover" @click="pickAtAll">
+					<text class="atrow-all">@所有人</text>
+				</view>
+				<scroll-view class="atlist" scroll-y>
+					<view
+						v-for="m in atCandidates"
+						:key="m.user_id"
+						class="atrow"
+						hover-class="atrow--hover"
+						@click="pickMention(m)"
+					>
+						<text class="atrow-name">{{ m.real_name }}</text>
+					</view>
+				</scroll-view>
+			</view>
+		</view>
+
 		<view class="composer">
 			<view class="composer-tool" hover-class="composer-tool--hover" @click="pickImage">
 				<text class="composer-tool-text">图</text>
 			</view>
 			<view class="composer-tool" hover-class="composer-tool--hover" @click="pickFile">
 				<text class="composer-tool-text">件</text>
+			</view>
+			<view v-if="isGroup" class="composer-tool" hover-class="composer-tool--hover" @click="openAt">
+				<text class="composer-tool-text">@</text>
 			</view>
 			<input
 				v-model="draft"
@@ -114,7 +138,7 @@
 		uploadChatFile,
 		recallChatMessage
 	} from '@/common/api.js'
-	import { fetchChatConversation } from '@/common/api.js'
+	import { fetchChatConversation, fetchChatMembers } from '@/common/api.js'
 	import { getCachedUser, absUrl } from '@/common/request.js'
 	import { chatSocket } from '@/common/chatSocket.js'
 
@@ -130,6 +154,12 @@
 	const peerReadSeq = ref(0)
 	const isGroup = ref(false)
 	const memberCount = ref(0)
+	const isOwner = ref(false)
+
+	/** @ 面板。mentioned 记点选过谁，发送时以**最终文本**为准反查 id */
+	const atVisible = ref(false)
+	const atCandidates = ref([])
+	const mentioned = ref({})
 
 	/** 乐观上屏用的占位 seq：比任何真实 seq 都大，保证排在末尾 */
 	const PENDING_SEQ = Number.MAX_SAFE_INTEGER
@@ -221,8 +251,13 @@
 		const text = draft.value.trim()
 		if (!text) return
 
+		const mentions = collectMentions(text)
+
 		draft.value = ''
-		await deliver({ type: 'text', content: text })
+		atVisible.value = false
+		mentioned.value = {}
+
+		await deliver({ type: 'text', content: text, extra: mentions })
 	}
 
 	/**
@@ -654,6 +689,50 @@
 		margin-top: 2px;
 		font-size: 12px;
 		color: #86868b;
+	}
+
+	/* 遮罩铺满可视区，点空白处收起 */
+	.atmask {
+		position: fixed;
+		left: 0;
+		right: 0;
+		top: var(--window-top);
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.25);
+		z-index: 10;
+		display: flex;
+		align-items: flex-end;
+	}
+
+	.atpanel {
+		width: 100%;
+		max-height: 50vh;
+		padding-bottom: env(safe-area-inset-bottom);
+		background: #ffffff;
+		border-radius: 14px 14px 0 0;
+	}
+
+	.atlist {
+		max-height: 40vh;
+	}
+
+	.atrow {
+		padding: 14px 20px;
+		border-bottom: 1px solid #f0f0f2;
+	}
+
+	.atrow--hover {
+		background: #f5f5f7;
+	}
+
+	.atrow-name {
+		font-size: 16px;
+		color: #1d1d1f;
+	}
+
+	.atrow-all {
+		font-size: 16px;
+		color: #409eff;
 	}
 
 	.composer {

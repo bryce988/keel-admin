@@ -55,12 +55,17 @@
 		updateChatSettings,
 		removeChatConversation
 	} from '@/common/api.js'
-	import { absUrl } from '@/common/request.js'
+	import { absUrl, getCachedUser } from '@/common/request.js'
 	import { chatSocket } from '@/common/chatSocket.js'
+	import { setChatBadge } from '@/common/api.js'
 
 	const rows = ref([])
 	const loading = ref(false)
 	const error = ref('')
+
+	function myUserId() {
+		return Number((getCachedUser() || {}).id || 0)
+	}
 
 	const unreadHint = computed(() => {
 		// 免打扰的不算进这句话，与角标口径一致
@@ -73,12 +78,24 @@
 		error.value = ''
 		try {
 			rows.value = await fetchChatConversations()
+			syncBadge()
 		} catch (e) {
 			if (e.code !== 401) error.value = e.message
 		} finally {
 			loading.value = false
 			uni.stopPullDownRefresh()
 		}
+	}
+
+	/**
+	 * tab 角标
+	 *
+	 * 口径与列表角标一致：**免打扰的不计入数字**，否则「免打扰」就只剩个名字。
+	 * 角标标在 index 0（消息），索引由 api.js 的常量管着——改 tab 顺序要回去改那里。
+	 */
+	function syncBadge() {
+		const n = rows.value.reduce((sum, c) => sum + (c.is_muted ? 0 : c.unread), 0)
+		setChatBadge(n)
 	}
 
 	/** 通讯录已经是 tab 页，只能用 switchTab——navigateTo 打不开 tabBar 里的页面 */
@@ -160,7 +177,23 @@
 
 		// 在列表页也要收推送：不然收到新消息得手动下拉才看得到
 		if (!offMessage) {
-			offMessage = chatSocket.on('message.new', () => load())
+			offMessage = chatSocket.on('message.new', (msg) => {
+				/*
+				 * 震动提醒
+				 *
+				 * 移动端**不做系统通知**——那要接厂商推送通道，与「脚手架不绑死
+				 * 服务商」冲突（chat-prd.md §5.7）。App 在前台时震一下是不依赖
+				 * 任何第三方就能做到的最强提醒。
+				 *
+				 * 自己发的不震：多设备登录时，我在电脑上发消息手机不该抖。
+				 */
+				if (msg && msg.sender_id !== myUserId()) {
+					// #ifndef H5
+					uni.vibrateShort({ fail: () => {} })
+					// #endif
+				}
+				load()
+			})
 			// 每次重连都会再来一次 ready，断线期间的消息靠这一步补进列表
 			offReady = chatSocket.on('ready', () => load())
 		}
