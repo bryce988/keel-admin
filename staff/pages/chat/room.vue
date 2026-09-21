@@ -1,5 +1,12 @@
 <template>
 	<view class="room">
+		<!-- 群信息条：只在群聊出现。room 用的是原生导航栏，加不了右上角按钮，
+		     所以群入口放在内容区顶部 -->
+		<view v-if="isGroup" class="groupbar" hover-class="groupbar--hover" @click="toMembers">
+			<text class="groupbar-text">{{ memberCount }} 人</text>
+			<text class="groupbar-more">群成员 ›</text>
+		</view>
+
 		<scroll-view
 			class="stream"
 			scroll-y
@@ -13,9 +20,19 @@
 					class="msg"
 					:class="{ 'msg--mine': isMine(m) }"
 				>
+					<!-- 系统消息（入群、改群名、解散）：与撤回同一种居中灰字。
+					     它们本来就该按时间夹在聊天记录里，所以用的是同一套 seq -->
+					<text v-if="m.type === 'system'" class="recalled">{{ m.content }}</text>
+
 					<!-- 撤回：整行居中灰字，不留气泡——留着会让人以为内容还在 -->
-					<text v-if="m.status === 2" class="recalled">
-						{{ isMine(m) ? '你撤回了一条消息' : m.sender_name + ' 撤回了一条消息' }}
+					<text v-else-if="m.status === 2" class="recalled">
+						{{
+							m.recalled_by !== m.sender_id
+								? '一条消息已被群主撤回'
+								: isMine(m)
+									? '你撤回了一条消息'
+									: m.sender_name + ' 撤回了一条消息'
+						}}
 					</text>
 
 					<block v-else>
@@ -97,6 +114,7 @@
 		uploadChatFile,
 		recallChatMessage
 	} from '@/common/api.js'
+	import { fetchChatConversation } from '@/common/api.js'
 	import { getCachedUser, absUrl } from '@/common/request.js'
 	import { chatSocket } from '@/common/chatSocket.js'
 
@@ -110,6 +128,8 @@
 	const uploading = ref(false)
 	/** 对方读到哪条了，用于给我最后一条消息打「已读」 */
 	const peerReadSeq = ref(0)
+	const isGroup = ref(false)
+	const memberCount = ref(0)
 
 	/** 乐观上屏用的占位 seq：比任何真实 seq 都大，保证排在末尾 */
 	const PENDING_SEQ = Number.MAX_SAFE_INTEGER
@@ -460,12 +480,15 @@
 		})
 
 		chatSocket.connect()
-		await loadHistory()
+		await Promise.all([loadHistory(), loadConversation()])
 	})
 
 	// 从后台切回前台时补一次：息屏期间连接可能已经被系统回收了
 	onShow(() => {
-		if (convId.value && !chatSocket.connected) chatSocket.connect()
+		if (!convId.value) return
+		if (!chatSocket.connected) chatSocket.connect()
+		// 从群成员页返回时人数可能变了（加了人 / 踢了人）
+		if (isGroup.value) loadConversation()
 	})
 
 	onUnload(() => {
@@ -483,6 +506,29 @@
 		flex-direction: column;
 		height: calc(100vh - var(--window-top));
 		background: #f5f5f7;
+	}
+
+	.groupbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 8px 16px;
+		background: #ffffff;
+		border-bottom: 1px solid #f0f0f2;
+	}
+
+	.groupbar--hover {
+		background: #f5f5f7;
+	}
+
+	.groupbar-text {
+		font-size: 13px;
+		color: #6e6e73;
+	}
+
+	.groupbar-more {
+		font-size: 13px;
+		color: #409eff;
 	}
 
 	.stream {

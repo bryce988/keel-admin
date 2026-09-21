@@ -208,3 +208,38 @@ export function uploadChatFile(filePath) {
 export function recallChatMessage(messageId) {
 	return request(`/staff/v1/chat/messages/${messageId}/recall`, 'POST')
 }
+
+// ---------------------------------------------------------------- 群聊
+
+/** 建群。至少选 2 人——两个人的「群」就是单聊 */
+export function createChatGroup(userIds, name = '') {
+	return request('/staff/v1/chat/groups', 'POST', { user_ids: userIds, name })
+}
+
+export function fetchChatMembers(convId) {
+	return request(`/staff/v1/chat/conversations/${convId}/members`)
+}
+
+/** 加人（群主）。新成员能看到入群之前的历史 */
+export function addChatMembers(convId, userIds) {
+	return request(`/staff/v1/chat/conversations/${convId}/members`, 'POST', { user_ids: userIds })
+}
+
+/** 移出成员 / 退群。uid 是自己就是退群，是别人就是踢人（只有群主能踢） */
+export function removeChatMember(convId, uid) {
+	return request(`/staff/v1/chat/conversations/${convId}/members/${uid}`, 'DELETE')
+}
+
+export function updateChatGroup(convId, data) {
+	return request(`/staff/v1/chat/conversations/${convId}/group`, 'PUT', data)
+}
+
+/** 解散（群主）。会话从所有人列表移除，消息保留在库里 */
+export function dissolveChatGroup(convId) {
+	return request(`/staff/v1/chat/conversations/${convId}/group`, 'DELETE')
+}
+
+/** 会话详情。群聊要靠它拿人数与群主 */
+export function fetchChatConversation(convId) {
+	return request(`/staff/v1/chat/conversations/${convId}`)
+}

@@ -55,6 +55,13 @@
 			}
 		},
 		{
+			"path": "pages/chat/members",
+			"style": {
+				"navigationBarTitleText": "群成员",
+				"navigationBarBackgroundColor": "#ffffff"
+			}
+		},
+		{
 			"path": "pages/mine/mine",
 			"style": {
 				"navigationBarTitleText": "我的",
