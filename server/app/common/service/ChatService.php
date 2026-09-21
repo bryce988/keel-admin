@@ -23,6 +23,7 @@ declare(strict_types=1);
 namespace app\common\service;
 
 use app\common\exception\BusinessException;
+use app\common\exception\ForbiddenException;
 use app\common\exception\NotFoundException;
 use app\common\exception\RateLimitException;
 use app\common\constant\BizCode;
@@ -42,6 +43,18 @@ class ChatService
 
     /** 历史消息每页条数，与前端的翻页粒度一致 */
     private const PAGE_SIZE = 30;
+
+    /** 撤回时限（秒）。参数 `chat.message.recallWindow` 可覆盖 */
+    private const RECALL_WINDOW = 120;
+
+    /**
+     * 附件必须落在这个前缀下
+     *
+     * 与上传接口 `biz=chat` 的落盘目录一致。写死不做成参数——
+     * 可配置的路径白名单等于给了配错的机会，而配错一次就能把
+     * 「发消息」变成「让别人的浏览器去下载任意文件」
+     */
+    private const ATTACHMENT_PREFIX = '/uploads/chat/';
 
     // ================================================================ 可见性
 
@@ -465,6 +478,8 @@ class ChatService
         $content = (string) ($data['content'] ?? '');
         $maxLen  = (int) ParamService::value('chat.message.maxLength', 5000);
 
+        $extra = is_array($data['extra'] ?? null) ? $data['extra'] : null;
+
         if ($type === ImMessageModel::TYPE_TEXT) {
             if (trim($content) === '') {
                 throw new BusinessException('消息内容不能为空');
@@ -475,6 +490,13 @@ class ChatService
                     BizCode::CHAT_CONTENT_TOO_LONG
                 );
             }
+        } elseif (in_array($type, [ImMessageModel::TYPE_IMAGE, ImMessageModel::TYPE_FILE], true)) {
+            $extra = self::guardAttachment($extra);
+            // 附件消息的 content 存展示用的文件名，列表摘要与搜索都靠它
+            $content = (string) ($extra['name'] ?? '');
+        } else {
+            // system 类型只能由服务端自己发（入群、改群名这类），不接受客户端指定
+            throw new BusinessException('不支持的消息类型');
         }
 
         self::guardRate($userId);
@@ -497,7 +519,7 @@ class ChatService
         $senderName = self::displayName($userId);
 
         try {
-            $message = Db::transaction(function () use ($convId, $userId, $senderName, $type, $content, $data, $clientMsgId) {
+            $message = Db::transaction(function () use ($convId, $userId, $senderName, $type, $content, $extra, $clientMsgId) {
                 $seq = self::nextSeq($convId);
 
                 $message = ImMessageModel::create([
@@ -507,7 +529,7 @@ class ChatService
                     'sender_name'   => $senderName,
                     'type'          => $type,
                     'content'       => $content,
-                    'extra'         => $data['extra'] ?? null,
+                    'extra'         => $extra,
                     'client_msg_id' => $clientMsgId,
                     'status'        => ImMessageModel::STATUS_NORMAL,
                 ]);
@@ -588,6 +610,115 @@ class ChatService
             ->pluck('user_id')
             ->map(fn ($v) => (int) $v)
             ->all();
+    }
+
+    /**
+     * 附件地址校验
+     *
+     * ⚠️ **不能只信前端传的 url**。`extra` 是客户端给的一个 JSON，
+     * 不校验的话任何人都能往里塞 `/uploads/avatar/xxx.png`（别人的头像）、
+     * `../../server/.env`、甚至一个外站地址——而这些会被原样渲染成
+     * `<img src>` 或下载链接发给会话里的其他人。
+     *
+     * 三道：
+     * 1. 必须以 `/uploads/chat/` 开头——上传接口的 `biz=chat` 落盘就在那儿，
+     *    别的目录一律不认（头像、公告图片都不该出现在聊天里）
+     * 2. 不许有 `..`——即便前缀对了，`/uploads/chat/../avatar/x.png` 仍能穿越
+     * 3. 文件名、大小这些展示字段做长度与类型收敛，脏数据别进库
+     *
+     * @return array<string, mixed> 洗过的 extra，只保留白名单字段
+     */
+    private static function guardAttachment(?array $extra): array
+    {
+        $url = (string) ($extra['url'] ?? '');
+
+        if ($url === '' || !str_starts_with($url, self::ATTACHMENT_PREFIX) || str_contains($url, '..')) {
+            throw new BusinessException('附件地址不合法', BizCode::CHAT_ATTACHMENT_INVALID);
+        }
+
+        // 白名单取字段，不把客户端传的整个对象存进库——多余的键既占空间又可能被后续代码误用
+        $clean = [
+            'url'  => $url,
+            'name' => mb_substr((string) ($extra['name'] ?? '未命名文件'), 0, 120),
+            'size' => max(0, (int) ($extra['size'] ?? 0)),
+            'ext'  => mb_substr(strtolower((string) ($extra['ext'] ?? '')), 0, 10),
+        ];
+
+        // 图片的宽高用于前端占位，避免加载完成时整段消息跳动。缺了不报错——
+        // 老客户端可能不带，而这只是体验问题不是正确性问题
+        foreach (['width', 'height'] as $k) {
+            if (isset($extra[$k])) {
+                $clean[$k] = max(0, (int) $extra[$k]);
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * 撤回
+     *
+     * 只允许撤回**自己的**消息，且在 `CHAT_RECALL_WINDOW` 秒内。
+     * 群主可撤回群内任意消息是第 ⑤ 批的事（群聊还没做，那条分支先不写——
+     * 提前写一个没有调用方的分支，等真做群聊时多半已经和实际需求对不上了）。
+     *
+     * **不删 content**，只改状态：留给以后的审计，也避免误撤回后无法追溯。
+     * 接口层不下发原文（见 presentMessage），所以对用户表现为「撤回了」。
+     */
+    public static function recall(int $messageId, int $userId): array
+    {
+        /** @var ImMessageModel|null $msg */
+        $msg = ImMessageModel::query()->find($messageId);
+        if (!$msg) {
+            throw new NotFoundException();
+        }
+
+        // 先确认他在这个会话里——不是成员的话连「这条消息存在」都不该知道
+        self::assertMember((int) $msg->conv_id, $userId);
+
+        if ((int) $msg->sender_id !== $userId) {
+            throw new ForbiddenException('只能撤回自己发送的消息', BizCode::CHAT_RECALL_FORBIDDEN);
+        }
+
+        // 已经撤回过的直接返回，不报错：两个标签页同时点撤回是正常操作
+        if ((int) $msg->status === ImMessageModel::STATUS_RECALLED) {
+            return self::presentMessage($msg);
+        }
+
+        $window = (int) ParamService::value('chat.message.recallWindow', self::RECALL_WINDOW);
+        $age    = time() - ($msg->created_at?->getTimestamp() ?? 0);
+
+        if ($age > $window) {
+            // 别直接 intdiv($window, 60) . '分钟'：时限调成 90 秒时会说成「超过 1 分钟」，
+            // 调成 30 秒更会说成「超过 0 分钟」——技术上没错，但用户不知道该怎么办。
+            // 与上传接口的 humanSize 是同一类问题
+            $human = $window >= 60 && $window % 60 === 0
+                ? intdiv($window, 60) . ' 分钟'
+                : $window . ' 秒';
+
+            throw new BusinessException(
+                "消息发出超过 {$human}，无法撤回",
+                BizCode::CHAT_RECALL_EXPIRED
+            );
+        }
+
+        $msg->status      = ImMessageModel::STATUS_RECALLED;
+        $msg->recalled_by = $userId;
+        $msg->recalled_at = date('Y-m-d H:i:s');
+        $msg->save();
+
+        // 撤回的如果是最后一条，会话列表的摘要还停在原文上——不改的话
+        // 消息已经撤回了，左栏还明晃晃写着那句话
+        ImConversationModel::query()
+            ->where('id', $msg->conv_id)
+            ->where('last_msg_id', $msg->id)
+            ->update(['last_msg_text' => '撤回了一条消息', 'updated_at' => date('Y-m-d H:i:s')]);
+
+        $payload = self::presentMessage($msg);
+
+        ChatFanout::messageRecalled((int) $msg->conv_id, self::memberIds((int) $msg->conv_id), $payload);
+
+        return $payload;
     }
 
     /**

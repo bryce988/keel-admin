@@ -584,6 +584,9 @@ $params = [
     ['chat.message.maxLength',  '5000',    'advanced', 'int',    '单条文本消息最大字数'],
     ['chat.group.maxMembers',   '200',     'advanced', 'int',    '群成员数量上限'],
     ['chat.rateLimit.perMinute','20',      'advanced', 'int',    '每人每分钟发送消息上限，0=不限'],
+    // 撤回时限。调大了会让「撤回」变成事实上的删除历史（想删多久前的都行），
+    // 所以默认跟主流 IM 一致给 2 分钟——它是给手滑兜底的，不是给后悔用的
+    ['chat.message.recallWindow','120',    'advanced', 'int',    '消息可撤回时限（秒）'],
     ['sys.cache.ttl',        '300',        'advanced', 'int',    '字典缓存秒数'],
     ['sys.role.maxPerUser',  '5',          'security', 'int',    '单账号最多可持有的角色数'],
     ['sys.pwd.minLength',    '8',          'security', 'int',    '密码最小长度'],

@@ -120,6 +120,9 @@ Route::group('/admin', function () {
     Route::get('/chat/conversations/{id:\d+}/messages', [ChatController::class, 'messages'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/messages', [ChatController::class, 'send'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/read', [ChatController::class, 'read'])->setParams(['perm' => 'chat:use']);
+    // 撤回挂在 /chat/messages/ 下而不是会话路径下：撤回的对象是一条消息，
+    // 而 id 在全表唯一，不需要再带会话 id（会话归属由 service 自己查出来校验）
+    Route::post('/chat/messages/{id:\d+}/recall', [ChatController::class, 'recall'])->setParams(['perm' => 'chat:use']);
     Route::put('/chat/conversations/{id:\d+}/settings', [ChatController::class, 'settings'])->setParams(['perm' => 'chat:use']);
     Route::delete('/chat/conversations/{id:\d+}', [ChatController::class, 'remove'])->setParams(['perm' => 'chat:use']);
 

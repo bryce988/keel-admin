@@ -196,6 +196,22 @@ class ChatController
         return Result::noContent();
     }
 
+/**
+     * 撤回消息
+     * @url POST /admin/chat/messages/{id}/recall
+     * @perm chat:use
+     * @description 只能撤回**自己的**消息，且在 2 分钟内（参数 `chat.message.recallWindow`）。
+     * 重复撤回不报错，直接返回已撤回的那条——两个标签页同时点是正常操作。
+     * 库里**保留原文**（审计与误撤回追溯），但接口不再下发。
+     * @error 400 超过可撤回时间
+     * @error 403 不是自己发的消息
+     * @error 404 消息不存在，或你不在它所属的会话里
+     */
+    public function recall(Request $request, int $id): Response
+    {
+        return Result::ok(ChatService::recall($id, self::uid()));
+    }
+
     /** 用户 id 只从令牌取。一旦改成从请求读，聊天立刻变成「以任意身份发消息」 */
     private static function uid(): int
     {

@@ -10,6 +10,7 @@ use app\staff\controller\v1\AuthController as StaffAuthController;
 use app\staff\controller\v1\ChatController as StaffChatController;
 use app\staff\controller\v1\NoticeController as StaffNoticeController;
 use app\staff\controller\v1\ProfileController as StaffProfileController;
+use app\staff\controller\v1\UploadController as StaffUploadController;
 use app\staff\controller\v1\WorkbenchController as StaffWorkbenchController;
 
 /**
@@ -57,6 +58,11 @@ Route::group('/staff/v1', function () {
      * 没被授予 chat:use 的人在手机上同样调不动（fail-closed）。
      * 可见性仍由 ChatService::assertMember() 把守，非成员 404。
      */
+    // 通用上传：与后台同一份 UploadService，只是入口分端。
+    // 让移动端直接打 /admin/upload 虽然能过鉴权（两端同一套身份），
+    // 但限流、渠道头、审计口径、网关路由都按前缀治理，混着调就分不开了
+    Route::post('/upload', [StaffUploadController::class, 'store'])->setParams(['perm' => '']);
+
     Route::get('/chat/contacts', [StaffChatController::class, 'contacts'])->setParams(['perm' => 'chat:use']);
     // 固定路径排在 {id} 之前
     Route::get('/chat/unread', [StaffChatController::class, 'unread'])->setParams(['perm' => 'chat:use']);
@@ -65,6 +71,9 @@ Route::group('/staff/v1', function () {
     Route::get('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'messages'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/messages', [StaffChatController::class, 'send'])->setParams(['perm' => 'chat:use']);
     Route::post('/chat/conversations/{id:\d+}/read', [StaffChatController::class, 'read'])->setParams(['perm' => 'chat:use']);
+    // 撤回挂在 /chat/messages/ 下而不是会话路径下：撤回的对象是一条消息，
+    // 而 id 在全表唯一，不需要再带会话 id（会话归属由 service 自己查出来校验）
+    Route::post('/chat/messages/{id:\d+}/recall', [StaffChatController::class, 'recall'])->setParams(['perm' => 'chat:use']);
     Route::put('/chat/conversations/{id:\d+}/settings', [StaffChatController::class, 'settings'])->setParams(['perm' => 'chat:use']);
     Route::delete('/chat/conversations/{id:\d+}', [StaffChatController::class, 'remove'])->setParams(['perm' => 'chat:use']);
 

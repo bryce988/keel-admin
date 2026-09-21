@@ -41,6 +41,12 @@ class ChatFanout
         self::publish('message.new', $convId, $userIds, $payload);
     }
 
+    /** 撤回。下发的 payload 里不含原文（presentMessage 已经抹掉） */
+    public static function messageRecalled(int $convId, array $userIds, array $payload): void
+    {
+        self::publish('message.recalled', $convId, $userIds, $payload);
+    }
+
     /** 已读水位变化，用于多端同步「对方已读」 */
     public static function conversationRead(int $convId, array $userIds, array $payload): void
     {

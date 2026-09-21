@@ -87,6 +87,9 @@ export const BizCode = {
 
   // ---------------------------------------------------------------- 管理后台 · 即时通讯（212xx）
   CHAT_CONTENT_TOO_LONG: 21201,   // 消息内容超出长度限制
+  CHAT_RECALL_EXPIRED: 21202,     // 消息已超过可撤回时间
+  CHAT_RECALL_FORBIDDEN: 21208,   // 只能撤回自己发送的消息
+  CHAT_ATTACHMENT_INVALID: 21209, // 附件地址不合法
   CHAT_PEER_DISABLED: 21205,      // 不能与已停用的员工发起会话
   CHAT_SELF_CONVERSATION: 21206,  // 不能和自己发起会话
 

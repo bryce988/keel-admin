@@ -112,6 +112,9 @@ final class BizCode
     // 会话不存在、非会话成员、会话已解散一律复用通用的 NOT_FOUND（10404）——
     // 它们对调用方是同一件事「这个会话你够不着」，而 404 伪装本来就是全站约定
     public const CHAT_CONTENT_TOO_LONG = 21201;   // 消息内容超出长度限制
+    public const CHAT_RECALL_EXPIRED = 21202;     // 消息已超过可撤回时间
+    public const CHAT_RECALL_FORBIDDEN = 21208;   // 只能撤回自己发送的消息
+    public const CHAT_ATTACHMENT_INVALID = 21209; // 附件地址不合法
     public const CHAT_PEER_DISABLED = 21205;      // 不能与已停用的员工发起会话
     public const CHAT_SELF_CONVERSATION = 21206;  // 不能和自己发起会话
 
