@@ -15,24 +15,32 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Bell, Delete, Document, Picture, Promotion, RefreshLeft, Top } from '@element-plus/icons-vue'
+import { Bell, Delete, Document, Picture, Promotion, RefreshLeft, Top, UserFilled } from '@element-plus/icons-vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { chatSocket } from '@/utils/chatSocket'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
 import { getContactDepts, getContacts as getContactPage, type ContactDept, type ContactPerson } from '@/api/contact'
 import {
+  addMembers,
+  createGroup,
+  dissolveGroup,
+  getConversation,
   getConversations,
+  getMembers,
   getMessages,
   markRead,
   openConversation,
-  removeConversation,
   recallMessage,
+  removeConversation,
+  removeMember,
   sendMessage,
+  updateGroup,
   updateSettings,
   uploadChatFile,
   type ChatConversation,
   type ChatConversationRow,
+  type ChatMember,
   type ChatMessage,
 } from '@/api/chat'
 
@@ -84,6 +92,18 @@ const uploading = ref(false)
  * 对方读到哪条，前面的必然都读过了（chat-prd.md §5.4）。
  */
 const peerReadSeq = ref(0)
+
+/** 通讯录多选：勾了人就进入「建群」模式 */
+const picked = ref<number[]>([])
+
+/** 群成员抽屉 */
+const memberDrawer = ref(false)
+const members = ref<ChatMember[]>([])
+const loadingMembers = ref(false)
+const addMode = ref(false)
+
+const isGroup = computed(() => conversation.value?.type === 2)
+const isOwner = computed(() => !!conversation.value && conversation.value.owner_id === myId.value)
 
 // ---------------------------------------------------------------- 通讯录
 
@@ -431,6 +451,138 @@ async function onPaste(e: ClipboardEvent) {
   await onFilePicked({ target: { files: [file], value: '' } } as unknown as Event, 'image')
 }
 
+// ---------------------------------------------------------------- 群
+
+function togglePick(id: number) {
+  const i = picked.value.indexOf(id)
+  if (i >= 0) picked.value.splice(i, 1)
+  else picked.value.push(id)
+}
+
+/**
+ * 建群
+ *
+ * 勾满 2 人才给建：两个人的「群」就是单聊，而单聊有自己的去重逻辑。
+ * 群名留空让服务端拼默认名——前端再拼一遍就是两份规则。
+ */
+async function submitGroup() {
+  if (picked.value.length < 2) {
+    ElMessage.warning('群聊至少需要选择 2 位同事')
+    return
+  }
+
+  try {
+    const conv = await createGroup(picked.value)
+    picked.value = []
+    sideTab.value = 'chat'
+    await loadList()
+
+    const row = conversations.value.find((c) => c.id === conv.id)
+    if (row) await selectConversation(row)
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '建群失败')
+  }
+}
+
+async function openMembers() {
+  memberDrawer.value = true
+  addMode.value = false
+  loadingMembers.value = true
+  try {
+    members.value = await getMembers(conversation.value!.id)
+  } finally {
+    loadingMembers.value = false
+  }
+}
+
+/** 进入「加人」模式：复用通讯录，但排掉已在群里的 */
+async function startAdd() {
+  addMode.value = true
+  picked.value = []
+  await ensureDepts()
+  await loadContacts()
+}
+
+const addableContacts = computed(() => {
+  const inGroup = new Set(members.value.map((m) => m.user_id))
+  return contacts.value.filter((c) => !inGroup.has(c.id))
+})
+
+async function submitAdd() {
+  if (!picked.value.length) return
+
+  try {
+    await addMembers(conversation.value!.id, picked.value)
+    picked.value = []
+    addMode.value = false
+    await openMembers()
+    await refreshConversation()
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '添加失败')
+  }
+}
+
+async function kick(m: ChatMember) {
+  await ElMessageBox.confirm(`确定把「${m.real_name}」移出群聊？`, '移出成员', { type: 'warning' })
+  await removeMember(conversation.value!.id, m.user_id)
+  await openMembers()
+  await refreshConversation()
+}
+
+async function quitGroup() {
+  await ElMessageBox.confirm('退出后将不再接收该群消息，历史记录也会从列表移除。', '退出群聊', {
+    type: 'warning',
+    confirmButtonText: '退出',
+  })
+
+  const id = conversation.value!.id
+  await removeMember(id, myId.value)
+  memberDrawer.value = false
+  await afterLeaveGroup(id)
+}
+
+async function doDissolve() {
+  await ElMessageBox.confirm(
+    '解散后所有成员的会话都会消失。消息会保留在服务器上（审计需要），但没有人能再看到。',
+    '解散群聊',
+    { type: 'warning', confirmButtonText: '解散' },
+  )
+
+  const id = conversation.value!.id
+  await dissolveGroup(id)
+  memberDrawer.value = false
+  await afterLeaveGroup(id)
+}
+
+/** 退群/解散之后：会话没了，清空右栏并刷新列表 */
+async function afterLeaveGroup(id: number) {
+  conversation.value = null
+  messages.value = []
+  chatStore.leave()
+  conversations.value = conversations.value.filter((c) => c.id !== id)
+  void chatStore.refresh()
+}
+
+async function renameGroup() {
+  const { value } = await ElMessageBox.prompt('群名称', '修改群名', {
+    inputValue: conversation.value!.name,
+    inputValidator: (v: string) => (v.trim() ? true : '群名称不能为空'),
+  })
+
+  const updated = await updateGroup(conversation.value!.id, { name: value.trim() })
+  conversation.value = { ...conversation.value!, name: updated.name }
+
+  const row = conversations.value.find((c) => c.id === updated.id)
+  if (row) row.name = updated.name
+}
+
+/** 成员数变了要刷新标题栏上的人数 */
+async function refreshConversation() {
+  if (!conversation.value) return
+  const fresh = await getConversation(conversation.value.id)
+  conversation.value = { ...conversation.value, ...fresh }
+}
+
 // ---------------------------------------------------------------- 撤回
 
 /** 2 分钟内、且是自己发的，才显示撤回按钮。服务端仍会再判一次 */
@@ -768,14 +920,24 @@ function timeOf(m: LocalMessage) {
         </div>
 
         <div v-loading="loadingContacts" class="chat__people">
-          <button v-for="c in contacts" :key="c.id" class="contact" type="button" @click="openWith(c)">
-            <el-avatar :size="36" :src="c.avatar || undefined">{{ c.real_name.slice(0, 1) }}</el-avatar>
-            <div class="contact__body">
-              <div class="contact__name">{{ c.real_name }}</div>
-              <!-- 手机号无权限时是掩码，直接显示即可，不用判断 -->
-              <div class="contact__sub">{{ c.post_name || c.dept_name }}{{ c.phone ? ' · ' + c.phone : '' }}</div>
+          <div v-for="c in contacts" :key="c.id" class="contact">
+            <!-- 勾选进入建群模式；不勾直接点行是单聊。
+                 两个动作共用一行，比「先选模式再选人」少一步 -->
+            <el-checkbox
+              :model-value="picked.includes(c.id)"
+              class="contact__check"
+              @change="togglePick(c.id)"
+              @click.stop
+            />
+            <div class="contact__hit" @click="picked.length ? togglePick(c.id) : openWith(c)">
+              <el-avatar :size="36" :src="c.avatar || undefined">{{ c.real_name.slice(0, 1) }}</el-avatar>
+              <div class="contact__body">
+                <div class="contact__name">{{ c.real_name }}</div>
+                <!-- 手机号无权限时是掩码，直接显示即可，不用判断 -->
+                <div class="contact__sub">{{ c.post_name || c.dept_name }}{{ c.phone ? ' · ' + c.phone : '' }}</div>
+              </div>
             </div>
-          </button>
+          </div>
 
           <EmptyState
             v-if="!loadingContacts && !contacts.length"
@@ -785,6 +947,13 @@ function timeOf(m: LocalMessage) {
             :size="60"
           />
         </div>
+
+        <!-- 勾了人才出现，不占常驻空间 -->
+        <div v-if="picked.length" class="chat__pickbar">
+          <span class="chat__pickbar-text">已选 {{ picked.length }} 人</span>
+          <el-button link @click="picked = []">清空</el-button>
+          <el-button type="primary" size="small" @click="submitGroup">建群</el-button>
+        </div>
       </div>
     </aside>
 
@@ -793,16 +962,30 @@ function timeOf(m: LocalMessage) {
       <template v-if="conversation">
         <header class="chat__header">
           <span class="chat__title">{{ conversation.name }}</span>
+          <span v-if="isGroup" class="chat__count">{{ conversation.member_count }} 人</span>
           <el-tag :type="connected ? 'success' : 'info'" size="small" effect="plain">
             {{ connected ? '已连接' : '连接中…' }}
           </el-tag>
+          <div class="chat__header-ops">
+            <el-button v-if="isGroup" text :icon="UserFilled" @click="openMembers">群成员</el-button>
+          </div>
         </header>
 
         <div ref="listRef" v-loading="loadingMessages" class="chat__messages">
           <div v-for="m in messages" :key="m.client_msg_id || m.id" class="msg" :class="{ 'msg--mine': isMine(m) }">
+            <!-- 系统消息（入群、改群名、解散）：与撤回同一种居中灰字。
+                 它们本来就该按时间夹在聊天记录里，所以用的是同一套 seq -->
+            <div v-if="m.type === 'system'" class="msg__recalled">{{ m.content }}</div>
+
             <!-- 撤回：整条变成一行灰字，不保留气泡。留着气泡会让人以为内容还在 -->
-            <div v-if="m.status === 2" class="msg__recalled">
-              {{ isMine(m) ? '你撤回了一条消息' : `${m.sender_name} 撤回了一条消息` }}
+            <div v-else-if="m.status === 2" class="msg__recalled">
+              {{
+                m.recalled_by !== m.sender_id
+                  ? '一条消息已被群主撤回'
+                  : isMine(m)
+                    ? '你撤回了一条消息'
+                    : `${m.sender_name} 撤回了一条消息`
+              }}
             </div>
 
             <template v-else>
@@ -918,6 +1101,59 @@ function timeOf(m: LocalMessage) {
 
       <EmptyState v-else scene="empty" description="选择左侧任意同事，开始对话" :action="false" />
     </section>
+
+    <!-- 群成员抽屉。用抽屉不用弹窗：成员列表可能几十行，
+         弹窗撑不下就要在内部再套一层滚动（P2 定的规范）
+
+         ⚠️ `#footer` 必须是 el-drawer 的**直接子元素**。把它包进
+         `<template v-if>` 里的话编译器会直接崩（Cannot read properties of
+         undefined (reading 'type')），而报错信息完全指不到这一点。
+         所以两种模式的分支写在插槽**内部**，不是套在插槽外面 -->
+    <el-drawer v-model="memberDrawer" :title="addMode ? '添加成员' : '群成员'" size="360px">
+      <el-input v-if="addMode" v-model="keyword" placeholder="搜索同事" clearable size="small" />
+
+      <div v-loading="addMode ? loadingContacts : loadingMembers" class="members">
+        <template v-if="!addMode">
+          <div v-for="m in members" :key="m.user_id" class="member">
+            <el-avatar :size="34" :src="m.avatar || undefined">{{ m.real_name.slice(0, 1) }}</el-avatar>
+            <span class="member__name">{{ m.real_name }}</span>
+            <el-tag v-if="m.role === 1" type="warning" size="small" effect="plain">群主</el-tag>
+            <!-- 群主自己不显示移出按钮：移出群主等于让群没人管，服务端也会拒 -->
+            <el-button
+              v-if="isOwner && m.user_id !== myId"
+              text
+              size="small"
+              :icon="Delete"
+              @click="kick(m)"
+            />
+          </div>
+        </template>
+
+        <template v-else>
+          <label v-for="c in addableContacts" :key="c.id" class="member member--pick">
+            <el-checkbox :model-value="picked.includes(c.id)" @change="togglePick(c.id)" />
+            <el-avatar :size="34" :src="c.avatar || undefined">{{ c.real_name.slice(0, 1) }}</el-avatar>
+            <span class="member__name">{{ c.real_name }}</span>
+          </label>
+        </template>
+      </div>
+
+      <template #footer>
+        <div v-if="!addMode" class="members__foot">
+          <el-button v-if="isOwner" type="primary" @click="startAdd">添加成员</el-button>
+          <el-button v-if="isOwner" @click="renameGroup">改群名</el-button>
+          <el-button v-if="isOwner" type="danger" plain @click="doDissolve">解散群聊</el-button>
+          <el-button v-else type="danger" plain @click="quitGroup">退出群聊</el-button>
+        </div>
+
+        <div v-else class="members__foot">
+          <el-button @click="addMode = false">返回</el-button>
+          <el-button type="primary" :disabled="!picked.length" @click="submitAdd">
+            添加{{ picked.length ? ` ${picked.length} 人` : '' }}
+          </el-button>
+        </div>
+      </template>
+    </el-drawer>
 
   </div>
 </template>
@@ -1209,6 +1445,80 @@ function timeOf(m: LocalMessage) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.contact__check {
+  margin-right: 2px;
+}
+
+.contact__hit {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* 勾了人才出现，不占常驻空间 */
+.chat__pickbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color-lighter);
+}
+
+.chat__pickbar-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.chat__count {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.chat__header-ops {
+  margin-left: auto;
+}
+
+.members {
+  padding: 4px 0;
+}
+
+.member {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 6px;
+}
+
+.member--pick {
+  cursor: pointer;
+}
+
+.member--pick:hover {
+  background: var(--el-fill-color-light);
+}
+
+.member__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.members__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .chat__main {

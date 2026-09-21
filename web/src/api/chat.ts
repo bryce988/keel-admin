@@ -32,6 +32,9 @@ export interface ChatConversation {
   last_msg_text: string
   /** 单聊时是对方的 id，群聊为 0 */
   peer_id: number
+  member_count: number
+  /** 群主 id，单聊为 0 */
+  owner_id: number
 }
 
 export interface ChatMessage {
@@ -54,6 +57,9 @@ export interface ChatMessage {
     ext: string
     width?: number
     height?: number
+    /** @ 到的人；`at_all` 时服务端已展开成全体成员 */
+    at_user_ids?: number[]
+    at_all?: boolean
   } | null
   /** 客户端生成的幂等 ID，本地乐观上屏的消息靠它对号入座 */
   client_msg_id: string
@@ -110,6 +116,53 @@ export function updateSettings(convId: number, data: { is_pinned?: boolean; is_m
 /** 删除会话：只从我的列表移除，不删消息，对方不受影响 */
 export function removeConversation(convId: number) {
   return request.delete<unknown, void>(`/admin/chat/conversations/${convId}`)
+}
+
+// ---------------------------------------------------------------- 群聊
+
+export interface ChatMember {
+  user_id: number
+  real_name: string
+  avatar: string
+  /** 0 成员 · 1 群主 */
+  role: number
+  joined_at: string | null
+}
+
+/**
+ * 建群
+ *
+ * 至少选 2 人——两个人的「群」就是单聊，而单聊有自己的去重逻辑（`uk_peer`）。
+ * 允许建的话会出现「我和他既有单聊又有一个双人群」，用户分不清该在哪说话。
+ */
+export function createGroup(userIds: number[], name = '') {
+  return request.post<unknown, ChatConversation>('/admin/chat/groups', { user_ids: userIds, name })
+}
+
+export function getMembers(convId: number) {
+  return request.get<unknown, ChatMember[]>(`/admin/chat/conversations/${convId}/members`)
+}
+
+/** 加人（群主）。新成员能看到入群之前的历史 */
+export function addMembers(convId: number, userIds: number[]) {
+  return request.post<unknown, { added: number[] }>(
+    `/admin/chat/conversations/${convId}/members`,
+    { user_ids: userIds },
+  )
+}
+
+/** 移出成员 / 退群。uid 是自己就是退群，是别人就是踢人（只有群主能踢） */
+export function removeMember(convId: number, uid: number) {
+  return request.delete<unknown, void>(`/admin/chat/conversations/${convId}/members/${uid}`)
+}
+
+export function updateGroup(convId: number, data: { name?: string; avatar?: string }) {
+  return request.put<unknown, ChatConversation>(`/admin/chat/conversations/${convId}/group`, data)
+}
+
+/** 解散（群主）。会话从所有人列表移除，消息保留在库里 */
+export function dissolveGroup(convId: number) {
+  return request.delete<unknown, void>(`/admin/chat/conversations/${convId}/group`)
 }
 
 export function getConversation(id: number) {
