@@ -193,3 +193,18 @@ export function sendChatMessage(convId, payload) {
 export function markChatRead(convId, lastReadSeq) {
 	return request(`/staff/v1/chat/conversations/${convId}/read`, 'POST', { last_read_seq: lastReadSeq })
 }
+
+/**
+ * 上传聊天附件
+ *
+ * 走通用上传接口，`biz=chat` 决定落盘目录。**服务端只认 /uploads/chat/ 前缀**——
+ * 发消息时会校验 extra.url，传别处的地址会被 21209 挡掉。
+ */
+export function uploadChatFile(filePath) {
+	return upload('/staff/v1/upload', filePath, 'file', true, { biz: 'chat' })
+}
+
+/** 撤回。只能撤自己的、2 分钟内的；重复调用不报错 */
+export function recallChatMessage(messageId) {
+	return request(`/staff/v1/chat/messages/${messageId}/recall`, 'POST')
+}

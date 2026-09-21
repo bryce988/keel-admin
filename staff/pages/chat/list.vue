@@ -217,6 +217,11 @@
 	}
 
 	.row {
+		/* 同聊天室：不禁用的话长按会先弹出 WebView 自带的「复制 / 搜索」，
+		   把 uni.showActionSheet 盖掉，表现是「长按菜单时好时坏」 */
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
 		position: relative;
 		display: flex;
 		align-items: center;

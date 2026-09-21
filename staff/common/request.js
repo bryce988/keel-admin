@@ -226,12 +226,15 @@ export function request(path, method = 'GET', data = null, withToken = true, ret
  * 手写 Content-Type 会漏掉它，后端解析不出文件。
  * 另一个坑：uploadFile 回来的 data 是**字符串**，要自己 JSON.parse。
  */
-export function upload(path, filePath, name = 'file', retry = true) {
+export function upload(path, filePath, name = 'file', retry = true, formData = null) {
 	return new Promise((resolve, reject) => {
 		uni.uploadFile({
 			url: BASE_URL + path,
 			filePath,
 			name,
+			// 附加字段（如通用上传的 biz=chat）。uni.uploadFile 只认 formData 这一个入口，
+			// 拼进 url 的 query 在 multipart 请求里后端 $request->post() 取不到
+			formData: formData || {},
 			// 不设 Content-Type：交给框架自己带 multipart 的 boundary，手写会漏掉它
 			header: {
 				'X-Channel': CHANNEL,
@@ -254,7 +257,10 @@ export function upload(path, filePath, name = 'file', retry = true) {
 				}
 				if (res.statusCode === 401 && retry && getRefreshToken()) {
 					doRefresh()
-						.then(() => resolve(upload(path, filePath, name, false)))
+						// ⚠️ formData 要一起传下去。漏了的话，401 续期后的那次重传就不带
+						// biz=chat 了，文件会落到 uploads/common/，而聊天接口只认
+						// /uploads/chat/ 前缀——表现是「偶尔发图失败，重试又好了」
+						.then(() => resolve(upload(path, filePath, name, false, formData)))
 						.catch(() => {
 							onUnauthorized(body.message)
 							reject({ code: 401, message: body.message || '登录已失效' })
