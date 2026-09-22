@@ -47,9 +47,9 @@
   --keel-tint: #ffffff;
   --keel-shade: #000000;
 
-  /* 应用外壳的三级表面：顶栏 → 页签 → 内容画布 */
+  /* 顶栏与页签共用一层 chrome，内容画布单独下沉一档。 */
   --keel-topbar-bg: var(--el-bg-color);
-  --keel-tags-bg: var(--el-fill-color-light);
+  --keel-tags-bg: var(--keel-topbar-bg);
   --keel-content-bg: var(--el-bg-color-page);
 }
 
@@ -165,9 +165,9 @@ html.dark {
   --keel-tint: #141414;
   --keel-shade: #ffffff;
 
-  /* 深色下逐级降低明度，仍全部取自官方表面色阶 */
+  /* 深色下顶栏与页签仍保持同色，内容画布再降低明度。 */
   --keel-topbar-bg: var(--el-bg-color-overlay);
-  --keel-tags-bg: var(--el-bg-color);
+  --keel-tags-bg: var(--keel-topbar-bg);
   --keel-content-bg: var(--el-bg-color-page);
 
   --el-color-primary-rgb: 64, 158, 255;

@@ -71,6 +71,8 @@ function hasChildren(node: MenuNode) {
 .sidebar-menu {
   /* 与侧栏容器共用白色内容底，避免菜单之外的空白区域出现灰色断层。 */
   --el-menu-bg-color: var(--el-bg-color);
+  /* EP 默认把二级项做矮一档；这里统一一级、二级的行高和点击区域。 */
+  --el-menu-sub-item-height: var(--el-menu-item-height);
   border-right: none;
 }
 
@@ -85,6 +87,5 @@ function hasChildren(node: MenuNode) {
 
 .sidebar-menu :deep(.el-sub-menu .el-menu-item) {
   min-width: 0;
-  margin-left: 20px;
 }
 </style>

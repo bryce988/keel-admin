@@ -189,11 +189,9 @@ onUnmounted(() => {
         :class="{ 'is-active': tag.path === route.path, 'is-affix': tag.affix }"
         @contextmenu.prevent="openFromTag($event, tag.path)"
       >
-        <span class="dot" />
         <span class="title">{{ tag.title }}</span>
-        <!-- 固定的页签把关闭位换成图钉：既表明状态，也说明它为什么关不掉 -->
-        <el-icon v-if="tag.affix" class="pin"><Paperclip /></el-icon>
-        <el-icon v-else class="close" @click.prevent.stop="onClose(tag.path)">
+        <!-- 固定页签和参考样式一致，只保留标题；其余页签显示关闭按钮 -->
+        <el-icon v-if="!tag.affix" class="close" @click.prevent.stop="onClose(tag.path)">
           <Close />
         </el-icon>
       </router-link>
@@ -229,7 +227,7 @@ onUnmounted(() => {
   gap: 8px;
   height: var(--keel-tags-height);
   padding: 0 16px;
-  /* 页签栏是顶栏与内容画布之间的过渡层，避免三块 chrome 连成一片。 */
+  /* 与顶栏使用同一表面色，让整块顶部导航保持连续。 */
   background: var(--keel-tags-bg);
   border-bottom: 1px solid var(--el-border-color-light);
   /* 阴影令牌在设计层里已经归零（web/docs/DESIGN.md：chrome 一律扁平，分隔靠发丝线）。
@@ -239,8 +237,7 @@ onUnmounted(() => {
 
 .strip {
   display: flex;
-  /* 间距 10px：页签之间靠得太近时，一排看下来是一整条色块而不是几个独立标签 */
-  gap: 10px;
+  gap: 8px;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
@@ -254,48 +251,30 @@ onUnmounted(() => {
 .tag {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: none;
-  /* 30px / 13px：比正文的 14px 小半档，页签是导航不是内容，
-     但也不能像原来 26px / 12px 那样小到要凑近才看清 */
+  /* 每个页签都有完整边界，避免一排文字浮在背景上、难以分辨点击范围。 */
   height: 30px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  /*
-   * 控件档（8px），不用胶囊
-   *
-   * 试过胶囊，理由是 web/docs/DESIGN.md 里「当前的、可点的」多是胶囊形。但页签只有 30px 高，
-   * 圆角占到高度的一半，一条页签栏排下来是一串药丸——与按钮那处是同一个毛病：
-   * 胶囊是给 44px 级别的大控件定的，尺寸降一半之后比例就不对了。
-   */
-  border-radius: var(--keel-radius);
-  background: transparent;
+  padding: 0 10px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-small);
+  background: var(--el-bg-color);
   color: var(--el-text-color-regular);
   font-size: 13px;
   text-decoration: none;
-  transition: all 0.15s;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
 }
 
 .tag:hover {
   color: var(--el-color-primary);
-  background: var(--el-fill-color-light);
-}
-
-.tag .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: transparent;
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
 }
 
 .tag.is-active {
   background: var(--el-color-primary-light-9);
-  border-color: var(--el-color-primary-light-7);
-  color: var(--el-color-primary-dark-2);
-}
-
-.tag.is-active .dot {
-  background: var(--el-color-primary);
+  border-color: var(--el-color-primary-light-5);
+  color: var(--el-color-primary);
 }
 
 .tag .close {
@@ -312,15 +291,12 @@ onUnmounted(() => {
 
 .tag.is-active .close:hover {
   background: var(--el-color-primary);
-  color: var(--el-bg-color);
+  color: #fff;
 }
 
-.tag .pin {
-  width: 14px;
-  height: 14px;
-  font-size: 11px;
-  /* 图钉是状态而非按钮，压暗一档，别让人以为能点 */
-  opacity: 0.65;
+.tag:focus-visible {
+  outline: 2px solid var(--el-color-primary-light-5);
+  outline-offset: 1px;
 }
 
 /* 右端的下拉入口。做成和页签同高，视觉上属于这条横条而不是浮在上面 */
