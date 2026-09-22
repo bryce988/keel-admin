@@ -629,7 +629,8 @@ CORS_ALLOW_ORIGINS=http://localhost:*,http://127.0.0.1:*,http://192.168.*,http:/
 ### 8.1 nginx
 
 ⚠️ 生产**只开了 8080**（宝塔占着 80，见 CLAUDE.md），所以 WebSocket 必须从 8080 反代过去，
-不能另开公网端口。
+不能另开公网端口。配置在 `docker/nginx/default.conf`（2026-09-22 才补进去：此前这段只写在本文里，
+线上握手一直失败，而开发环境直连 8788、不经 nginx，本地复现不了）。
 
 ```nginx
 location ^~ /ws {
