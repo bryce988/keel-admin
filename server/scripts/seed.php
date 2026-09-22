@@ -75,7 +75,9 @@ $tree = [
      */
     [
         'name' => '协同', 'code' => 'collab', 'type' => 1,
-        'path' => '/collab', 'component' => 'Layout', 'icon' => 'ChatDotRound', 'sort' => 20,
+        // 目录用「连接」而不是聊天气泡：子项「消息」已经是气泡（ChatLineRound），
+        // 两个气泡上下挨着，侧栏里分不出哪个是目录
+        'path' => '/collab', 'component' => 'Layout', 'icon' => 'Connection', 'sort' => 20,
         'children' => [
             ['name' => '消息', 'code' => 'chat:use', 'type' => 2,
              'path' => '/collab/chat', 'component' => 'views/chat/index.vue',

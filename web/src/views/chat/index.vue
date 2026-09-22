@@ -24,9 +24,9 @@ import {
   FolderOpened,
   Loading,
   MuteNotification,
+  Notebook,
   Picture,
   Plus,
-  Postcard,
   RefreshLeft,
   Remove,
   Search,
@@ -1725,7 +1725,8 @@ async function copyText(m: LocalMessage) {
           :class="{ 'rail__btn--on': sideTab === 'contact' }"
           @click="switchTab('contact')"
         >
-          <el-icon><Postcard /></el-icon>
+          <!-- 通讯录用本子而不是 Postcard：后者像证件，而且「岗位管理」菜单已经在用它 -->
+          <el-icon><Notebook /></el-icon>
         </button>
       </el-tooltip>
     </nav>
