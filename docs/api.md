@@ -628,6 +628,7 @@ GET /admin/dicts/common_status/items → 200 OK
 | 方法 | 路径 | 权限标识 | 说明 |
 |---|---|---|---|
 | GET | `/admin/my/notices` | 登录态 | 铃铛用：未读数 + 最新未读 id/标题 + 最近 10 条 |
+| GET | `/admin/my/notices/inbox` | 登录态 | 聊天页「系统公告」面板用：分页收件箱（`page_num` / `page_size`），每条带 `is_read`，另带 `unread_count`。与 `GET /staff/v1/notices` 同一份查询 |
 | GET | `/admin/my/notices/{id}` | 登录态 | 读一条，**同时落已读回执** |
 | POST | `/admin/my/notices/read-all` | 登录态 | 全部已读，返回 `{count}`（本次新增的回执数） |
 
@@ -663,8 +664,11 @@ GET /admin/my/notices → 200 OK
   `target="_blank" rel="noopener"`。**存进去的就是干净的**，所以读的地方直接 `v-html`。
   反过来（渲染时净化）要求每个渲染点都记得做一次，漏一个就是漏一个洞
 - 列表的 `summary` 是正文**剥成纯文字**后的前 60 字，不是截断的 HTML
-- **没有推送**：前端每 60 秒轮询一次 `/admin/my/notices`，标签页不可见时不轮询。
-  脚手架不引长连接，公告延迟一分钟没有影响
+- **推送 + 轮询兜底**（2026-09-22 起）：发布、撤回、删除、编辑已发布的公告时，服务端经聊天长连接
+  向所有在线用户广播 `notice.changed`；某人读了公告，只推给他本人 `notice.read`（多标签页 / 多设备同步）。
+  顶栏铃铛（现在只对没有 `chat:use` 的人显示）仍每 60 秒轮询 `/admin/my/notices` 兜底。事件定义见 `docs/chat-tech.md` §5.2
+- **未读公告计入聊天总未读**：`GET /admin/chat/unread`（移动端 `/staff/v1/chat/unread`）的 `total` 含未读公告，
+  另带 `notice: {unread, latest_id, latest_title, latest_at}` 给消息列表顶部的「系统公告」一行
 - 状态字典是 `notice_status`（0 草稿 / 1 已发布），**不复用 `enable_status`**——
   公告没有「停用」这回事，共用会让列表里显示成「已停用」
 

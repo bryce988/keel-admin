@@ -288,9 +288,15 @@ class ChatService
             }
         }
 
+        // 系统公告计入总数（产品定的：不管在哪看，未读只有一个数字）。
+        // 顶栏聊天红点、浏览器标题、移动端「消息」tab 的角标都读这个 total
+        $notice = NoticeService::chatEntry($userId);
+
         return [
-            // 红点上的数字：不含免打扰
-            'total' => $total,
+            // 红点上的数字：不含免打扰的会话，含未读公告
+            'total' => $total + $notice['unread'],
+            // 消息列表顶部「系统公告」那一行
+            'notice' => $notice,
             // 有未读的会话数：含免打扰，用于「有消息但不弹数字」的小圆点
             'conversations' => $convs,
             'has_at' => $hasAt,

@@ -7,6 +7,7 @@ import DictTag from '@/components/DictTag.vue'
 import { useDictStore } from '@/stores/dict'
 import { NOTICE_POLL_MS, useNoticeStore } from '@/stores/notice'
 import { useUserStore } from '@/stores/user'
+import { chatSocket } from '@/utils/chatSocket'
 
 /**
  * 顶栏消息铃铛
@@ -71,6 +72,15 @@ function goList() {
  */
 let timer = 0 as ReturnType<typeof setInterval> | 0
 
+/*
+ * 长连接上的公告推送：发布后立刻弹，不用等下一次轮询
+ *
+ * 轮询保留作兜底——长连接断着的时候（网关重启、网络切换）仍然一分钟内能看到。
+ * 两条路重复触发也无害：pollAndPop 靠「弹过的最新 id」判断，同一条不会弹两次
+ */
+let offChanged: (() => void) | undefined
+let offRead: (() => void) | undefined
+
 /** 标签页不可见时不轮询；切回来立刻补一次，否则最长要等一整个间隔才看到新消息 */
 function onVisible() {
   if (document.visibilityState === 'visible') void pollAndPop()
@@ -85,12 +95,18 @@ onMounted(() => {
   }, NOTICE_POLL_MS)
 
   document.addEventListener('visibilitychange', onVisible)
+
+  offChanged = chatSocket.on('notice.changed', () => void pollAndPop())
+  // 在聊天页、别的标签页或手机上读了公告：铃铛的角标与列表跟着变
+  offRead = chatSocket.on('notice.read', () => void noticeStore.poll())
 })
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
   timer = 0
   document.removeEventListener('visibilitychange', onVisible)
+  offChanged?.()
+  offRead?.()
 })
 </script>
 

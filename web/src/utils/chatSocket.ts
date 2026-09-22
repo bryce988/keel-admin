@@ -9,7 +9,16 @@
  */
 
 /** 下行事件，与网关的帧格式一一对应（chat-tech.md §5.2） */
-export type ChatEvent = 'ready' | 'ping' | 'pong' | 'message.new' | 'message.recalled' | 'conversation.read'
+export type ChatEvent =
+  | 'ready'
+  | 'ping'
+  | 'pong'
+  | 'message.new'
+  | 'message.recalled'
+  | 'conversation.read'
+  // 系统公告：变化（发布 / 撤回 / 删除 / 编辑）是全员广播，已读只推给本人
+  | 'notice.changed'
+  | 'notice.read'
 
 type Handler = (data: any) => void
 

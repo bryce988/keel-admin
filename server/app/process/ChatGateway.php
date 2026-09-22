@@ -246,6 +246,16 @@ class ChatGateway
             'data' => $frame['data'] ?? null,
         ], JSON_UNESCAPED_UNICODE);
 
+        // 全员广播（系统公告）：推给本进程持有的每一条连接。
+        // 这仍是纯传输——「谁该收」已经由发布方决定成了「所有人」，网关不做判断
+        if (!empty($frame['all'])) {
+            foreach (array_keys($this->connections) as $connId) {
+                $conn = $this->worker->connections[$connId] ?? null;
+                $conn?->send($payload);
+            }
+            return;
+        }
+
         foreach ((array) $frame['user_ids'] as $uid) {
             foreach (array_keys($this->userIndex[(int) $uid] ?? []) as $connId) {
                 // 本进程持有的连接才推得到。count>1 时其余连接在别的进程里，

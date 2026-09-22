@@ -1,5 +1,5 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
-import { getUnread, type ChatMessage } from '@/api/chat'
+import { getUnread, type ChatMessage, type ChatNoticeEntry } from '@/api/chat'
 import { chatSocket } from '@/utils/chatSocket'
 import { notifyNewMessage } from '@/utils/chatNotify'
 import { useUserStore } from '@/stores/user'
@@ -23,8 +23,10 @@ import router from '@/router'
  */
 export const useChatStore = defineStore('chat', {
   state: () => ({
-    /** 红点上的数字，不含免打扰 */
+    /** 红点上的数字：不含免打扰的会话，含未读公告 */
     total: 0,
+    /** 消息列表顶部「系统公告」那一行的数据，由服务端的未读汇总一并给出 */
+    notice: { unread: 0, latest_id: 0, latest_title: '', latest_at: null } as ChatNoticeEntry,
     /** 有未读的会话数，含免打扰 */
     conversations: 0,
     hasAt: false,
@@ -41,6 +43,7 @@ export const useChatStore = defineStore('chat', {
       try {
         const d = await getUnread()
         this.total = d.total
+        this.notice = d.notice
         this.conversations = d.conversations
         this.hasAt = d.has_at
         this.syncTitle()
@@ -92,6 +95,25 @@ export const useChatStore = defineStore('chat', {
       })
 
       chatSocket.on('conversation.read', () => void this.refresh())
+
+      /*
+       * 系统公告计入总数，所以公告有变化也要对一次
+       *
+       * 这里不做乐观 +1：公告的变化有发布、撤回、删除、编辑四种，
+       * 只有发布是 +1，其余要么 -1 要么不变，自己算容易算错，直接拉一次最稳。
+       * 只有发布才提醒（提示音 / 桌面通知）；撤回、删除只是让数字对齐
+       */
+      chatSocket.on('notice.changed', (data) => {
+        void this.refresh()
+        const d = data as { id: number; action: string; title: string }
+        if (d.action === 'published') {
+          notifyNewMessage('系统公告', d.title, () => {
+            void router.push({ path: '/collab/chat', query: { notice: String(d.id) } })
+          })
+        }
+      })
+      // 在别的标签页 / 手机上读了公告，这里的数字也要跟着减
+      chatSocket.on('notice.read', () => void this.refresh())
     },
 
     /**

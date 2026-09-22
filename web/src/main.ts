@@ -10,15 +10,18 @@ import { createPinia } from 'pinia'
  * 1. 深色模式令牌：全站的 CSS 变量表，不属于任何单个组件
  * 2. 基础重置（base）：按需导入只会带上用到的**组件**样式，
  *    EP 的 reset/base 没有任何组件引用它，漏了会看到字体与行高整体不对
- * 3. ElMessage / ElMessageBox：它们在各页面里是显式 `import { ElMessage } from 'element-plus'`
+ * 3. ElMessage / ElMessageBox / ElNotification：它们在各页面里是显式 `import { ElMessage } from 'element-plus'`
  *    的，AutoImport 对已声明的标识符不介入，也就带不上样式。
- *    不引这两行的表现是「提示框弹出来了但没有底色和边框」，
- *    而且只在生产构建里出现（dev 下 EP 的样式常被别的路径捎带进来），最容易漏
+ *    不引的表现是「提示框弹出来了但没有底色和边框」，
+ *    而且只在生产构建里出现（dev 下 EP 的样式常被别的路径捎带进来），最容易漏。
+ *    ElNotification 漏得更隐蔽：没有定位样式时它被排成一个整屏宽的块、落在可视区下方，
+ *    **弹了但看不见**——顶栏铃铛的「新公告」提示就这样一直没人见过
  */
 import 'element-plus/theme-chalk/base.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-message-box.css'
+import 'element-plus/theme-chalk/el-notification.css'
 import './styles/index.css'
 /*
  * 设计层排在 index.css **之后**：它按 web/docs/DESIGN.md 重写主色、中性色、圆角与阴影，

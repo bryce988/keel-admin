@@ -90,11 +90,12 @@ export function readAllNotices() {
  * ⚠️ 索引是**位置**不是语义，改 tabBar 顺序必须回来改这里。
  * 2026-09-20 改过一次：原来公告占 index 1，现在 tabBar 是
  * 0 消息(聊天) / 1 通讯录 / 2 工作台 / 3 我的，公告降级成工作台里的入口，
- * 所以公告的未读数标到工作台上。忘了改的话角标会跑到通讯录上，
- * 而那是个纯浏览页面，用户完全不知道那个红点在说什么。
+ * 忘了改的话角标会跑到通讯录上，而那是个纯浏览页面，用户完全不知道那个红点在说什么。
+ *
+ * 2026-09-22 起只剩「消息」一个 tab 有角标：未读公告计入它的总数（common/chatBadge.js），
+ * 工作台 tab 不再单独标公告，否则同一条公告在两个 tab 上各算一次。
  */
 const TAB_CHAT = 0
-const TAB_WORKBENCH = 2
 
 function setBadge(index, count) {
 	if (count > 0) {
@@ -104,14 +105,9 @@ function setBadge(index, count) {
 	}
 }
 
-/** 聊天未读：标在「消息」上 */
+/** 「消息」tab 的角标：聊天未读 + 未读公告，数字由 common/chatBadge.js 从服务端汇总取 */
 export function setChatBadge(count) {
 	setBadge(TAB_CHAT, count)
-}
-
-/** 公告未读：标在「工作台」上——公告现在是工作台里的一个入口 */
-export function setNoticeBadge(count) {
-	setBadge(TAB_WORKBENCH, count)
 }
 
 export function fetchProfile() {

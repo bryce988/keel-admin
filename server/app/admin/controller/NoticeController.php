@@ -165,6 +165,30 @@ class NoticeController
     }
 
     /**
+     * 我的公告（分页收件箱）
+     * @url GET /admin/my/notices/inbox
+     * @perm 登录即可
+     * @description 聊天页「系统公告」入口用：铃铛只给最近 10 条，这里能翻到全部。
+     * 与移动端 `GET /staff/v1/notices` 同一份查询与行映射，每条带 `is_read`，
+     * 响应额外带 `unread_count`。
+     */
+    public function inbox(Request $request): Response
+    {
+        $userId = Ctx::userId();
+
+        $page = Paginator::make(
+            NoticeService::inboxQuery(),
+            $request,
+            sortable: ['published_at', 'id'],
+            defaultField: 'published_at',
+            defaultOrder: 'desc',
+            map: NoticeService::inboxMapper($userId),
+        );
+
+        return Result::ok($page + ['unread_count' => NoticeService::unreadCount($userId)]);
+    }
+
+    /**
      * 读一条（同时落已读回执）
      * @url GET /admin/my/notices/{id}
      * @perm 登录即可

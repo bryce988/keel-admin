@@ -37,6 +37,14 @@ const { activeChildren, activeTop } = useMenuNav()
  * fullscreenchange（没有只靠 resize），所以这里不用做任何事。
  */
 const canFullscreen = fullscreenSupported()
+
+/**
+ * 有聊天权限的人不再显示公告铃铛：公告已经进了消息列表（「系统公告」一行），
+ * 顶栏的聊天红点也已计入未读公告，铃铛再标一遍就是同一条算两次。
+ *
+ * 没有 chat:use 的人进不了聊天页，铃铛是他们唯一的公告入口，所以对他们保留
+ */
+const showNoticeBell = computed(() => !userStore.can('chat:use'))
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen()
 
 const isMix = computed(() => appStore.layout === 'mix')
@@ -203,9 +211,10 @@ async function onUserCommand(cmd: string) {
         </el-icon>
       </el-tooltip>
 
-      <!-- 消息铃铛排在界面设置左边：它是每天都会看的东西，设置不是 -->
+      <!-- 聊天入口排在界面设置左边：它是每天都会看的东西，设置不是。
+           公告铃铛只给没有聊天权限的人（见 showNoticeBell） -->
       <ChatEntry />
-      <NoticeBell />
+      <NoticeBell v-if="showNoticeBell" />
 
       <el-tooltip content="界面设置">
         <el-icon class="icon-btn" @click="settingsDrawer?.open()">

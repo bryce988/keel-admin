@@ -16,6 +16,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  ArrowLeft,
   Bell,
   ChatDotRound,
   Delete,
@@ -39,6 +40,7 @@ import { BizError } from '@/utils/request'
 import { formatListTime, formatMessageTime, parseChatTime } from '@/utils/chatTime'
 import { copyText as writeClipboard, uuid } from '@/utils/secureFallback'
 import { BizCode } from '@/constants/bizCode'
+import { fetchInbox, readAllNotices, readNotice, type BellNotice, type NoticeDetail } from '@/api/notice'
 import { chatSocket } from '@/utils/chatSocket'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
@@ -310,6 +312,7 @@ async function selectConversation(row: ChatConversationRow) {
     scrollMemo.set(conversation.value.id, listRef.value.scrollTop)
   }
 
+  noticeMode.value = false
   conversation.value = row
   chatStore.enter(row.id)
   clearUnreadLocally(row.id)
@@ -528,10 +531,114 @@ async function openWith(contact: ContactPerson) {
   if (row) {
     await selectConversation(row)
   } else {
+    noticeMode.value = false
     conversation.value = conv
     chatStore.enter(conv.id)
     await loadHistory()
   }
+}
+
+// ---------------------------------------------------------------- 系统公告
+
+/**
+ * 「系统公告」入口
+ *
+ * 它不是一个会话：数据直接读公告与已读回执（与顶栏铃铛同一份），不往聊天表里复制。
+ * 这样撤回、删除、已读天然一致——复制一份的话，撤回后每个人那里都还留着一条。
+ * 未读计入总数，由服务端的未读汇总（chatStore.notice）一并给出
+ */
+const noticeMode = ref(false)
+const notices = ref<BellNotice[]>([])
+const noticePage = ref(1)
+const noticeTotal = ref(0)
+const noticeLoading = ref(false)
+const noticeDetail = ref<NoticeDetail | null>(null)
+const NOTICE_PAGE_SIZE = 20
+
+/** 搜索时只有关键词像「系统公告」才留着这一行，否则它会挡在搜索结果最上面 */
+const showNoticeRow = computed(() => {
+  const kw = convKeyword.value.trim()
+  return !kw || '系统公告'.includes(kw)
+})
+
+async function openNoticePanel(focusId = 0) {
+  // 与切会话一样：离开前记下滚动位置
+  if (conversation.value && listRef.value) {
+    scrollMemo.set(conversation.value.id, listRef.value.scrollTop)
+  }
+
+  conversation.value = null
+  messages.value = []
+  // 看公告时没有「正在看的会话」，这期间来的消息照常计未读、照常提醒
+  chatStore.leave()
+
+  noticeMode.value = true
+  noticeDetail.value = null
+  await loadNotices(true)
+
+  if (focusId) await openNotice(focusId)
+}
+
+async function loadNotices(reset = false) {
+  if (noticeLoading.value) return
+  if (reset) noticePage.value = 1
+
+  noticeLoading.value = true
+  try {
+    const res = await fetchInbox({ page_num: noticePage.value, page_size: NOTICE_PAGE_SIZE })
+    notices.value = reset ? res.list : [...notices.value, ...res.list]
+    noticeTotal.value = res.total
+  } finally {
+    noticeLoading.value = false
+  }
+}
+
+const noticeHasMore = computed(() => notices.value.length < noticeTotal.value)
+
+function onNoticeScroll(e: Event) {
+  const el = e.target as HTMLElement
+  if (!noticeHasMore.value || noticeLoading.value) return
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+    noticePage.value += 1
+    void loadNotices()
+  }
+}
+
+/**
+ * 打开一条：服务端顺带落已读回执，并推 notice.read 给我自己的所有标签页，
+ * 各处的数字靠那个推送对齐；这里再主动刷一次，是为了长连接断着的时候也对
+ */
+async function openNotice(id: number) {
+  try {
+    noticeDetail.value = await readNotice(id)
+  } catch (e) {
+    // 404：点开的那一刻它刚被撤回或删除
+    toastError(e, '公告不存在或已被撤回')
+    await loadNotices(true)
+    return
+  }
+
+  const hit = notices.value.find((n) => n.id === id)
+  if (hit) hit.is_read = true
+  void chatStore.refresh()
+}
+
+async function markAllNoticesRead() {
+  await readAllNotices()
+  notices.value = notices.value.map((n) => ({ ...n, is_read: true }))
+  void chatStore.refresh()
+}
+
+/** 公告有变化时，正开着公告面板就重拉；正在看的那条被撤回 / 删除了就退回列表 */
+function onNoticeChanged(data: unknown) {
+  if (!noticeMode.value) return
+  const d = data as { id: number; action: string }
+
+  if (noticeDetail.value?.id === d.id && (d.action === 'revoked' || d.action === 'deleted')) {
+    noticeDetail.value = null
+    ElMessage.info('这条公告已被撤回')
+  }
+  void loadNotices(true)
 }
 
 async function loadHistory() {
@@ -1372,18 +1479,15 @@ let offReady: (() => void) | undefined
 let offMessage: (() => void) | undefined
 let offRecalled: (() => void) | undefined
 let offRead: (() => void) | undefined
+let offNotice: (() => void) | undefined
 
 onMounted(async () => {
   chatStore.bind()
   await loadList()
   void chatStore.refresh()
 
-  // 从桌面通知点进来会带 ?conv=，直接打开那个会话
-  const wanted = Number(route.query.conv || 0)
-  if (wanted) {
-    const row = conversations.value.find((c) => c.id === wanted)
-    if (row) await selectConversation(row)
-  }
+  // 从桌面通知点进来会带 ?conv= 或 ?notice=，直接打开那个会话或那条公告
+  await openFromQuery()
 
   /*
    * 重连后的对齐：ready 是「握手完成」的信号，每次重连都会再来一次。
@@ -1398,6 +1502,7 @@ onMounted(async () => {
   })
   offMessage = chatSocket.on('message.new', (data) => onPush(data as ChatMessage))
   offRecalled = chatSocket.on('message.recalled', (data) => applyRecall(data as ChatMessage))
+  offNotice = chatSocket.on('notice.changed', onNoticeChanged)
 
   /*
    * 对方已读：把水位记下来，用于给我最后一条消息打「已读」
@@ -1424,6 +1529,30 @@ onMounted(async () => {
   window.addEventListener('keydown', onGlobalKey)
 })
 
+async function openFromQuery() {
+  const notice = Number(route.query.notice || 0)
+  if (notice) {
+    sideTab.value = 'chat'
+    await openNoticePanel(notice)
+    return
+  }
+
+  const wanted = Number(route.query.conv || 0)
+  if (wanted) {
+    const row = conversations.value.find((c) => c.id === wanted)
+    if (row) await selectConversation(row)
+  }
+}
+
+/*
+ * 已经在聊天页时点桌面通知，路由只变 query、组件不重建，onMounted 不会再跑。
+ * 不看这个变化的话，点通知只会把窗口拉到前台，停在原来的会话上
+ */
+watch(
+  () => [route.query.conv, route.query.notice],
+  () => void openFromQuery(),
+)
+
 function onVisible() {
   if (!document.hidden) {
     void flushRead()
@@ -1437,6 +1566,7 @@ onBeforeUnmount(() => {
   offMessage?.()
   offRecalled?.()
   offRead?.()
+  offNotice?.()
   document.removeEventListener('visibilitychange', onVisible)
 
   // 这几条挂在 window 上，页面卸载后不摘的话会一直攒着（页签缓存切换时尤其）
@@ -1614,6 +1744,29 @@ async function copyText(m: LocalMessage) {
       <div v-else class="chat__side-head">通讯录</div>
 
       <div v-show="sideTab === 'chat'" v-loading="loadingList" class="chat__list">
+        <!-- 系统公告：固定在最上面，不参与置顶排序、没有右键菜单（它删不掉，也没有免打扰） -->
+        <div
+          v-if="showNoticeRow"
+          class="conv conv--notice"
+          :class="{ 'conv--active': noticeMode }"
+          @click="openNoticePanel()"
+          @contextmenu.prevent
+        >
+          <div class="conv__notice-icon"><el-icon><Bell /></el-icon></div>
+          <div class="conv__body">
+            <div class="conv__line">
+              <span class="conv__name">系统公告</span>
+              <span class="conv__time">{{ listTime(chatStore.notice.latest_at) }}</span>
+            </div>
+            <div class="conv__line">
+              <span class="conv__brief">{{ chatStore.notice.latest_title || '暂无公告' }}</span>
+              <span v-if="chatStore.notice.unread > 0" class="conv__badge">
+                {{ chatStore.notice.unread > 99 ? '99+' : chatStore.notice.unread }}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div
           v-for="row in filteredConversations"
           :key="row.id"
@@ -2079,6 +2232,54 @@ async function copyText(m: LocalMessage) {
         </footer>
       </template>
 
+      <!-- 系统公告面板：列表 → 详情。正文在入库前已经白名单净化，这里直接 v-html（同顶栏铃铛） -->
+      <template v-else-if="noticeMode">
+        <header class="chat__header">
+          <el-button v-if="noticeDetail" text :icon="ArrowLeft" @click="noticeDetail = null">返回</el-button>
+          <span class="chat__title">系统公告</span>
+          <div class="chat__header-ops">
+            <el-button v-if="!noticeDetail" text :disabled="!chatStore.notice.unread" @click="markAllNoticesRead">
+              全部已读
+            </el-button>
+          </div>
+        </header>
+
+        <div v-if="noticeDetail" class="notice-detail">
+          <h2 class="notice-detail__title">{{ noticeDetail.title }}</h2>
+          <div class="notice-detail__meta">
+            <span>{{ noticeDetail.publisher_name }}</span>
+            <span>{{ noticeDetail.published_at ? formatMessageTime(parseChatTime(noticeDetail.published_at)!) : '' }}</span>
+          </div>
+          <div class="rich-content" v-html="noticeDetail.content" />
+        </div>
+
+        <div v-else v-loading="noticeLoading && !notices.length" class="notice-list" @scroll.passive="onNoticeScroll">
+          <button
+            v-for="n in notices"
+            :key="n.id"
+            type="button"
+            class="notice-item"
+            :class="{ 'notice-item--unread': !n.is_read }"
+            @click="openNotice(n.id)"
+          >
+            <span class="notice-item__dot" />
+            <span class="notice-item__body">
+              <span class="notice-item__title">{{ n.title }}</span>
+              <span class="notice-item__summary">{{ n.summary }}</span>
+            </span>
+            <span class="notice-item__time">{{ listTime(n.published_at) }}</span>
+          </button>
+
+          <div v-if="noticeLoading && notices.length" class="msg__more">加载中…</div>
+          <EmptyState
+            v-if="!noticeLoading && !notices.length"
+            scene="empty"
+            description="还没有公告"
+            :action="false"
+          />
+        </div>
+      </template>
+
       <EmptyState v-else scene="empty" description="选择一个会话开始聊天" :action="false" />
     </section>
 
@@ -2455,6 +2656,112 @@ async function copyText(m: LocalMessage) {
 
 .conv--active {
   background: var(--el-color-primary-light-9);
+}
+
+/* 系统公告的图标头像：与会话头像同尺寸，底色用主色浅档，一眼看出它不是一个人 */
+.conv__notice-icon {
+  display: flex;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--el-color-warning-light-8);
+  font-size: 19px;
+  color: var(--el-color-warning);
+}
+
+.notice-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.notice-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.notice-item:hover {
+  background: var(--el-fill-color-light);
+}
+
+/* 未读才有圆点；已读保留占位，标题才对得齐 */
+.notice-item__dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+}
+
+.notice-item--unread .notice-item__dot {
+  background: var(--el-color-danger);
+}
+
+.notice-item__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notice-item__title {
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+}
+
+.notice-item--unread .notice-item__title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.notice-item__summary {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-item__time {
+  flex: none;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+
+.notice-detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 28px;
+}
+
+.notice-detail__title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.notice-detail__meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 /* 置顶用一条左边框标记，不占额外行高——列表里每一行都很金贵 */

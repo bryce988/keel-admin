@@ -95,9 +95,19 @@ export function getConversations() {
   return request.get<unknown, ChatConversationRow[]>('/admin/chat/conversations')
 }
 
+/** 消息列表顶部「系统公告」那一行 */
+export interface ChatNoticeEntry {
+  unread: number
+  /** 最新一条已发布公告（不论读没读），0 = 一条都没有 */
+  latest_id: number
+  latest_title: string
+  latest_at: string | null
+}
+
 export interface ChatUnread {
-  /** 红点上的数字，**不含免打扰** */
+  /** 红点上的数字：**不含免打扰**的会话，**含未读公告** */
   total: number
+  notice: ChatNoticeEntry
   /** 有未读的会话数，含免打扰——用于「有消息但不弹数字」的小圆点 */
   conversations: number
   has_at: boolean

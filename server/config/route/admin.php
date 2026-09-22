@@ -156,6 +156,7 @@ Route::group('/admin', function () {
      * 记下来只会把真正的操作淹掉（读公告不是需要审计的行为）。
      */
     Route::get('/my/notices', [NoticeController::class, 'bell'])->setParams(['perm' => '']);
+    Route::get('/my/notices/inbox', [NoticeController::class, 'inbox'])->setParams(['perm' => '']);
     // 固定路径排在 {id} 之前，否则 read-all 会被当成 id 匹配掉
     Route::post('/my/notices/read-all', [NoticeController::class, 'readAll'])
         ->setParams(['perm' => '']);

@@ -37,6 +37,7 @@ namespace app\common\service;
 
 use app\common\model\SysNoticeModel;
 use app\common\model\SysNoticeReadModel;
+use app\common\support\ChatFanout;
 use app\common\support\Ctx;
 use app\common\support\Db;
 use app\common\support\Html;
@@ -116,7 +117,7 @@ class NoticeService
 
     public static function create(array $data): SysNoticeModel
     {
-        return Db::transaction(function () use ($data) {
+        $notice = Db::transaction(function () use ($data) {
             $notice = new SysNoticeModel();
             $notice->fill($data);
             // 净化放在 fill 之后：fill 进来的是前端原样提交的 HTML
@@ -133,6 +134,12 @@ class NoticeService
 
             return $notice;
         });
+
+        if ((int) $notice->status === SysNoticeModel::STATUS_PUBLISHED) {
+            self::broadcast($notice, 'published');
+        }
+
+        return $notice;
     }
 
     public static function update(int $id, array $data): SysNoticeModel
@@ -142,8 +149,9 @@ class NoticeService
 
         $before = $notice->toArray();
 
-        return Db::transaction(function () use ($notice, $data, $before) {
-            $wasPublished = (int) $notice->status === SysNoticeModel::STATUS_PUBLISHED;
+        $wasPublished = (int) $notice->status === SysNoticeModel::STATUS_PUBLISHED;
+
+        $notice = Db::transaction(function () use ($notice, $data, $before, $wasPublished) {
             $notice->fill($data);
             $notice->content = Html::purify((string) $notice->content);
             $nowPublished = (int) $notice->status === SysNoticeModel::STATUS_PUBLISHED;
@@ -170,6 +178,19 @@ class NoticeService
 
             return $notice;
         });
+
+        // 跨过发布线的两个方向要广播；已发布的改了标题也要——消息列表里显示的是最新一条的标题。
+        // 草稿之间的编辑对接收端不存在，不打扰任何人
+        $nowPublished = (int) $notice->status === SysNoticeModel::STATUS_PUBLISHED;
+        if (!$wasPublished && $nowPublished) {
+            self::broadcast($notice, 'published');
+        } elseif ($wasPublished && !$nowPublished) {
+            self::broadcast($notice, 'revoked');
+        } elseif ($nowPublished) {
+            self::broadcast($notice, 'updated');
+        }
+
+        return $notice;
     }
 
     /**
@@ -193,6 +214,8 @@ class NoticeService
         $notice->status = SysNoticeModel::STATUS_PUBLISHED;
         $notice->save();
 
+        self::broadcast($notice, 'published');
+
         return $notice;
     }
 
@@ -209,11 +232,17 @@ class NoticeService
 
         OpLog::target("公告 {$notice->title}({$notice->id})");
 
+        $wasPublished = (int) $notice->status === SysNoticeModel::STATUS_PUBLISHED;
+
         $notice->status         = SysNoticeModel::STATUS_DRAFT;
         $notice->published_at   = null;
         $notice->publisher_id   = 0;
         $notice->publisher_name = '';
         $notice->save();
+
+        if ($wasPublished) {
+            self::broadcast($notice, 'revoked');
+        }
 
         return $notice;
     }
@@ -225,11 +254,34 @@ class NoticeService
 
         OpLog::target("公告 {$notice->title}({$notice->id})");
 
+        $wasPublished = (int) $notice->status === SysNoticeModel::STATUS_PUBLISHED;
+
         // 公告是硬删，回执要一并清掉，否则 sys_notice_reads 会积压指向空 id 的行
         Db::transaction(function () use ($notice) {
             SysNoticeReadModel::query()->where('notice_id', $notice->id)->delete();
             $notice->delete();
         });
+
+        // 删的是草稿就没人见过它，不用广播
+        if ($wasPublished) {
+            self::broadcast($notice, 'deleted');
+        }
+    }
+
+    /**
+     * 通知所有在线的人「公告变了」
+     *
+     * ⚠️ 必须在事务提交之后调：在事务里广播的话，客户端收到后立刻来拉未读数，
+     * 可能拉到提交前的旧数据（与聊天发消息是同一个坑，见 ChatService::send）。
+     * 只有 published 会让客户端响提示音、弹通知；其余只是让角标与列表重算
+     */
+    private static function broadcast(SysNoticeModel $notice, string $action): void
+    {
+        ChatFanout::noticeChanged([
+            'id'     => (int) $notice->id,
+            'action' => $action,
+            'title'  => (string) $notice->title,
+        ]);
     }
 
     private static function stampPublish(SysNoticeModel $notice): void
@@ -296,6 +348,28 @@ class NoticeService
         }
 
         return $query->count();
+    }
+
+    /**
+     * 消息列表里「系统公告」那一行要的数据：未读数 + 最新一条的标题与时间
+     *
+     * 最新一条取全部已发布的（不只未读的）：全读完之后这一行仍要显示最近那条公告，
+     * 就像会话读完了摘要还在一样。
+     */
+    public static function chatEntry(int $userId): array
+    {
+        /** @var SysNoticeModel|null $latest */
+        $latest = SysNoticeModel::query()->published()
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->first(['id', 'title', 'published_at']);
+
+        return [
+            'unread'       => self::unreadCount($userId),
+            'latest_id'    => (int) ($latest->id ?? 0),
+            'latest_title' => (string) ($latest->title ?? ''),
+            'latest_at'    => $latest?->published_at?->format('Y-m-d H:i:s'),
+        ];
     }
 
     /**
@@ -366,10 +440,14 @@ class NoticeService
         // 回执用 firstOrCreate 而不是先查后插：同一个人两个标签页同时点开会并发插入，
         // 唯一键会让后一条 500。firstOrCreate 在这里仍可能撞，所以外面还包了一层
         try {
-            SysNoticeReadModel::query()->firstOrCreate(
+            $receipt = SysNoticeReadModel::query()->firstOrCreate(
                 ['notice_id' => $notice->id, 'user_id' => $userId],
                 ['created_at' => date('Y-m-d H:i:s')],
             );
+            // 第一次读才推：其他标签页 / 手机上的未读数要跟着减。重复打开不必再推
+            if ($receipt->wasRecentlyCreated) {
+                ChatFanout::noticeRead($userId, ['id' => (int) $notice->id]);
+            }
         } catch (\Throwable) {
             // 撞唯一键说明回执已经在了，这正是我们要的结果，不必打扰调用方
         }
@@ -416,6 +494,8 @@ class NoticeService
         foreach (array_chunk($rows, 500) as $chunk) {
             SysNoticeReadModel::query()->insert($chunk);
         }
+
+        ChatFanout::noticeRead($userId, ['id' => 0]);
 
         return count($ids);
     }

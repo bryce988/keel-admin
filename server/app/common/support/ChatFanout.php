@@ -54,6 +54,24 @@ class ChatFanout
     }
 
     /**
+     * 系统公告有变化（发布 / 撤回 / 删除 / 已发布的被编辑）
+     *
+     * 公告是全员可见的，收件人就是「所有在线的人」，所以走广播而不是列 user_ids：
+     * 列出来的话每发一条公告都要先把全公司的 id 查一遍、塞进一条 Redis 消息里。
+     * 客户端收到后自己去拉未读数，这里只说「变了」，不带谁该 +1 的判断
+     */
+    public static function noticeChanged(array $payload): void
+    {
+        self::send(['ev' => 'notice.changed', 'conv_id' => 0, 'all' => true, 'user_ids' => [], 'data' => $payload]);
+    }
+
+    /** 某人读了公告：推给他自己的其他标签页 / 设备，让各处的未读数一起变 */
+    public static function noticeRead(int $userId, array $payload): void
+    {
+        self::publish('notice.read', 0, [$userId], $payload);
+    }
+
+    /**
      * 发布
      *
      * `user_ids` 由调用方（HTTP 侧）算好传进来，**不让网关去查库**：
@@ -66,18 +84,23 @@ class ChatFanout
             return;
         }
 
+        self::send([
+            'ev'       => $event,
+            'conv_id'  => $convId,
+            'user_ids' => array_values(array_map('intval', $userIds)),
+            'data'     => $payload,
+        ]);
+    }
+
+    private static function send(array $frame): void
+    {
         try {
-            Cache::conn()->publish(self::CHANNEL, json_encode([
-                'ev'       => $event,
-                'conv_id'  => $convId,
-                'user_ids' => array_values(array_map('intval', $userIds)),
-                'data'     => $payload,
-            ], JSON_UNESCAPED_UNICODE));
+            Cache::conn()->publish(self::CHANNEL, json_encode($frame, JSON_UNESCAPED_UNICODE));
         } catch (\Throwable $e) {
-            // 只记不抛：消息已经落库，客户端下次对齐会补上
+            // 只记不抛：数据已经落库，客户端下次对齐会补上
             Log::warning('[chat] 广播失败 ' . $e->getMessage(), [
-                'event'   => $event,
-                'conv_id' => $convId,
+                'event'   => $frame['ev'] ?? '',
+                'conv_id' => $frame['conv_id'] ?? 0,
             ]);
         }
     }

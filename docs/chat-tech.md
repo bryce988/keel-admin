@@ -431,6 +431,12 @@ ws://<host>:8080/ws?token=<access_token>
 | `message.recalled` | `{ conv_id, seq, recalled_by }` | 替换为撤回提示 |
 | `conversation.updated` | `{ conv_id, … }` | 群名变更、成员变动 |
 | `conversation.read` | `{ conv_id, last_read_seq }` | 多端同步已读，更新「已读」标记 |
+| `notice.changed` | `{ id, action, title }`，`action` ∈ `published / revoked / deleted / updated` | **全员广播**。重拉未读汇总；`published` 才提醒（提示音、桌面通知、铃铛弹窗） |
+| `notice.read` | `{ id }`（全部已读时 `id=0`） | 只推给读的人本人：其他标签页 / 设备重拉未读汇总 |
+
+**全员广播**：Redis 帧带 `all: true`、`user_ids` 为空，网关推给本进程持有的每一条连接。
+这仍是纯传输——「推给所有人」是发布方（`NoticeService`）决定的，网关不查库、不判断。
+公告的广播在事务提交**之后**发，理由同发消息：客户端收到后会立刻来拉未读数。
 
 **上行**：只有 `ping`。发消息、标已读全部走 HTTP。
 服务端每 30 秒无帧则发 `ping`，连续两次无 `pong` 判定为死连接并清理。

@@ -8,7 +8,32 @@
 			<text class="hero-sub">{{ unreadHint }}</text>
 		</view>
 
-		<view v-if="rows.length" class="panel">
+		<view class="panel">
+			<!-- 系统公告：固定在最上面，不参与置顶排序，没有长按菜单（删不掉，也没有免打扰）。
+			     数据直接读公告与已读回执，不是一个真的会话 -->
+			<view
+				class="row"
+				:class="{ 'row--last': !rows.length }"
+				hover-class="row--hover"
+				@click="toNotices"
+			>
+				<view class="avatar avatar--notice">
+					<text class="avatar-notice-text">告</text>
+				</view>
+				<view class="row-body">
+					<view class="row-line">
+						<text class="row-name">系统公告</text>
+						<text class="row-time">{{ listTime(notice.latest_at) }}</text>
+					</view>
+					<view class="row-line">
+						<text class="row-brief">{{ notice.latest_title || '暂无公告' }}</text>
+						<view v-if="notice.unread > 0" class="badge">
+							<text class="badge-text">{{ notice.unread > 99 ? '99+' : notice.unread }}</text>
+						</view>
+					</view>
+				</view>
+			</view>
+
 			<view
 				v-for="(c, i) in rows"
 				:key="c.id"
@@ -43,7 +68,7 @@
 			</view>
 		</view>
 
-		<text v-else class="hint">{{ loading ? '正在加载' : (error || '还没有会话，去底部「通讯录」找个同事聊聊') }}</text>
+		<text v-if="!rows.length" class="hint">{{ loading ? '正在加载' : (error || '还没有会话，去底部「通讯录」找个同事聊聊') }}</text>
 	</view>
 </template>
 
@@ -57,10 +82,12 @@
 	} from '@/common/api.js'
 	import { absUrl, getCachedUser } from '@/common/request.js'
 	import { chatSocket } from '@/common/chatSocket.js'
-	import { setChatBadge } from '@/common/api.js'
+	import { bindChatBadge, refreshChatBadge } from '@/common/chatBadge.js'
 	import { formatListTime, parseChatTime } from '@/common/chatTime.js'
 
 	const rows = ref([])
+	/** 「系统公告」那一行：未读数与最新一条，来自未读汇总 */
+	const notice = ref({ unread: 0, latest_id: 0, latest_title: '', latest_at: null })
 	const loading = ref(false)
 	const error = ref('')
 
@@ -71,15 +98,20 @@
 	const unreadHint = computed(() => {
 		// 免打扰的不算进这句话，与角标口径一致
 		const n = rows.value.filter((c) => c.unread > 0 && !c.is_muted).length
-		return n ? `${n} 个会话有新消息` : '没有未读消息'
+		const parts = []
+		if (n) parts.push(`${n} 个会话有新消息`)
+		if (notice.value.unread) parts.push(`${notice.value.unread} 条未读公告`)
+		return parts.length ? parts.join('，') : '没有未读消息'
 	})
 
 	async function load() {
 		loading.value = true
 		error.value = ''
 		try {
-			rows.value = await fetchChatConversations()
-			syncBadge()
+			// 两个请求一起发：会话列表给行，未读汇总给「系统公告」那一行与 tab 角标
+			const [list, summary] = await Promise.all([fetchChatConversations(), refreshChatBadge()])
+			rows.value = list
+			notice.value = summary.notice || notice.value
 		} catch (e) {
 			if (e.code !== 401) error.value = e.message
 		} finally {
@@ -88,15 +120,9 @@
 		}
 	}
 
-	/**
-	 * tab 角标
-	 *
-	 * 口径与列表角标一致：**免打扰的不计入数字**，否则「免打扰」就只剩个名字。
-	 * 角标标在 index 0（消息），索引由 api.js 的常量管着——改 tab 顺序要回去改那里。
-	 */
-	function syncBadge() {
-		const n = rows.value.reduce((sum, c) => sum + (c.is_muted ? 0 : c.unread), 0)
-		setChatBadge(n)
+	/** 公告页不是 tab 页，navigateTo 压栈；读完返回时 onShow 会重拉，数字自然对上 */
+	function toNotices() {
+		uni.navigateTo({ url: '/pages/notice/list' })
 	}
 
 	/**
@@ -167,10 +193,14 @@
 
 	let offMessage = null
 	let offReady = null
+	let offNotice = null
+	let offNoticeRead = null
 
 	onShow(() => {
 		load()
 		chatSocket.connect()
+		// 全局角标同步：挂一次就不摘，人在别的 tab 时角标也会跟着变（见 common/chatBadge.js）
+		bindChatBadge()
 
 		// 在列表页也要收推送：不然收到新消息得手动下拉才看得到
 		if (!offMessage) {
@@ -193,12 +223,26 @@
 			})
 			// 每次重连都会再来一次 ready，断线期间的消息靠这一步补进列表
 			offReady = chatSocket.on('ready', () => load())
+
+			// 公告有变化（发布 / 撤回 / 删除 / 编辑）或在别处读了：「系统公告」那一行跟着变。
+			// 新发布的震一下，与新消息同一种提醒
+			offNotice = chatSocket.on('notice.changed', (d) => {
+				if (d && d.action === 'published') {
+					// #ifndef H5
+					uni.vibrateShort({ fail: () => {} })
+					// #endif
+				}
+				load()
+			})
+			offNoticeRead = chatSocket.on('notice.read', () => load())
 		}
 	})
 
 	onHide(() => {
 		if (offMessage) { offMessage(); offMessage = null }
 		if (offReady) { offReady(); offReady = null }
+		if (offNotice) { offNotice(); offNotice = null }
+		if (offNoticeRead) { offNoticeRead(); offNoticeRead = null }
 	})
 
 	onPullDownRefresh(load)
@@ -278,6 +322,17 @@
 		justify-content: center;
 		overflow: hidden;
 		flex-shrink: 0;
+	}
+
+	/* 系统公告的图标头像：暖色底，一眼看出它不是一个人 */
+	.avatar--notice {
+		background-color: var(--keel-color-warning);
+	}
+
+	.avatar-notice-text {
+		font-size: 17px;
+		font-weight: 600;
+		color: #fff;
 	}
 
 	.avatar-img {

@@ -13,14 +13,16 @@
 		</view>
 
 		<!--
-			工作台是入口聚合页：聊天与通讯录已经是 tabBar 项，不在这里重复；
-			公告从 tab 降级到这里——它是「一天几条、看完就走」的东西，占一个 tab 位不值，
-			而聊天是每天要回好几次的
+			工作台是入口聚合页：聊天与通讯录已经是 tabBar 项，不在这里重复。
+
+			公告入口只给没有聊天权限的人：有聊天权限的人在「消息」列表最上面就能看到「系统公告」，
+			这里再放一个就是同一件事两个入口、两个红点。没有 chat:use 的人进不了消息列表，
+			这里是他们唯一的公告入口，所以对他们保留
 		-->
-		<view class="section-head">
+		<view v-if="showNoticeEntry" class="section-head">
 			<text class="section-title">常用</text>
 		</view>
-		<view class="group">
+		<view v-if="showNoticeEntry" class="group">
 			<view class="entry" hover-class="entry--hover" @click="toNotice">
 				<text class="entry-name">公告</text>
 				<view class="entry-right">
@@ -72,8 +74,8 @@
 <script setup>
 	import { ref } from 'vue'
 	import { onShow } from '@dcloudio/uni-app'
-	import { fetchWorkbench, setNoticeBadge } from '@/common/api.js'
-	import { getCachedUser } from '@/common/request.js'
+	import { fetchWorkbench } from '@/common/api.js'
+	import { can, getCachedUser } from '@/common/request.js'
 
 	const greeting = ref('你好')
 	const deptName = ref('')
@@ -83,6 +85,8 @@
 	const canDashboard = ref(false)
 	/** 公告未读数，同时用于入口右侧的角标与 tabBar 角标 */
 	const noticeUnread = ref(0)
+	/** 权限点是登录时缓存的快照；每次进页面重算，换号登录后不会沿用上一个人的 */
+	const showNoticeEntry = ref(true)
 
 	const WEEKDAYS = '日一二三四五六'
 	const now = new Date()
@@ -115,9 +119,9 @@
 			canDashboard.value = !!(res.dashboard && res.dashboard.visible)
 			stats.value = (res.dashboard && res.dashboard.stats) || []
 
-			// 工作台顺带把未读数带回来了，省掉一次单独的角标请求
+			// 工作台顺带把未读数带回来了，只标在页面里的「公告」入口上。
+			// 不再标到工作台 tab：未读公告已经计入「消息」tab 的总数，两个 tab 都标就是一条算两次
 			noticeUnread.value = res.unread_notice || 0
-			setNoticeBadge(noticeUnread.value)
 		} catch (e) {
 			// 401 已经在 request 层踢回登录页了，这里只处理别的错
 			if (e.code !== 401) {
@@ -135,6 +139,7 @@
 	 * 回首页得能看到新的——只写 onLoad 的话要杀掉应用重进才会变。
 	 */
 	onShow(() => {
+		showNoticeEntry.value = !can('chat:use')
 		// 先用缓存把问候语顶上，避免请求回来之前是一片空白；随后 load() 会覆盖成最新的
 		const user = getCachedUser()
 		if (user) {

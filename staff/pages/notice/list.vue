@@ -55,7 +55,7 @@
 <script setup>
 	import { ref } from 'vue'
 	import { onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
-	import { fetchNotices, readAllNotices, setNoticeBadge } from '@/common/api.js'
+	import { fetchNotices, readAllNotices } from '@/common/api.js'
 
 	const list = ref([])
 	const unread = ref(0)
@@ -93,7 +93,6 @@
 
 			list.value = reset ? res.list : list.value.concat(res.list)
 			unread.value = res.unread_count
-			setNoticeBadge(res.unread_count)
 
 			pageNum.value = page + 1
 			finished.value = list.value.length >= res.total

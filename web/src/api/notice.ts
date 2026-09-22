@@ -111,6 +111,18 @@ export function readNotice(id: number) {
   return request.get<unknown, NoticeDetail>(`/admin/my/notices/${id}`)
 }
 
+/**
+ * 我的公告（分页收件箱）
+ *
+ * 聊天页「系统公告」入口用：铃铛只有最近 10 条，这里能翻到全部。
+ * 与移动端的收件箱同一份查询，多带一个 `unread_count`
+ */
+export function fetchInbox(params: { page_num?: number; page_size?: number }) {
+  return request.get<unknown, PageResult<BellNotice> & { unread_count: number }>('/admin/my/notices/inbox', {
+    params,
+  })
+}
+
 export function readAllNotices() {
   return request.post<unknown, { count: number }>('/admin/my/notices/read-all')
 }
