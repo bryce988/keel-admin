@@ -63,17 +63,16 @@ npm run dev
 
 - 从 `develop` 切分支：`feature/模块-简述`、`fix/问题简述`、`docs/简述`
 - PR 一律合入 `develop`；`main` 只接受发版合并
-- 提交信息格式：`type(scope): subject`
+- 提交信息：用中文一句话说清改了什么，**不加 `type(scope):` 前缀**；需要细节就空一行写正文
 
 ```
-feat(role): 角色详情增加字段级权限配置
-fix(auth): 修复刷新 token 后权限缓存未失效
-refactor(table): ProTable 抽出列设置逻辑
-docs(readme): 补充 Docker 启动说明
-chore(deps): 升级 element-plus 到 2.9.0
+角色详情增加字段级权限配置
+修复刷新 token 后权限缓存未失效
+ProTable 抽出列设置逻辑
+README 补充 Docker 启动说明
+升级 element-plus 到 2.9.0
 ```
 
-type 取值：`feat` `fix` `refactor` `perf` `style` `docs` `test` `chore`。
 一个提交只做一件事；不要把格式化和逻辑改动混在一个提交里。
 
 ---

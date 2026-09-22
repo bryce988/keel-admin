@@ -1030,7 +1030,7 @@ stdout_logfile=/var/log/webman-admin.log
 ## 13. 开发规范
 
 - **分支**：`feature/模块-简述`、`fix/问题简述`，合并到 `develop` 需 Code Review
-- **提交信息**：`type(scope): subject`，type 取 `feat|fix|refactor|style|docs|chore`
+- **提交信息**：中文一句话说清改了什么，不加 `type(scope):` 前缀；需要细节就空一行写正文
 - **命名**：组件 PascalCase，文件 kebab-case，常量 UPPER_SNAKE，接口方法 `getXxx / createXxx / updateXxx / deleteXxx`
 - **组件拆分**：单文件超过 300 行考虑拆分；弹窗独立成组件，不堆在页面里
 - **禁止（前端）**：在页面里直接写 `axios`、写死颜色值、写死枚举、绕过权限指令

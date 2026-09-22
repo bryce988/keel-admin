@@ -303,7 +303,7 @@ MySQL 与 Redis 不暴露宿主机端口。部署前请更换数据库密码和 
 ## 参与贡献
 
 GitHub 与 Gitee 内容保持一致，可就近提交 Issue 或 Pull Request。提交前请阅读
-[CONTRIBUTING.md](CONTRIBUTING.md)，提交信息使用 `type(scope): subject`。
+[CONTRIBUTING.md](CONTRIBUTING.md)，提交信息用中文一句话说清改了什么，不加类型前缀。
 
 - Bug 与功能建议：[GitHub Issues](https://github.com/bryce988/keel-admin/issues)
 - 安全问题：按 [SECURITY.md](SECURITY.md) 提供的私密渠道报告
