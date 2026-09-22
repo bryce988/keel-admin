@@ -146,6 +146,16 @@ export function fetchChatContacts(keyword = '') {
  * 置顶在前，其余按最后消息时间倒序。每条带 unread / has_at / is_pinned / is_muted。
  * 未读数是**算出来的**（会话最大序号 − 我的已读水位），不存计数字段。
  */
+/**
+ * 同事名片（点消息头像、点通讯录里的人）
+ *
+ * 权限点是 `contact:view` 而不是 `chat:use`：看资料是通讯录的能力。
+ * 停用或不存在的人返回 404——界面退回只显示名字
+ */
+export function fetchChatContact(id) {
+	return request(`/staff/v1/chat/contacts/${id}`)
+}
+
 export function fetchChatConversations() {
 	return request('/staff/v1/chat/conversations')
 }

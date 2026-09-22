@@ -61,7 +61,7 @@
 	import { ref, computed } from 'vue'
 	import { onShow } from '@dcloudio/uni-app'
 	import { fetchProfile, updateProfile, uploadAvatar, logout } from '@/common/api.js'
-	import { absUrl } from '@/common/request.js'
+	import { absUrl, cacheUser, getCachedUser } from '@/common/request.js'
 	import { APP_VERSION } from '@/common/config.js'
 
 	const profile = ref({ username: '', real_name: '', dept_name: '', phone: '', email: '', roles: [], last_login_at: '' })
@@ -135,6 +135,8 @@
 					 * 不是真的传成功了——上传失败时界面反而显示新头像，最难查
 					 */
 					avatar.value = absUrl(data.avatar)
+					// 登录缓存里的头像也要换：聊天室里「我」的头像取的是它，不换就要重新登录才变
+					cacheUser(Object.assign({}, getCachedUser() || {}, { avatar: data.avatar }))
 					uni.showToast({ title: '头像已更新', icon: 'none' })
 				} catch (e) {
 					uni.showToast({ title: e.message, icon: 'none' })

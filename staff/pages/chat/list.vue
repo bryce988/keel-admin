@@ -3,7 +3,7 @@
 		<view class="hero">
 			<view class="hero-row">
 				<text class="hero-title">聊天</text>
-				<text class="hero-action" @click="toContacts">发起</text>
+				<text class="hero-action" @click="toGroupPicker">发起群聊</text>
 			</view>
 			<text class="hero-sub">{{ unreadHint }}</text>
 		</view>
@@ -58,6 +58,7 @@
 	import { absUrl, getCachedUser } from '@/common/request.js'
 	import { chatSocket } from '@/common/chatSocket.js'
 	import { setChatBadge } from '@/common/api.js'
+	import { formatListTime, parseChatTime } from '@/common/chatTime.js'
 
 	const rows = ref([])
 	const loading = ref(false)
@@ -98,9 +99,13 @@
 		setChatBadge(n)
 	}
 
-	/** 通讯录已经是 tab 页，只能用 switchTab——navigateTo 打不开 tabBar 里的页面 */
-	function toContacts() {
-		uni.switchTab({ url: '/pages/chat/contacts' })
+	/**
+	 * 发起群聊：打开选人页
+	 *
+	 * 建群放在消息页而不是通讯录：「拉个群聊一下」是从聊天里冒出来的念头（与电脑端一致）
+	 */
+	function toGroupPicker() {
+		uni.navigateTo({ url: '/pages/chat/pick' })
 	}
 
 	function openRoom(c) {
@@ -154,18 +159,10 @@
 		})
 	}
 
-	/** 今天给时刻，昨天给「昨天」，更早给日期——列表里精确到秒没有意义 */
+	/** 分档规则见 common/chatTime.js：今天给时刻、昨天、今年给月日、往年带年份 */
 	function listTime(at) {
-		if (!at) return ''
-
-		const d = at.slice(0, 10)
-		const pad = (n) => String(n).padStart(2, '0')
-		const ymd = (x) => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`
-		const today = new Date()
-
-		if (d === ymd(today)) return at.slice(11, 16)
-		if (d === ymd(new Date(today.getTime() - 86400000))) return '昨天'
-		return at.slice(5, 10)
+		const d = parseChatTime(at)
+		return d ? formatListTime(d) : ''
 	}
 
 	let offMessage = null

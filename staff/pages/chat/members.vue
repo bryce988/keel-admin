@@ -7,6 +7,7 @@
 				class="row"
 				:class="{ 'row--last': i === rows.length - 1 }"
 				hover-class="row--hover"
+				@click="toProfile(m)"
 				@longpress="onLongPress(m)"
 			>
 				<view class="avatar">
@@ -99,7 +100,7 @@
 
 	function toAdd() {
 		// 复用通讯录页，带上 conv 参数让它进入「加人」模式而不是建群
-		uni.navigateTo({ url: `/pages/chat/contacts?add_to=${convId.value}` })
+		uni.navigateTo({ url: `/pages/chat/pick?add_to=${convId.value}` })
 	}
 
 	function rename() {
@@ -144,6 +145,11 @@
 				}
 			}
 		})
+	}
+
+	/** 点成员看资料，与聊天里点头像同一个名片页 */
+	function toProfile(m) {
+		uni.navigateTo({ url: `/pages/chat/profile?id=${m.user_id}&name=${encodeURIComponent(m.real_name)}` })
 	}
 
 	onLoad((options) => {

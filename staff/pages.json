@@ -62,6 +62,20 @@
 			}
 		},
 		{
+			"path": "pages/chat/pick",
+			"style": {
+				"navigationBarTitleText": "选择同事",
+				"navigationBarBackgroundColor": "#f5f5f7"
+			}
+		},
+		{
+			"path": "pages/chat/profile",
+			"style": {
+				"navigationBarTitleText": "资料",
+				"navigationBarBackgroundColor": "#f5f5f7"
+			}
+		},
+		{
 			"path": "pages/mine/mine",
 			"style": {
 				"navigationBarTitleText": "我的",
