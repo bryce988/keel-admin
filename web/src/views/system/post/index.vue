@@ -210,7 +210,6 @@ onMounted(() => {
       :columns="columns"
       selection
       id-column
-      title="岗位列表"
       @selection-change="selected = $event as PostRow[]"
     >
       <template #toolbar>

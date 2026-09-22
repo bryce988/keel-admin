@@ -162,7 +162,6 @@ onMounted(() => dictStore.preload(['data_scope', 'enable_status']))
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
-      title="角色列表"
     >
       <template #toolbar>
         <el-button v-permission="'sys:role:create'" type="primary" :icon="Plus" @click="onCreate">

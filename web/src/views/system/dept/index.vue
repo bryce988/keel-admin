@@ -182,7 +182,6 @@ onMounted(() => {
       :param-parsers="paramParsers"
       :columns="columns"
       tree
-      title="部门列表"
     >
       <template #toolbar>
         <el-button v-permission="'sys:dept:create'" type="primary" :icon="Plus" @click="onCreate()">

@@ -192,7 +192,6 @@ onMounted(loadMasters)
         :sync-url="false"
         id-column
         height="auto"
-        title="明细列表"
       >
         <template #toolbar>
           <el-button type="primary" :icon="Plus" @click="onCreateChild">新增明细</el-button>

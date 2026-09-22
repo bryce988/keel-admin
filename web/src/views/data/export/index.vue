@@ -132,7 +132,6 @@ function formatSize(bytes: number): string {
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
-      title="导出任务"
     >
       <template #toolbar>
         <!-- 有任务在跑时给一句说明：否则用户不知道这一页会自己变 -->

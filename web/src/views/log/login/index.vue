@@ -85,7 +85,6 @@ onMounted(() => dictStore.preload(['login_type', 'log_status']))
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
-      title="登录日志"
     >
       <template #toolbar>
         <el-button

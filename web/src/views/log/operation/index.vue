@@ -138,7 +138,6 @@ onMounted(() => dictStore.preload(['log_action', 'log_status']))
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
-      title="操作日志"
     >
       <template #toolbar>
         <el-button

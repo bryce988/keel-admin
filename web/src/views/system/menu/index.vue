@@ -218,7 +218,6 @@ onMounted(() => {
       :param-parsers="paramParsers"
       :columns="columns"
       tree
-      title="菜单列表"
     >
       <template #toolbar>
         <el-button

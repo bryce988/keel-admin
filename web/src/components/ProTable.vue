@@ -155,7 +155,6 @@ const props = withDefaults(
      * - auto：完全按内容撑开，滚动交给页面
      */
     height?: 'fill' | 'fit' | 'auto'
-    title?: string
     pageSize?: number
     /**
      * 首列显示主键 ID
@@ -544,7 +543,6 @@ defineExpose({ reload, refresh, selected, loading })
   <div class="panel pro-table" :class="{ 'is-refined': refined }">
     <div class="toolbar">
       <div class="left">
-        <span v-if="title" class="table-title">{{ title }}</span>
         <slot name="toolbar" :selected="selected" />
       </div>
       <div class="right">
@@ -723,14 +721,6 @@ defineExpose({ reload, refresh, selected, loading })
   margin-top: var(--keel-gap);
 }
 
-.table-title {
-  flex: none;
-  margin-right: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
 .col-settings-title {
   margin-bottom: 4px;
   color: var(--el-text-color-secondary);
@@ -802,10 +792,6 @@ defineExpose({ reload, refresh, selected, loading })
 @media (max-width: 600px) {
   .is-refined .toolbar {
     align-items: flex-start;
-  }
-
-  .is-refined .table-title {
-    width: 100%;
   }
 
   .is-refined .pagination {

@@ -206,13 +206,13 @@ Element Plus base
     v-model:params="query"
     :request="fetchRows"
     :columns="columns"
-    title="业务列表"
   />
 </div>
 ```
 
 - 搜索面板在上，表格面板在下，间距由 `.page` 统一提供。
-- 表格必须提供清晰的 `title`。
+- 表格**不加标题**：页面是什么已经由菜单、页签、面包屑说了三遍，工具栏左侧直接放业务操作。
+  `ProTable` 已不再提供 `title` 属性（2026-09-22）。
 - 新增、导入、导出等业务操作放在表格 `toolbar` 左侧。
 - 刷新、密度、列设置放在右侧工具区。
 - 默认可见列尽量不超过 8 列，次要信息通过 `hidden: true` 收入列设置。

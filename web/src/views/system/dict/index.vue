@@ -364,7 +364,6 @@ onMounted(async () => {
         :immediate="false"
         selection
         id-column
-        title="字典项"
         @selection-change="selected = $event as DictItemRow[]"
       >
         <template #toolbar>

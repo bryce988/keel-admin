@@ -196,7 +196,6 @@ async function onBatchDelete() {
       :columns="columns"
       id-column
       selection
-      title="公告列表"
       @selection-change="selected = $event as NoticeRow[]"
     >
       <template #toolbar>

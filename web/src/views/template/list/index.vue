@@ -132,7 +132,6 @@ async function onDelete(row: DemoRow) {
       :param-parsers="paramParsers"
       :columns="columns"
       id-column
-      title="业务列表"
     >
       <template #toolbar>
         <el-button type="primary" :icon="Plus" @click="onCreate">新增</el-button>

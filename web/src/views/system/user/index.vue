@@ -396,7 +396,6 @@ onMounted(() => {
         :param-parsers="paramParsers"
         :columns="columns"
         id-column
-        title="用户列表"
       >
         <template #toolbar>
           <el-button v-permission="'sys:user:create'" type="primary" :icon="Plus" @click="onCreate">
