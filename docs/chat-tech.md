@@ -289,6 +289,14 @@ CREATE TABLE `im_messages` (
 | POST | `/admin/chat/messages/{id}/recall` | 撤回 | `chat:use` |
 | GET | `/admin/chat/unread` | 全局未读汇总（顶栏红点用，轻量） | `chat:use` |
 
+同事名片两端各一个入口、同一份 `ContactService::detail`：后台 `GET /admin/contacts/{id}`，
+移动端 `GET /staff/v1/chat/contacts/{id}`，权限点都是 `contact:view`（看资料是通讯录的能力，不是聊天的）。
+只收在职员工，停用或不存在一律 404；手机号、邮箱受字段级权限管。
+
+**会话对象里的 `peer_active`**：单聊对方是否在职（未停用且未删除），群聊恒为 `true`。
+为 `false` 时前端把输入框换成「对方已离职」提示，历史照常可看；发消息接口同样会拦（400 + `21205`），
+前端那一层只是界面收敛。
+
 **只有一个权限点 `chat:use`**，不按增删改查拆。聊天的边界是「在不在这个会话里」，
 拆成 `chat:message:add` / `chat:message:recall` 只会制造一堆永远一起授予的权限点。
 
@@ -386,7 +394,7 @@ private function assertMember(int $convId, int $userId): ChatConversationMemberM
 | 400 | `21202` | 消息已超过可撤回时间 | 超 2 分钟且不是群主 |
 | 403 | `21203` | 只有群主可以执行该操作 | 踢人、改群名、解散、@所有人 |
 | 400 | `21204` | 群成员数量已达上限 | 超过 `chat.group.maxMembers` |
-| 400 | `21205` | 不能与已停用的员工发起会话 | 离职员工 |
+| 400 | `21205` | 不能与已停用的员工发起会话 | 离职员工：发起单聊，或往已有单聊里发消息（此时 message 是「对方已离职，无法发送消息」） |
 | 400 | `21206` | 不能和自己发起会话 | |
 | 409 | `21207` | 该成员已在群中 | |
 | 429 | `10429` | 操作过于频繁 | 复用通用码，带 `Retry-After` |

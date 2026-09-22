@@ -20,6 +20,7 @@ namespace app\staff\controller\v1;
 
 use app\common\exception\BusinessException;
 use app\common\service\ChatService;
+use app\common\service\ContactService;
 use app\common\support\Ctx;
 use app\common\support\Result;
 use support\Response;
@@ -47,6 +48,18 @@ class ChatController
     }
 
 /**
+     * 同事名片
+     * @url GET /staff/v1/chat/contacts/{id}
+     * @perm contact:view
+     * @description 与后台 `GET /admin/contacts/{id}` 同一份 ContactService：只收在职员工，
+     * 停用或不存在一律 404；手机号、邮箱照旧受字段级权限管，没授权给掩码。
+     */
+    public function contact(Request $request, int $id): Response
+    {
+        return Result::ok(ContactService::detail($id));
+    }
+
+    /**
      * 我的会话列表
      * @url GET /staff/v1/chat/conversations
      * @perm 登录即可

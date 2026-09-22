@@ -64,6 +64,9 @@ Route::group('/staff/v1', function () {
     Route::post('/upload', [StaffUploadController::class, 'store'])->setParams(['perm' => '']);
 
     Route::get('/chat/contacts', [StaffChatController::class, 'contacts'])->setParams(['perm' => 'chat:use']);
+    // 同事名片（点消息头像、点通讯录里的人）。权限点与后台 /admin/contacts/{id} 一致：
+    // 看资料是「通讯录」的能力，不是「聊天」的——只授了 chat:use 的人看不到名片
+    Route::get('/chat/contacts/{id:\d+}', [StaffChatController::class, 'contact'])->setParams(['perm' => 'contact:view']);
     // 固定路径排在 {id} 之前
     Route::get('/chat/unread', [StaffChatController::class, 'unread'])->setParams(['perm' => 'chat:use']);
     Route::get('/chat/conversations', [StaffChatController::class, 'conversations'])->setParams(['perm' => 'chat:use']);

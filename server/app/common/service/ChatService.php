@@ -766,6 +766,8 @@ class ChatService
             'last_msg_at'   => $conv->last_msg_at?->format('Y-m-d H:i:s'),
             'last_msg_text' => (string) $conv->last_msg_text,
             'peer_id'       => 0,
+            // 单聊对方是否在职。群聊恒为 true——群里有人离职不影响其他人说话
+            'peer_active'   => true,
         ];
 
         $data['member_count'] = (int) $conv->member_count;
@@ -779,6 +781,8 @@ class ChatService
             $data['peer_id'] = $peerId;
             $data['name']    = $peer?->real_name ?: ($peer?->username ?? '已注销用户');
             $data['avatar']  = (string) ($peer?->avatar ?? '');
+            // 已停用或已删除都算不在职：历史照看，但不能再发（send 里同样会拦）
+            $data['peer_active'] = $peer !== null && (int) $peer->status === 1;
         }
 
         return $data;
@@ -874,6 +878,7 @@ class ChatService
     public static function send(int $convId, int $userId, array $data): array
     {
         self::assertMember($convId, $userId);
+        self::assertPeerActive($convId, $userId);
 
         $type    = (string) ($data['type'] ?? ImMessageModel::TYPE_TEXT);
         $content = (string) ($data['content'] ?? '');
@@ -1268,6 +1273,29 @@ class ChatService
     }
 
     // ================================================================ 内部
+
+    /**
+     * 单聊对方已离职（停用）就不能再发
+     *
+     * 前端会把输入框换成「对方已离职」，但那只是界面收敛——这里才是拦截点，
+     * 否则一个旧页面、一次重发都能往一个再也不会有人读的会话里塞消息。
+     * 复用「不能与已停用的员工发起会话」的码：对调用方是同一件事
+     */
+    private static function assertPeerActive(int $convId, int $userId): void
+    {
+        /** @var ImConversationModel|null $conv */
+        $conv = ImConversationModel::query()->find($convId);
+        if (!$conv || (int) $conv->type !== ImConversationModel::TYPE_SINGLE) {
+            return;
+        }
+
+        $peerId = self::peerIdOf($conv, $userId);
+        $active = $peerId && SysUserModel::withoutDataScope()->where('id', $peerId)->where('status', 1)->exists();
+
+        if (!$active) {
+            throw new BusinessException('对方已离职，无法发送消息', BizCode::CHAT_PEER_DISABLED);
+        }
+    }
 
     /** 发送频率限制。计数放 Redis：webman 多进程模型下进程内计数会被放大 N 倍 */
     private static function guardRate(int $userId): void
