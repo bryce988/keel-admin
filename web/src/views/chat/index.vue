@@ -37,6 +37,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import { EMOJIS } from './emoji'
 import { BizError } from '@/utils/request'
 import { formatListTime, formatMessageTime, parseChatTime } from '@/utils/chatTime'
+import { copyText as writeClipboard, uuid } from '@/utils/secureFallback'
 import { BizCode } from '@/constants/bizCode'
 import { chatSocket } from '@/utils/chatSocket'
 import { useUserStore } from '@/stores/user'
@@ -678,7 +679,8 @@ async function deliver(
   const conv = conversation.value
   if (!conv) return
 
-  const clientMsgId = reuseClientMsgId ?? crypto.randomUUID()
+  // 不直接用 crypto.randomUUID：线上是 http，非安全上下文里它不存在（见 utils/secureFallback）
+  const clientMsgId = reuseClientMsgId ?? uuid()
 
   // 重发时复用同一个 client_msg_id：服务端靠它幂等，
   // 换一个的话「超时但其实成功了」的那条会变成两条
@@ -1560,12 +1562,8 @@ const rows = computed(() =>
 )
 
 async function copyText(m: LocalMessage) {
-  try {
-    await navigator.clipboard.writeText(m.content)
-    ElMessage.success('已复制')
-  } catch {
-    ElMessage.warning('浏览器不允许写剪贴板，请手动选中复制')
-  }
+  if (await writeClipboard(m.content)) ElMessage.success('已复制')
+  else ElMessage.warning('浏览器不允许写剪贴板，请手动选中复制')
 }
 </script>
 
