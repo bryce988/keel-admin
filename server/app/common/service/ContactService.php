@@ -32,6 +32,7 @@ namespace app\common\service;
 use app\common\exception\NotFoundException;
 use app\common\model\SysDeptModel;
 use app\common\model\SysUserModel;
+use app\common\model\scope\DataScope;
 use app\common\support\Arr;
 use app\common\support\Ctx;
 
@@ -132,7 +133,7 @@ class ContactService
 
         $total = (clone $q)->count();
 
-        $rows = $q->with(['dept', 'post'])
+        $rows = $q->with(self::relations())
             ->orderBy('dept_id')
             ->orderBy('id')
             ->forPage($pageNum, $pageSize)
@@ -175,7 +176,7 @@ class ContactService
     public static function detail(int $id): array
     {
         $user = SysUserModel::withoutDataScope()
-            ->with(['dept', 'post'])
+            ->with(self::relations())
             ->where('status', 1)
             ->find($id);
 
@@ -184,6 +185,21 @@ class ContactService
         }
 
         return (self::rowMapper())($user);
+    }
+
+    /**
+     * 部门、岗位的预加载**也要绕开数据权限**
+     *
+     * ⚠️ 只给主查询加 withoutDataScope() 不够：部门表与岗位表自己也接了数据权限，
+     * 预加载时各自再套一次。普通员工（数据范围 = 本部门）查到别的部门的同事，
+     * 关联被过滤成 null，部门名就是空的——人找得到，却不知道他在哪个部门，
+     * 而那恰恰是通讯录最该告诉你的事
+     */
+    private static function relations(): array
+    {
+        $unscoped = static fn ($q) => $q->withoutGlobalScope(DataScope::class);
+
+        return ['dept' => $unscoped, 'post' => $unscoped];
     }
 
     /**
