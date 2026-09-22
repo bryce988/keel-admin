@@ -32,6 +32,8 @@ export interface ChatConversation {
   last_msg_text: string
   /** 单聊时是对方的 id，群聊为 0 */
   peer_id: number
+  /** 单聊对方是否在职；群聊恒为 true。false 时只读（发消息会被 400 + 21205 拦下） */
+  peer_active: boolean
   member_count: number
   /** 群主 id，单聊为 0 */
   owner_id: number
