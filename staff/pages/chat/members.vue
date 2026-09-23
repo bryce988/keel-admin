@@ -1,5 +1,14 @@
 <template>
 	<view class="page">
+		<!-- 群资料：头像与群名。群主点头像可更换 -->
+		<view v-if="conv" class="gprofile" :hover-class="isOwner ? 'gprofile--hover' : 'none'" @click="changeAvatar">
+			<group-avatar :src="conv.avatar" :faces="conv.avatar_members" :name="conv.name" :size="60" />
+			<view class="gprofile-info">
+				<text class="gprofile-name">{{ conv.name }}</text>
+				<text class="gprofile-sub">{{ isOwner ? (uploading ? '上传中…' : '点头像更换群头像') : conv.member_count + ' 人' }}</text>
+			</view>
+		</view>
+
 		<view v-if="rows.length" class="panel">
 			<view
 				v-for="(m, i) in rows"
@@ -28,6 +37,9 @@
 			<view v-if="isOwner" class="op" hover-class="op--hover" @click="rename">
 				<text class="op-text">修改群名</text>
 			</view>
+			<view v-if="isOwner && conv && conv.avatar" class="op" hover-class="op--hover" @click="resetAvatar">
+				<text class="op-text">恢复默认群头像</text>
+			</view>
 			<view class="op op--danger" hover-class="op--hover" @click="leave">
 				<text class="op-text op-text--danger">{{ isOwner ? '解散群聊' : '退出群聊' }}</text>
 			</view>
@@ -43,9 +55,11 @@
 		fetchChatConversation,
 		removeChatMember,
 		updateChatGroup,
+		uploadChatFile,
 		dissolveChatGroup
 	} from '@/common/api.js'
 	import { absUrl, getCachedUser } from '@/common/request.js'
+	import GroupAvatar from '@/components/group-avatar/group-avatar.vue'
 
 	const convId = ref(0)
 	const rows = ref([])
@@ -101,6 +115,49 @@
 	function toAdd() {
 		// 复用通讯录页，带上 conv 参数让它进入「加人」模式而不是建群
 		uni.navigateTo({ url: `/pages/chat/pick?add_to=${convId.value}` })
+	}
+
+	const uploading = ref(false)
+
+	/**
+	 * 更换群头像（群主）
+	 *
+	 * 先走聊天的上传拿地址，再改群资料——服务端只认 `/uploads/chat/` 下的图，
+	 * 与发图片同一条路。改完群里会出一条系统消息，其他人的列表跟着刷新
+	 */
+	function changeAvatar() {
+		if (!isOwner.value || uploading.value) return
+
+		uni.chooseImage({
+			count: 1,
+			sizeType: ['compressed'],
+			success: async (res) => {
+				const path = res.tempFilePaths && res.tempFilePaths[0]
+				if (!path) return
+
+				uploading.value = true
+				try {
+					const up = await uploadChatFile(path)
+					await updateChatGroup(convId.value, { avatar: up.url })
+					await load()
+					uni.showToast({ title: '群头像已更新', icon: 'none' })
+				} catch (e) {
+					if (e.code !== 401) uni.showToast({ title: e.message || '上传失败', icon: 'none' })
+				} finally {
+					uploading.value = false
+				}
+			}
+		})
+	}
+
+	/** 恢复默认 = 头像置空，列表里重新拼成员头像 */
+	async function resetAvatar() {
+		try {
+			await updateChatGroup(convId.value, { avatar: '' })
+			await load()
+		} catch (e) {
+			if (e.code !== 401) uni.showToast({ title: e.message, icon: 'none' })
+		}
 	}
 
 	function rename() {
@@ -164,6 +221,39 @@
 </script>
 
 <style scoped>
+	.gprofile {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		margin: 16px 16px 12px;
+		padding: 14px 16px;
+		background-color: var(--keel-bg-color);
+		border-radius: 12px;
+	}
+
+	.gprofile--hover {
+		background-color: var(--keel-pressed-bg);
+	}
+
+	.gprofile-info {
+		display: flex;
+		flex-direction: column;
+		margin-left: 14px;
+		min-width: 0;
+	}
+
+	.gprofile-name {
+		font-size: 17px;
+		font-weight: 600;
+		color: var(--keel-text-color-primary);
+	}
+
+	.gprofile-sub {
+		margin-top: 4px;
+		font-size: 13px;
+		color: var(--keel-text-color-secondary);
+	}
+
 	.page {
 		min-height: calc(100vh - var(--window-top));
 		padding: 12px 0 32px;

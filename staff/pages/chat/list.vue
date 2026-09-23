@@ -43,9 +43,9 @@
 				@click="openRoom(c)"
 				@longpress="onLongPress(c)"
 			>
-				<view class="avatar">
-					<image v-if="c.avatar" class="avatar-img" :src="absUrl(c.avatar)" mode="aspectFill" />
-					<text v-else class="avatar-text">{{ c.name.slice(0, 1) }}</text>
+				<!-- 单聊是对方头像；群没设头像时拼成员头像 -->
+				<view class="avatar-slot">
+					<group-avatar :src="c.avatar" :faces="c.avatar_members" :name="c.name" :size="44" />
 				</view>
 
 				<view class="row-body">
@@ -84,6 +84,7 @@
 	import { chatSocket } from '@/common/chatSocket.js'
 	import { bindChatBadge, refreshChatBadge } from '@/common/chatBadge.js'
 	import { formatListTime, parseChatTime } from '@/common/chatTime.js'
+	import GroupAvatar from '@/components/group-avatar/group-avatar.vue'
 
 	const rows = ref([])
 	/** 「系统公告」那一行：未读数与最新一条，来自未读汇总 */
@@ -321,6 +322,11 @@
 		align-items: center;
 		justify-content: center;
 		overflow: hidden;
+		flex-shrink: 0;
+	}
+
+	.avatar-slot {
+		margin-right: 12px;
 		flex-shrink: 0;
 	}
 

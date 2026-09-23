@@ -20,6 +20,12 @@ export interface ChatContact {
   dept_id: number
 }
 
+/** 拼接群头像用的成员（服务端最多给 4 个，群主排第一） */
+export interface ChatFace {
+  real_name: string
+  avatar: string
+}
+
 export interface ChatConversation {
   id: number
   /** 1 单聊 · 2 群聊 */
@@ -34,6 +40,8 @@ export interface ChatConversation {
   peer_id: number
   /** 单聊对方是否在职；群聊恒为 true。false 时只读（发消息会被 400 + 21205 拦下） */
   peer_active: boolean
+  /** 群没设头像时才有：前几位成员，前端拼成宫格。设了头像或单聊时没有这个字段 */
+  avatar_members?: ChatFace[]
   member_count: number
   /** 群主 id，单聊为 0 */
   owner_id: number

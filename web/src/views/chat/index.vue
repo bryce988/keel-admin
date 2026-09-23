@@ -21,6 +21,7 @@ import {
   ChatDotRound,
   Delete,
   Document,
+  Edit,
   FolderOpened,
   Loading,
   MuteNotification,
@@ -36,6 +37,7 @@ import {
 } from '@element-plus/icons-vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { EMOJIS } from './emoji'
+import GroupAvatar from './GroupAvatar.vue'
 import { BizError } from '@/utils/request'
 import { formatListTime, formatMessageTime, parseChatTime } from '@/utils/chatTime'
 import { copyText as writeClipboard, uuid } from '@/utils/secureFallback'
@@ -1350,18 +1352,79 @@ async function renameGroup() {
     inputValidator: (v: string) => (v.trim() ? true : '群名称不能为空'),
   })
 
-  const updated = await updateGroup(conversation.value!.id, { name: value.trim() })
-  conversation.value = { ...conversation.value!, name: updated.name }
-
-  const row = conversations.value.find((c) => c.id === updated.id)
-  if (row) row.name = updated.name
+  applyGroupInfo(await updateGroup(conversation.value!.id, { name: value.trim() }))
 }
 
-/** 成员数变了要刷新标题栏上的人数 */
+/**
+ * 群头像（群主）
+ *
+ * 两步：先走聊天的上传拿到地址，再改群资料——与发图片同一条路，服务端只认 `/uploads/chat/` 下的图。
+ * 恢复默认 = 把头像置空，列表里重新拼成员头像
+ */
+const groupAvatarInput = ref<HTMLInputElement>()
+const uploadingGroupAvatar = ref(false)
+
+function pickGroupAvatar() {
+  if (!isOwner.value || uploadingGroupAvatar.value) return
+  groupAvatarInput.value?.click()
+}
+
+async function onGroupAvatarPicked(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || !conversation.value) return
+
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片')
+    return
+  }
+
+  uploadingGroupAvatar.value = true
+  try {
+    const up = await uploadChatFile(file)
+    applyGroupInfo(await updateGroup(conversation.value.id, { avatar: up.url }))
+    ElMessage.success('群头像已更新')
+  } catch (err) {
+    toastError(err, '更换失败')
+  } finally {
+    uploadingGroupAvatar.value = false
+  }
+}
+
+async function resetGroupAvatar() {
+  if (!conversation.value) return
+  try {
+    applyGroupInfo(await updateGroup(conversation.value.id, { avatar: '' }))
+  } catch (err) {
+    toastError(err, '操作失败')
+  }
+}
+
+/**
+ * 群资料变了（名称、头像、人数）：标题栏与左栏那一行一起更新
+ *
+ * 整体换掉 avatar_members 而不是合并：设了自定义头像时服务端不再下发它，
+ * 合并的话旧的成员拼图会留着
+ */
+function applyGroupInfo(fresh: ChatConversation) {
+  const pick = {
+    name: fresh.name,
+    avatar: fresh.avatar,
+    avatar_members: fresh.avatar_members,
+    member_count: fresh.member_count,
+  }
+
+  if (conversation.value?.id === fresh.id) conversation.value = { ...conversation.value, ...pick }
+
+  const row = conversations.value.find((c) => c.id === fresh.id)
+  if (row) Object.assign(row, pick)
+}
+
+/** 成员数、群名、群头像变了要刷新标题栏与左栏 */
 async function refreshConversation() {
   if (!conversation.value) return
-  const fresh = await getConversation(conversation.value.id)
-  conversation.value = { ...conversation.value, ...fresh }
+  applyGroupInfo(await getConversation(conversation.value.id))
 }
 
 // ---------------------------------------------------------------- 撤回
@@ -1423,10 +1486,12 @@ async function onPush(msg: ChatMessage) {
   if (!conv || msg.conv_id !== conv.id) {
     const row = conversations.value.find((c) => c.id === msg.conv_id)
     if (row) {
-      row.last_msg_text = msg.type === 'text' ? msg.content.slice(0, 40) : `[${msg.type}]`
+      row.last_msg_text = summaryOf(msg)
       row.last_msg_at = msg.created_at
       row.max_seq = msg.seq
       if (msg.sender_id !== myId.value) row.unread += 1
+      // 别的群改了名、换了头像、进出了人：这一行的名字与拼接头像都可能变，重拉一次列表最稳
+      if (msg.type === 'system') void loadList()
       // 新消息把会话顶上去，但置顶的仍然在最前
       conversations.value.sort((a, b) => {
         if (a.is_pinned !== b.is_pinned) return Number(b.is_pinned) - Number(a.is_pinned)
@@ -1452,7 +1517,7 @@ async function onPush(msg: ChatMessage) {
   // 当前会话的摘要也要更新，否则切走再回来左栏还是旧的
   const row = conversations.value.find((c) => c.id === msg.conv_id)
   if (row) {
-    row.last_msg_text = msg.type === 'text' ? msg.content.slice(0, 40) : `[${msg.type}]`
+    row.last_msg_text = summaryOf(msg)
     row.last_msg_at = msg.created_at
     row.max_seq = msg.seq
     // 在看通讯录时它并没被看见，照常累加；切回消息时再清零
@@ -1461,10 +1526,26 @@ async function onPush(msg: ChatMessage) {
   }
 
   // 入群、退群的系统消息意味着成员变了，头像和 @ 面板要跟着刷新
-  if (msg.type === 'system' && isGroup.value) void loadMembersQuietly()
+  // 改群名、改群头像同样落系统消息：标题栏与左栏那一行的名字、头像跟着刷新
+  if (msg.type === 'system' && isGroup.value) {
+    void loadMembersQuietly()
+    void refreshConversation()
+  }
 
   await scrollToBottom()
   await flushRead()
+}
+
+/**
+ * 左栏摘要，与服务端 ChatService::summarize 同一套规则
+ *
+ * 原来写的是 `[${msg.type}]`，推送一到，图片、文件、系统消息的摘要就成了
+ * `[image]` `[file]` `[system]`，要刷新才变回服务端给的中文
+ */
+function summaryOf(msg: ChatMessage): string {
+  if (msg.type === 'image') return '[图片]'
+  if (msg.type === 'file') return '[文件]'
+  return [...msg.content].slice(0, 40).join('')
 }
 
 async function scrollToBottom() {
@@ -1780,7 +1861,7 @@ async function copyText(m: LocalMessage) {
           @click="selectConversation(row)"
           @contextmenu.prevent="openMenu($event, row)"
         >
-          <el-avatar :size="38" :src="row.avatar || undefined">{{ row.name.slice(0, 1) }}</el-avatar>
+          <GroupAvatar :size="38" :src="row.avatar" :faces="row.avatar_members" :name="row.name" />
 
           <div class="conv__body">
             <div class="conv__line">
@@ -2430,6 +2511,41 @@ async function copyText(m: LocalMessage) {
     <el-drawer v-model="memberDrawer" :title="addMode ? '添加成员' : '群成员'" size="360px">
       <el-input v-if="addMode" v-model="keyword" placeholder="搜索同事" clearable size="small" />
 
+      <!-- 群资料：头像、群名。群主点头像更换、点铅笔改名 -->
+      <div v-if="!addMode && conversation" class="gprofile">
+        <div
+          class="gprofile__avatar"
+          :class="{ 'is-editable': isOwner }"
+          :title="isOwner ? '更换群头像' : undefined"
+          @click="pickGroupAvatar"
+        >
+          <GroupAvatar
+            :size="64"
+            :src="conversation.avatar"
+            :faces="conversation.avatar_members"
+            :name="conversation.name"
+          />
+          <span v-if="isOwner" class="gprofile__mask">{{ uploadingGroupAvatar ? '上传中' : '更换' }}</span>
+        </div>
+        <div class="gprofile__info">
+          <div class="gprofile__name">
+            <span class="gprofile__text">{{ conversation.name }}</span>
+            <el-button v-if="isOwner" link :icon="Edit" aria-label="修改群名" @click="renameGroup" />
+          </div>
+          <div class="gprofile__sub">{{ conversation.member_count }} 人</div>
+          <el-button v-if="isOwner && conversation.avatar" link type="primary" size="small" @click="resetGroupAvatar">
+            恢复默认头像
+          </el-button>
+        </div>
+        <input
+          ref="groupAvatarInput"
+          type="file"
+          accept="image/*"
+          class="chat__file-input"
+          @change="onGroupAvatarPicked"
+        />
+      </div>
+
       <div v-loading="addMode ? loadingContacts : loadingMembers" class="members">
         <template v-if="!addMode">
           <div v-for="m in members" :key="m.user_id" class="member">
@@ -2459,7 +2575,6 @@ async function copyText(m: LocalMessage) {
       <template #footer>
         <div v-if="!addMode" class="members__foot">
           <el-button v-if="isOwner" type="primary" @click="startAdd">添加成员</el-button>
-          <el-button v-if="isOwner" @click="renameGroup">改群名</el-button>
           <el-button v-if="isOwner" type="danger" plain @click="doDissolve()">解散群聊</el-button>
           <el-button v-else type="danger" plain @click="quitGroup()">退出群聊</el-button>
         </div>
@@ -2959,6 +3074,70 @@ async function copyText(m: LocalMessage) {
 
 .chat__header-ops {
   margin-left: auto;
+}
+
+/* 群成员抽屉顶部的群资料 */
+.gprofile {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 4px 0 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.gprofile__avatar {
+  position: relative;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.gprofile__avatar.is-editable {
+  cursor: pointer;
+}
+
+/* 「更换」只在悬停时浮出，平时不挡头像 */
+.gprofile__mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--el-overlay-color-lighter);
+  font-size: 12px;
+  color: var(--el-color-white);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.gprofile__avatar.is-editable:hover .gprofile__mask {
+  opacity: 1;
+}
+
+.gprofile__info {
+  min-width: 0;
+}
+
+.gprofile__name {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.gprofile__text {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gprofile__sub {
+  margin: 2px 0 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .members {

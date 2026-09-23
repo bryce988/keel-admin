@@ -225,13 +225,19 @@ class ChatService
             ->orderByDesc('id')
             ->get();
 
+        // 没设自定义头像的群要拼成员头像：一次查完所有群的前几位，不按群逐个查
+        $faces = self::groupFaces(
+            $convs->filter(fn ($c) => (int) $c->type === ImConversationModel::TYPE_GROUP && (string) $c->avatar === '')
+                ->pluck('id')->map(fn ($id) => (int) $id)->all()
+        );
+
         $rows = [];
 
         foreach ($convs as $conv) {
             /** @var ImConversationMemberModel $m */
             $m = $members[$conv->id];
 
-            $rows[] = self::presentConversation($conv, $userId) + [
+            $rows[] = self::presentConversation($conv, $userId, $faces) + [
                 // 从来没发过消息的会话（刚建就没说话）不该显示未读
                 'unread'    => max(0, (int) $conv->max_seq - (int) $m->last_read_seq),
                 // 被 @ 的序号比已读水位高 = 有没读到的 @
@@ -605,16 +611,35 @@ class ChatService
             }
             $patch['name'] = mb_substr($name, 0, 64);
         }
+        // null = 这次没传（控制器对没给的字段一律塞 null），空串 = 明确要恢复默认。
+        // 不能用 array_key_exists：只改群名的请求会把自定义头像一起清掉
         if (isset($data['avatar'])) {
-            $patch['avatar'] = mb_substr((string) $data['avatar'], 0, 255);
+            $avatar = trim((string) $data['avatar']);
+            /*
+             * 只收本系统上传到聊天目录的图片；空串 = 恢复成成员拼接头像
+             *
+             * ⚠️ 原来这里原样存任何字符串。群头像会出现在每个成员的会话列表里，
+             * 存一个外部地址等于让所有成员打开列表时都去请求它（能拿到每个人的 IP 与在线时间），
+             * 存一段 `javascript:` 则取决于哪个客户端哪天把它放进了 href。与附件同一条前缀规则
+             */
+            if ($avatar !== '' && (!str_starts_with($avatar, self::ATTACHMENT_PREFIX) || str_contains($avatar, '..'))) {
+                throw new BusinessException('群头像地址不合法', BizCode::CHAT_ATTACHMENT_INVALID);
+            }
+            $patch['avatar'] = mb_substr($avatar, 0, 255);
         }
 
         if ($patch) {
-            $old = (string) $conv->name;
+            $oldName   = (string) $conv->name;
+            $oldAvatar = (string) $conv->avatar;
             ImConversationModel::query()->where('id', $convId)->update($patch);
 
-            if (isset($patch['name']) && $patch['name'] !== $old) {
-                self::systemMessage($convId, self::displayName($userId) . " 把群名改为「{$patch['name']}」");
+            // 系统消息既是给成员的告知，也是其他客户端刷新群信息的信号（见前端 onPush）
+            $who = self::displayName($userId);
+            if (isset($patch['name']) && $patch['name'] !== $oldName) {
+                self::systemMessage($convId, "{$who} 把群名改为「{$patch['name']}」");
+            }
+            if (isset($patch['avatar']) && $patch['avatar'] !== $oldAvatar) {
+                self::systemMessage($convId, $patch['avatar'] === '' ? "{$who} 恢复了默认群头像" : "{$who} 修改了群头像");
             }
         }
 
@@ -761,7 +786,7 @@ class ChatService
      * 单聊没有自己的名字和头像，用对方的。这一步放在服务端而不是前端：
      * 两个端都要显示同一个标题，放前端就要写两遍，而且移动端还得自己再查一次人。
      */
-    private static function presentConversation(ImConversationModel $conv, int $userId): array
+    private static function presentConversation(ImConversationModel $conv, int $userId, ?array $faces = null): array
     {
         $data = [
             'id'            => (int) $conv->id,
@@ -789,9 +814,59 @@ class ChatService
             $data['avatar']  = (string) ($peer?->avatar ?? '');
             // 已停用或已删除都算不在职：历史照看，但不能再发（send 里同样会拦）
             $data['peer_active'] = $peer !== null && (int) $peer->status === 1;
+        } elseif ((string) $conv->avatar === '') {
+            // 群没设头像时给前几位成员，前端拼成宫格（微信、钉钉同款）。
+            // 设了自定义头像就不给——客户端直接用 avatar，多查一次没意义
+            $faces ??= self::groupFaces([(int) $conv->id]);
+            $data['avatar_members'] = $faces[(int) $conv->id] ?? [];
         }
 
         return $data;
+    }
+
+    /** 拼接群头像用几个人：4 个排成 2×2，再多格子太小、脸就认不出了 */
+    private const GROUP_FACE_COUNT = 4;
+
+    /**
+     * 每个群的前几位成员（拼接群头像用）
+     *
+     * 群主排第一个，其余按入群先后——头像不该因为有人进出群就整个洗牌，
+     * 而群主与最早的成员最稳定。只取在群里的人（quit_at 为空）。
+     *
+     * 一条 SQL 取完所有群：ROW_NUMBER 按群分区，外层只留每组前 N 个。
+     * 按群逐个查的话，会话列表里有 30 个群就是 30 次往返
+     *
+     * @param int[] $convIds
+     * @return array<int, list<array{real_name: string, avatar: string}>>
+     */
+    private static function groupFaces(array $convIds): array
+    {
+        if (!$convIds) {
+            return [];
+        }
+
+        $in = implode(',', array_map('intval', $convIds));
+        $rows = Db::conn()->select(
+            "SELECT t.conv_id, t.real_name, t.username, t.avatar FROM (
+                SELECT m.conv_id, u.real_name, u.username, u.avatar,
+                       ROW_NUMBER() OVER (PARTITION BY m.conv_id ORDER BY m.role DESC, m.id ASC) AS rn
+                FROM im_conversation_members m
+                JOIN sys_users u ON u.id = m.user_id
+                WHERE m.conv_id IN ({$in}) AND m.quit_at IS NULL
+            ) t WHERE t.rn <= ?
+            ORDER BY t.conv_id, t.rn",
+            [self::GROUP_FACE_COUNT]
+        );
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(int) $r->conv_id][] = [
+                'real_name' => (string) ($r->real_name ?: $r->username),
+                'avatar'    => (string) $r->avatar,
+            ];
+        }
+
+        return $out;
     }
 
     /** 从 peer_key 里解出「对方是谁」，比再查一次成员表便宜 */
