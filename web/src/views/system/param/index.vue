@@ -15,6 +15,7 @@ import {
 } from '@/api/system'
 import type { FormDrawerInstance } from '@/components'
 import { BizCode } from '@/constants/bizCode'
+import { testAiProvider } from '@/api/ai'
 
 
 /**
@@ -44,6 +45,35 @@ const saving = ref(false)
 const form = ref<Record<string, string>>({})
 
 const currentGroup = computed(() => groups.value.find((g) => g.code === activeGroup.value))
+
+// ---------------------------------------------------------------- DeepSeek「测试连接」
+
+/**
+ * 只在有 DeepSeek 参数的那一组出现。测的是**已保存**的配置（接口不收密钥），
+ * 所以改了 ai.deepseek.* 还没保存时置灰——否则测的是旧值，结果会误导人。
+ *
+ * 不做这个按钮的话，密钥填错、余额用完的唯一表现是全员的小k 都在失败
+ * （docs/ai-tech.md §3.2）。
+ */
+const hasAiParams = computed(() => rows.value.some((r) => r.param_key.startsWith('ai.deepseek.')))
+const aiDirty = computed(() => dirtyKeys.value.some((k) => k.startsWith('ai.deepseek.')))
+const aiTesting = ref(false)
+
+async function onTestAi() {
+  aiTesting.value = true
+  try {
+    const res = await testAiProvider()
+    if (!res.ok) {
+      ElMessage.error(`连接失败：${res.error}`)
+      return
+    }
+    const balance = res.balances.map((b) => `${b.total_balance} ${b.currency}`).join('、') || '—'
+    if (res.is_available) ElMessage.success(`连接正常，账户余额 ${balance}`)
+    else ElMessage.warning(`密钥有效，但余额不足（${balance}），小k 暂时用不了`)
+  } finally {
+    aiTesting.value = false
+  }
+}
 
 const dirtyKeys = computed(() =>
   rows.value.filter((r) => form.value[r.param_key] !== r.param_value).map((r) => r.param_key)
@@ -220,6 +250,22 @@ onMounted(async () => {
             >
               新增参数
             </el-button>
+            <el-tooltip
+              v-if="hasAiParams"
+              :content="aiDirty ? '先保存，再测试（测的是已保存的配置）' : '用已保存的密钥查一次 DeepSeek 余额'"
+              placement="bottom"
+            >
+              <span>
+                <el-button
+                  v-permission="'sys:param:update'"
+                  :loading="aiTesting"
+                  :disabled="aiDirty"
+                  @click="onTestAi"
+                >
+                  测试 DeepSeek 连接
+                </el-button>
+              </span>
+            </el-tooltip>
             <el-button :icon="RefreshLeft" :disabled="!dirtyKeys.length" @click="resetForm">
               撤销修改
             </el-button>

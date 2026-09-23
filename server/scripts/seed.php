@@ -98,6 +98,14 @@ $tree = [
              * （比如外包人员能找到人报事，但不给他发起会话）。
              */
             ['name' => '通讯录', 'code' => 'contact:view', 'type' => 3, 'sort' => 20],
+            /*
+             * AI 助手「小k」：消息列表里固定的一行，不是独立菜单，所以同样是 type=3
+             *
+             * **内置角色默认都不给**（超管自动全有）：它会花钱，也会把数据发给外部模型服务，
+             * 这两件事都该由管理员明确点头，而不是装上就全员可用（docs/ai-prd.md §4.1）。
+             * 另外还有总开关参数 ai.enabled，默认关。
+             */
+            ['name' => 'AI 助手', 'code' => 'ai:use', 'type' => 3, 'sort' => 30],
         ],
     ],
     [
@@ -224,6 +232,17 @@ $tree = [
              'path' => '/log/login', 'component' => 'views/log/login/index.vue', 'icon' => 'Key', 'sort' => 20,
              'children' => [
                  ['name' => '导出登录日志', 'code' => 'sys:log:login:export', 'type' => 3, 'sort' => 1],
+             ]],
+            /*
+             * AI 调用记录：谁问了几次、花了多少、查了什么数据（以谁的身份、是否被拒）
+             *
+             * 只有元数据，**看不到对话内容**——要看对话内容与聊天审计一样单独立项（ai-prd §8.4）。
+             * 放在日志审计下而不是系统配置下：它回答的是「发生了什么」，不是「系统怎么配」
+             */
+            ['name' => 'AI 调用记录', 'code' => 'ai:log:list', 'type' => 2,
+             'path' => '/log/ai', 'component' => 'views/log/ai/index.vue', 'icon' => 'MagicStick', 'sort' => 30,
+             'children' => [
+                 ['name' => '查看详情', 'code' => 'ai:log:detail', 'type' => 3, 'sort' => 1],
              ]],
         ],
     ],
@@ -487,11 +506,17 @@ $dicts = [
         ['登录日志', 'log_login', 'info'],
     ]],
     'notice_status' => ['公告状态', [['草稿', '0', 'info'], ['已发布', '1', 'success']]],
-    'im_conv_type'  => ['会话类型', [['单聊', '1', 'primary'], ['群聊', '2', 'success']]],
+    'im_conv_type'  => ['会话类型', [['单聊', '1', 'primary'], ['群聊', '2', 'success'], ['AI 助手', '3', 'warning']]],
     'im_msg_type'   => ['消息类型', [
         ['文本', 'text', 'primary'], ['图片', 'image', 'success'],
-        ['文件', 'file', 'warning'], ['系统', 'system', 'info'],
+        ['文件', 'file', 'warning'], ['系统', 'system', 'info'], ['AI 回答', 'ai', 'warning'],
     ]],
+    // 「排队中」「运行中」是过程态；失败给 danger，停止是用户主动的，给 info
+    'ai_run_status' => ['AI 问答状态', [
+        ['排队中', '0', 'warning'], ['回答中', '1', 'primary'], ['完成', '2', 'success'],
+        ['已停止', '3', 'info'], ['失败', '4', 'danger'],
+    ]],
+    'ai_rating'     => ['AI 回答评价', [['有用', '1', 'success'], ['未评价', '0', 'info'], ['没用', '-1', 'danger']]],
     // 撤回不是「失败」而是一次正常操作，所以给 info 不给 danger
     'im_msg_status' => ['消息状态', [['正常', '1', 'success'], ['已撤回', '2', 'info']]],
     'yes_no'        => ['是否', [['是', '1', 'success'], ['否', '0', 'info']]],
@@ -589,6 +614,17 @@ $params = [
     // 撤回时限。调大了会让「撤回」变成事实上的删除历史（想删多久前的都行），
     // 所以默认跟主流 IM 一致给 2 分钟——它是给手滑兜底的，不是给后悔用的
     ['chat.message.recallWindow','120',    'advanced', 'int',    '消息可撤回时限（秒）'],
+    /*
+     * AI 助手「小k」（docs/ai-tech.md §3.2、§8.3）
+     *
+     * 总开关默认关：装上脚手架不等于同意把数据发给外部模型服务。
+     */
+    ['ai.enabled',        '0',  'advanced', 'bool', 'AI 助手总开关', 0, '关闭时所有人的消息列表里都不显示小k'],
+    ['ai.quota.daily',    '50', 'advanced', 'int',  'AI 每人每天提问数', 0, '0 = 不限'],
+    ['ai.run.maxSteps',   '8',  'advanced', 'int',  'AI 单次问答最多查询次数', 0, '防止模型反复查询绕圈'],
+    ['ai.run.timeout',    '90', 'advanced', 'int',  'AI 单次问答最长耗时（秒）', 0, '超时后已输出的部分保留'],
+    ['ai.field.unmask',   '0',  'advanced', 'bool', 'AI 可见手机号邮箱明文', 0, '默认关：即使提问人有明文权限，发给模型的也是掩码'],
+    ['ai.budget.monthly', '0',  'advanced', 'int',  'AI 全公司月预算（美元）', 0, '0 = 不限；达到后全员暂停'],
     ['sys.cache.ttl',        '300',        'advanced', 'int',    '字典缓存秒数'],
     ['sys.role.maxPerUser',  '5',          'security', 'int',    '单账号最多可持有的角色数'],
     ['sys.pwd.minLength',    '8',          'security', 'int',    '密码最小长度'],
@@ -602,6 +638,16 @@ $params = [
     ['sys.sms.accessKey',    '',           'integration', 'string', '短信 AccessKey', 1],
     ['sys.oss.endpoint',     '',           'integration', 'string', '对象存储 Endpoint'],
     ['sys.oss.accessSecret', '',           'integration', 'string', '对象存储 AccessSecret', 1],
+    /*
+     * DeepSeek（AI 助手的模型服务）
+     *
+     * 参数表优先、`.env` 兜底（DEEPSEEK_API_KEY 等），与邮件同一个模式。
+     * ⚠️ 接口地址**故意不在这里**，只认 .env 的 DEEPSEEK_BASE_URL：
+     * 能在界面上改地址，就能把地址指向自己的服务器，下一次提问时密钥会被发过去。
+     */
+    ['ai.deepseek.apiKey',          '',               'integration', 'string', 'DeepSeek 密钥', 1, '在 platform.deepseek.com 创建。保存后只显示掩码'],
+    ['ai.deepseek.model',           'deepseek-flash', 'integration', 'string', 'DeepSeek 模型', 0, 'deepseek-flash（快、便宜）/ deepseek-v4-pro'],
+    ['ai.deepseek.reasoningEffort', 'high',           'integration', 'string', 'DeepSeek 思考强度', 0, 'none 关闭思考 / low / high / max'],
     /*
      * 邮件（邮箱登录用）
      *

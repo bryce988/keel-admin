@@ -22,6 +22,7 @@ use app\common\model\SysPermissionModel;
 use app\common\model\SysRoleModel;
 use app\common\model\SysUserModel;
 use app\common\support\Cache;
+use app\common\support\Ctx;
 use app\common\support\Env;
 use app\common\support\IpLocation;
 
@@ -460,6 +461,38 @@ class AuthService
         // 密码哈希不进请求上下文（Ctx 里的东西会被日志、调试面板顺手打印出来），
         // 模型的 $hidden 已经把它挡在 toArray() 之外，这里不用再手动 unset
         return $user->toArray();
+    }
+
+    /**
+     * 顶着某人的身份执行一段代码（队列、定时任务这类没有 HTTP 请求的地方）
+     *
+     * 数据权限（`DataScope`）、字段脱敏、`PermissionService::has(Ctx::user())`
+     * 全都读 `Ctx::user()`。没有请求就没有它——而 `DataScope` 在 `Ctx::user() === null`
+     * 时**不注入任何条件**（那是给命令行与 seed 留的口子），所以不还原身份直接跑查询，
+     * 拿到的是全表。导出与 AI 助手都在消费进程里以发起人身份查数据，共用这一个入口。
+     *
+     * 两条红线：
+     * - 进入前 `Ctx` 必须是干净的。有残留说明上一个任务没清掉，此时宁可失败也不能
+     *   在别人的身份上叠一层——「普通员工拿到超管的数据」这种事故没有任何报错
+     * - `finally` 里必须 `Ctx::clear()`：消费进程是常驻的，不清的话下一个任务
+     *   会顶着这一个人的身份跑
+     *
+     * 账号被停用/删除时 `loadUser()` 抛异常，任务随之失败——人都走了，
+     * 他排着队的任务不该还以他的名义去读数据。
+     */
+    public static function actAs(int $userId, callable $work): mixed
+    {
+        if (Ctx::user() !== null) {
+            throw new \LogicException('Ctx 里残留着上一个身份，拒绝叠加执行');
+        }
+
+        try {
+            Ctx::set('user', self::loadUser($userId));
+
+            return $work();
+        } finally {
+            Ctx::clear();
+        }
     }
 
     /** 当前用户的资料 + 角色 + 权限 + 菜单树 */

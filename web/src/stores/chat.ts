@@ -1,5 +1,5 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
-import { getUnread, type ChatMessage, type ChatNoticeEntry } from '@/api/chat'
+import { getUnread, type ChatAiEntry, type ChatMessage, type ChatNoticeEntry } from '@/api/chat'
 import { chatSocket } from '@/utils/chatSocket'
 import { notifyNewMessage } from '@/utils/chatNotify'
 import { useUserStore } from '@/stores/user'
@@ -27,6 +27,8 @@ export const useChatStore = defineStore('chat', {
     total: 0,
     /** 消息列表顶部「系统公告」那一行的数据，由服务端的未读汇总一并给出 */
     notice: { unread: 0, latest_id: 0, latest_title: '', latest_at: null } as ChatNoticeEntry,
+    /** 公告下面「小k」那一行；null = 这个人用不了（没有 ai:use 或功能未启用） */
+    ai: null as ChatAiEntry | null,
     /** 有未读的会话数，含免打扰 */
     conversations: 0,
     hasAt: false,
@@ -44,6 +46,7 @@ export const useChatStore = defineStore('chat', {
         const d = await getUnread()
         this.total = d.total
         this.notice = d.notice
+        this.ai = d.ai
         this.conversations = d.conversations
         this.hasAt = d.has_at
         this.syncTitle()
@@ -68,6 +71,13 @@ export const useChatStore = defineStore('chat', {
       chatSocket.on('message.new', (data) => {
         const msg = data as ChatMessage
         const me = Number(useUserStore().profile?.user.id ?? 0)
+
+        // 小k 那一行的摘要跟着变（它不在会话列表里，列表页的 onPush 管不到它）
+        if (this.ai && this.ai.conv_id && msg.conv_id === this.ai.conv_id) {
+          this.ai.latest_text = msg.content.replace(/\[\[link:\d+\]\]|[*`#>|]/g, '').replace(/\s+/g, ' ').slice(0, 40)
+          this.ai.latest_at = msg.created_at
+          if (msg.sender_id !== me && msg.conv_id !== this.activeConvId) this.ai.unread += 1
+        }
 
         // 自己发的不算未读；正在看的会话也不算——用户就在看着它
         if (msg.sender_id === me || msg.conv_id === this.activeConvId) return
@@ -114,6 +124,14 @@ export const useChatStore = defineStore('chat', {
       })
       // 在别的标签页 / 手机上读了公告，这里的数字也要跟着减
       chatSocket.on('notice.read', () => void this.refresh())
+
+      // 左栏小k 那一行在回答期间显示「正在回答…」，不管人在不在小k 面板里
+      chatSocket.on('ai.run.started', () => {
+        if (this.ai) this.ai.running = true
+      })
+      chatSocket.on('ai.run.finished', () => {
+        if (this.ai) this.ai.running = false
+      })
     },
 
     /**
@@ -124,7 +142,13 @@ export const useChatStore = defineStore('chat', {
      */
     announce(msg: ChatMessage) {
       const body =
-        msg.type === 'image' ? '[图片]' : msg.type === 'file' ? '[文件]' : msg.content
+        msg.type === 'image'
+          ? '[图片]'
+          : msg.type === 'file'
+            ? '[文件]'
+            : msg.type === 'ai'
+              ? msg.content.replace(/\[\[link:\d+\]\]|[*`#>|]/g, '').replace(/\s+/g, ' ')
+              : msg.content
 
       notifyNewMessage(msg.sender_name || '新消息', body, () => {
         // 点通知跳到聊天页。已经在聊天页时路由不会变，但窗口已经聚焦了

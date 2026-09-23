@@ -105,6 +105,14 @@ services:
       EMAIL_CODE_RESEND_SECONDS: ${EMAIL_CODE_RESEND_SECONDS:-60}
       EMAIL_CODE_MAX_ATTEMPTS: ${EMAIL_CODE_MAX_ATTEMPTS:-5}
       EMAIL_CODE_DAILY_LIMIT: ${EMAIL_CODE_DAILY_LIMIT:-10}
+      # AI 助手「小k」的模型服务（docs/ai-tech.md §3.2）。密钥、模型、思考强度优先读
+      # 「参数配置」里的 ai.deepseek.*，那边留空才用这里。接口地址只认这里（不进参数表）
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-}
+      DEEPSEEK_REASONING_EFFORT: ${DEEPSEEK_REASONING_EFFORT:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-}
+      # AI 消费进程数 = 全站同时进行的问答上限
+      AI_WORKERS: ${AI_WORKERS:-4}
       # HTTP worker 进程数；留空按 CPU 核数 × 4，依据见 server/config/process.php
       WORKER_COUNT: ${WORKER_COUNT:-}
       TZ: Asia/Shanghai

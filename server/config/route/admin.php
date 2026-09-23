@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Webman\Route;
 use app\admin\controller\AuthController;
+use app\admin\controller\AiController;
 use app\admin\controller\ChatController;
 use app\admin\controller\ContactController;
 use app\admin\controller\DashboardController;
@@ -141,6 +142,26 @@ Route::group('/admin', function () {
     Route::delete('/chat/conversations/{id:\d+}/group', [ChatController::class, 'dissolve'])->setParams(['perm' => 'chat:use']);
     Route::put('/chat/conversations/{id:\d+}/settings', [ChatController::class, 'settings'])->setParams(['perm' => 'chat:use']);
     Route::delete('/chat/conversations/{id:\d+}', [ChatController::class, 'remove'])->setParams(['perm' => 'chat:use']);
+
+    /*
+     * AI 助手「小k」（docs/ai-prd.md、docs/ai-tech.md）
+     *
+     * 「我的」这一组只挂 ai:use：小k 没有自己的身份，能查到什么由工具背后的
+     * 现有权限点与数据权限决定，不在这里。不记操作日志，理由见 AiController。
+     *
+     * 固定路径（summary、provider/test）要排在 {id} 之前。
+     */
+    Route::get('/ai/conversation', [AiController::class, 'conversation'])->setParams(['perm' => 'ai:use']);
+    Route::post('/ai/messages', [AiController::class, 'ask'])->setParams(['perm' => 'ai:use']);
+    Route::post('/ai/reset', [AiController::class, 'reset'])->setParams(['perm' => 'ai:use']);
+    Route::post('/ai/runs/{id:\d+}/cancel', [AiController::class, 'cancel'])->setParams(['perm' => 'ai:use']);
+    Route::post('/ai/runs/{id:\d+}/feedback', [AiController::class, 'feedback'])->setParams(['perm' => 'ai:use']);
+    // 审计：全公司的问答元数据，不含对话内容
+    Route::get('/ai/runs/summary', [AiController::class, 'summary'])->setParams(['perm' => 'ai:log:list']);
+    Route::get('/ai/runs', [AiController::class, 'runs'])->setParams(['perm' => 'ai:log:list']);
+    Route::get('/ai/runs/{id:\d+}', [AiController::class, 'run'])->setParams(['perm' => 'ai:log:detail']);
+    // 参数配置页的「测试连接」。挂 sys:param:update：能改密钥的人才需要验密钥
+    Route::post('/ai/provider/test', [AiController::class, 'testProvider'])->setParams(['perm' => 'sys:param:update']);
 
     // 系统概览：数据都受数据权限约束，部门主管看到的是他管得到的那部分
     Route::get('/dashboard/overview', [DashboardController::class, 'overview'])

@@ -114,6 +114,47 @@ final class DataScope implements Scope
     }
 
     /**
+     * 当前用户数据范围的人话描述，null = 不受限（全部 / 超管 / 无登录态）
+     *
+     * 给 AI 助手的回答说明口径用：同一个问题，部门主管和超管问的「正确答案」本来就不同，
+     * 不说清楚的话部门主管会把「你能看到的 23 人」当成「全公司 23 人」（docs/ai-prd.md §4.2）。
+     * 与 apply() 用同一份计算，不会出现「说的范围」和「查的范围」对不上。
+     */
+    public static function describe(): ?string
+    {
+        $user = Ctx::user();
+        if ($user === null || !empty($user['is_super'])) {
+            return null;
+        }
+
+        $level = self::level((int) $user['id']);
+
+        $names = static function (array $ids): array {
+            // 与 deptTree() 同理：Scope 内部查部门表必须用 Db::table，否则自己触发自己
+            return Db::table('sys_depts')->whereIn('id', $ids ?: [0])->whereNull('deleted_at')
+                ->orderBy('id')->pluck('name')->map(fn ($v) => (string) $v)->all();
+        };
+        $own = $names([(int) $user['dept_id']])[0] ?? '本部门';
+
+        return match ($level) {
+            self::ALL       => null,
+            self::DEPT_TREE => "{$own}及下属部门",
+            self::DEPT      => $own,
+            self::SELF      => '仅本人的数据',
+            self::CUSTOM    => (static function () use ($names, $user) {
+                $list = $names(self::customDepts((int) $user['id']));
+                if (!$list) {
+                    return '没有被授权任何部门';
+                }
+                $head = implode('、', array_slice($list, 0, 3));
+
+                return count($list) > 3 ? "被授权的 " . count($list) . " 个部门（{$head} 等）" : "被授权的部门（{$head}）";
+            })(),
+            default => null,
+        };
+    }
+
+    /**
      * 当前用户的数据范围，一个请求内只算一次
      *
      * 这里刻意用查询构造器而不是模型：模型自身挂着本 Scope，会无限递归。

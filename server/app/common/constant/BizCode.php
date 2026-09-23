@@ -122,6 +122,15 @@ final class BizCode
     public const CHAT_PEER_DISABLED = 21205;      // 不能与已停用的员工发起会话
     public const CHAT_SELF_CONVERSATION = 21206;  // 不能和自己发起会话
 
+    // ---------------------------------------------------------------- 管理后台 · AI 助手（213xx）
+    // 小k 会话不存在、run 不是自己的一律复用 NOT_FOUND（10404），与聊天同一条 404 伪装约定
+    public const AI_DISABLED = 21301;            // AI 助手未启用（参数 ai.enabled）
+    public const AI_NOT_CONFIGURED = 21302;      // 未配置模型服务密钥
+    public const AI_RUN_IN_PROGRESS = 21303;     // 上一个问题还没回答完
+    public const AI_QUOTA_EXCEEDED = 21304;      // 今日提问次数已用完
+    public const AI_BUDGET_EXCEEDED = 21305;     // 本月用量已达全公司预算上限
+    public const AI_QUESTION_TOO_LONG = 21306;   // 问题超出长度限制
+
     // ---------------------------------------------------------------- C 端（30000-39999）
     public const CHANNEL_HEADER_MISSING = 30001;  // 缺少 X-Channel 请求头
     public const CHANNEL_UNSUPPORTED = 30002;     // 不支持的渠道标识

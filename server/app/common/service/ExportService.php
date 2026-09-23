@@ -180,20 +180,15 @@ class ExportService
     /**
      * 顶着发起人的身份执行
      *
-     * `Ctx::clear()` 放在 finally 里，而且**必须**清：消费进程是常驻的，
-     * 不清的话下一条任务会顶着上一条发起人的数据权限与字段权限跑。
+     * 实现在 `AuthService::actAs()`（AI 助手也用它，全仓只留一份）：
+     * 进入前断言 Ctx 干净、`finally` 里清掉，理由见那边的注释。
      *
-     * 账号被停用/删除时 `AuthService::loadUser()` 会抛异常，任务随之失败——
-     * 这是对的：人都走了，他排队里的导出不该还在生成一份带手机号的名单。
+     * 账号被停用/删除时会抛异常，任务随之失败——这是对的：
+     * 人都走了，他排队里的导出不该还在生成一份带手机号的名单。
      */
     private static function impersonate(SysExportTaskModel $task, callable $work): void
     {
-        try {
-            Ctx::set('user', AuthService::loadUser((int) $task->creator_id));
-            $work();
-        } finally {
-            Ctx::clear();
-        }
+        AuthService::actAs((int) $task->creator_id, $work);
     }
 
     // ---------------------------------------------------------------- 列表与下载

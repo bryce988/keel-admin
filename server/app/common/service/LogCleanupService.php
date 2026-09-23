@@ -15,6 +15,8 @@ declare(strict_types=1);
 
 namespace app\common\service;
 
+use app\common\model\AiRunModel;
+use app\common\model\AiToolCallModel;
 use app\common\model\SysLoginLogModel;
 use app\common\model\SysOperationLogModel;
 use support\Log;
@@ -29,7 +31,7 @@ class LogCleanupService
     /**
      * 一轮清理，返回各表删除的行数
      *
-     * @return array{operation: int, login: int, task: int, before: string}
+     * @return array{operation: int, login: int, task: int, ai: int, before: string}
      */
     public static function run(): array
     {
@@ -41,6 +43,9 @@ class LogCleanupService
         // 任务日志同样只增不减：一天两条看着不多，三年就是两千多行，且没人会去删。
         // 它没有 HasDataScope，所以走自己的 purge（不需要 withoutGlobalScopes）
         $task      = TaskLogService::purge($before, self::CHUNK);
+        // AI 调用记录与工具调用审计同属审计日志，沿用同一个保留天数。
+        // 对话内容本身在 im_messages 里，跟聊天记录走 chat.message.retainDays
+        $ai        = self::purge(AiRunModel::class, $before) + self::purge(AiToolCallModel::class, $before);
 
         Log::info('日志清理完成', [
             'before'    => $before,
@@ -48,9 +53,10 @@ class LogCleanupService
             'operation' => $operation,
             'login'     => $login,
             'task'      => $task,
+            'ai'        => $ai,
         ]);
 
-        return ['operation' => $operation, 'login' => $login, 'task' => $task, 'before' => $before];
+        return ['operation' => $operation, 'login' => $login, 'task' => $task, 'ai' => $ai, 'before' => $before];
     }
 
     /**

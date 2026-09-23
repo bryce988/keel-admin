@@ -21,4 +21,21 @@ return [
             'consumer_dir' => app_path() . '/queue',
         ],
     ],
+    /*
+     * AI 助手的消费进程组（docs/ai-tech.md §7.4）
+     *
+     * 独立成组是因为一次问答 5~90 秒，混在上面那组里会把导出堵住。
+     * count 就是**全站同时进行的问答上限**，超出的在队列里排队（界面上显示「排队中」）。
+     * 每个进程常驻约 30MB + 一条 MySQL 连接，调大前算一下 config/process.php 注释里那笔账。
+     *
+     * ⚠️ 目录是 `app/queue_ai` 而不是 `app/queue/ai`：插件递归扫描 consumer_dir，
+     * 放在子目录里会被上面那组也加载，两组进程抢同一个队列。
+     */
+    'ai-consumer' => [
+        'handler'     => Webman\RedisQueue\Process\Consumer::class,
+        'count'       => Env::int('AI_WORKERS', 4),
+        'constructor' => [
+            'consumer_dir' => app_path() . '/queue_ai',
+        ],
+    ],
 ];

@@ -572,6 +572,21 @@ insert 直接报 `Unknown column 'creator_id'`——而写入方吞异常只记�
 `message` 成功时存结果摘要（清理任务给的是各表删除行数的 JSON），失败时存异常信息，
 按列宽 500 截断。保留期与业务日志共用 `sys.log.retainDays`，由 `LogCleanupService` 一起清。
 
+### 3.17 ai_runs / ai_tool_calls AI 助手
+
+建表语句以 `server/database/schema.sql` 为准，设计理由见 [ai-tech.md](ai-tech.md) §8。要点：
+
+- **对话本身不在这两张表里**：小k 会话是 `im_conversations.type = 3`（`peer_key = ai:<user_id>`，每人一个），
+  提问与回答是 `im_messages`（回答 `type = 'ai'`、`sender_id = 0`）。这两张表只存元数据
+- **不存提问、回答、思考内容与查询结果**：前两者已在消息表里；思考内容会复述查询结果，
+  在审计表里再存一份就多一处要保护的业务数据
+- `ai_runs`：一次提问一行。状态 0 排队 · 1 回答中 · 2 完成 · 3 停止 · 4 失败（字典 `ai_run_status`）；
+  token 分缓存命中 / 未命中 / 输出（含思考）；`cost_usd` 是按 `config/ai.php` 单价的**估算**，区分高峰价
+- `ai_tool_calls`：小k 每查一次数据一行。`acting_user_id` 取自执行那一刻的 `Ctx::userId()`，
+  **不抄** `ai_runs.user_id`——两者不一致就是消费进程里身份串号了
+- 两张表都**不挂 `HasDataScope`**：审计员要看全公司，页面只给 `ai:log:list`
+- 保留期与业务日志共用 `sys.log.retainDays`，由 `LogCleanupService` 一起清
+
 ---
 
 ## 4. 二期预留

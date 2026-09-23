@@ -273,6 +273,12 @@ instance.interceptors.response.use(undefined, (err) => {
 | 409 | `20602` | 参数键已存在 | |
 | 400 | `20701` | 导出数据量超过上限 | 提示缩小筛选范围 |
 | 409 | `20802` | 该岗位下存在用户，无法删除 | 岗位曾借用部门的 `20203`，已独立 |
+| 400 | `21301` | AI 助手未启用 | 参数 `ai.enabled` 关着（§15） |
+| 400 | `21302` | AI 服务尚未配置 | 没有 DeepSeek 密钥（参数表与 `.env` 都空） |
+| 409 | `21303` | 上一个问题还没回答完 | 一个人同时只能有一个进行中的问答 |
+| 429 | `21304` | 今天的 N 次提问已经用完 | 带 `Retry-After`（到次日零点）。参数 `ai.quota.daily` |
+| 400 | `21305` | 本月 AI 用量已达上限 | 参数 `ai.budget.monthly`（美元） |
+| 400 | `21306` | 问题不能超过 2000 字 | |
 
 **C 端**
 
@@ -1212,3 +1218,59 @@ POST /admin/upload            // multipart/form-data
 - **Mock 数据**：前端按本文结构自造 mock，不等后端；后端接口就绪后切换 baseURL 即可
 - **字段增删**：新增字段不算破坏性变更；删除或改名字段必须提前一个版本标记废弃
 - **联调顺序**：`/admin/auth/*` → `/admin/dict/all` → 各业务模块。前两个通了，后面的页面才有基础数据
+
+---
+
+## 15. AI 助手「小k」
+
+设计见 [ai-prd.md](ai-prd.md) 与 [ai-tech.md](ai-tech.md)。只有后台端。
+
+**小k 没有自己的身份**：每一次查询都以提问人的身份执行，数据权限、字段权限照常生效。
+所以这组接口本身只挂 `ai:use`，「能查到什么」由工具背后的现有权限点决定。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/admin/ai/conversation` | `ai:use` | 我的小k 会话，没有就建（写一条欢迎语）。多返回 `active_run_id`、`suggestions` |
+| POST | `/admin/ai/messages` | `ai:use` | 提问 `{content, client_msg_id?}` → **202** `{message, run_id}`，不等回答 |
+| POST | `/admin/ai/runs/{id}/cancel` | `ai:use` | 停止生成 → 204。不是自己的 404，已结束的幂等 |
+| POST | `/admin/ai/reset` | `ai:use` | 新对话：插一条 `kind=ai_reset` 的系统消息 |
+| POST | `/admin/ai/runs/{id}/feedback` | `ai:use` | `{rating: 1\|-1\|0, feedback?}` → 204 |
+| GET | `/admin/ai/runs` | `ai:log:list` | 审计列表（分页）。筛选 `keyword`（提问人）`status` `rating` `start_time` `end_time` |
+| GET | `/admin/ai/runs/summary` | `ai:log:list` | 今天 / 本月的次数、失败数、估算费用、缓存命中率，月预算，最近一次需管理员处理的故障 |
+| GET | `/admin/ai/runs/{id}` | `ai:log:detail` | 审计详情，含工具调用明细。**不含提问与回答原文** |
+| POST | `/admin/ai/provider/test` | `sys:param:update` | 用**已保存**的配置查 DeepSeek 余额。不接受传密钥。失败也是 200，`{ok:false, error}` |
+
+**历史消息**复用 `GET /admin/chat/conversations/{id}/messages`（小k 会话是 `type=3` 的会话）。
+小k 会话不出现在 `GET /admin/chat/conversations` 里，它的那一行由 `GET /admin/chat/unread` 的 `ai` 字段给出：
+
+```json
+"ai": { "conv_id": 17, "unread": 0, "latest_text": "…", "latest_at": "2026-09-23 12:15:08", "running": false }
+```
+
+`ai` 为 `null` 表示这个人用不了（没有 `ai:use`、没有 `chat:use`，或总开关关着）。
+对小k 会话调聊天的发送、置顶/免打扰、删除接口一律 400。
+
+**回答怎么到达**：回答在 AI 消费进程里生成，经长连接推给提问人自己（所有标签页）：
+
+| 帧 | 载荷 |
+|---|---|
+| `ai.run.started` | `{run_id, conv_id}` |
+| `ai.thinking` | `{run_id, round}`，每轮进入思考阶段推一次，不带思考内容 |
+| `ai.delta` | `{run_id, round, text}`，增量；`round` 变了说明中间查过数据，丢掉上一轮的半截话 |
+| `ai.step` | `{run_id, label, rows, denied}`，查了一项数据 |
+| `ai.run.finished` | `{run_id, status: done\|stopped\|failed}` |
+
+回答结束时**一定**落一条 `type=ai`、`sender_id=0` 的消息并推 `message.new`，界面以它为准，上面几帧丢了无所谓。
+它的 `extra`：
+
+```json
+{
+  "run_id": 42, "status": "done",
+  "steps": [{ "label": "人数统计：启用，按部门", "rows": 5, "denied": false }],
+  "links": [{ "path": "/system/user", "query": { "status": "1" }, "label": "在用户列表中查看" }]
+}
+```
+
+`content` 是受限的 Markdown（段落、加粗、列表、行内代码、表格），其中 `[[link:N]]` 对应 `extra.links[N]`，
+服务端已剔除提问人没权限打开的页面。失败时 `content` 是给用户看的原因，`extra.partial` 是中断前已输出的部分。
+

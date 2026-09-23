@@ -19,6 +19,13 @@ export type ChatEvent =
   // 系统公告：变化（发布 / 撤回 / 删除 / 编辑）是全员广播，已读只推给本人
   | 'notice.changed'
   | 'notice.read'
+  // AI 助手的流式过程，只推给提问人自己（docs/ai-tech.md §7.2）。
+  // 回答结束时照常落库并推 message.new，这几帧丢了不影响最终结果
+  | 'ai.run.started'
+  | 'ai.thinking'
+  | 'ai.delta'
+  | 'ai.step'
+  | 'ai.run.finished'
 
 type Handler = (data: any) => void
 

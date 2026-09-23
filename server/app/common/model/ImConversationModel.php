@@ -41,6 +41,8 @@ class ImConversationModel extends BaseModel
 
     public const TYPE_SINGLE = 1;
     public const TYPE_GROUP  = 2;
+    /** AI 助手「小k」：每人一个，成员只有本人（docs/ai-tech.md §2） */
+    public const TYPE_AI     = 3;
 
     public const STATUS_DISBANDED = 0;
     public const STATUS_NORMAL    = 1;
@@ -65,6 +67,17 @@ class ImConversationModel extends BaseModel
     public static function peerKey(int $a, int $b): string
     {
         return min($a, $b) . ':' . max($a, $b);
+    }
+
+    /**
+     * 小k 会话的唯一键：`ai:<user_id>`
+     *
+     * 复用 `uk_peer` 保证每人只有一个——首次打开时两个标签页同时来建，
+     * 靠唯一索引而不是先查后插。与单聊的 `min:max` 不会撞：那边两段都是数字
+     */
+    public static function aiKey(int $userId): string
+    {
+        return 'ai:' . $userId;
     }
 
     public function members(): HasMany

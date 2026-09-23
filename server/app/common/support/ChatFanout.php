@@ -72,6 +72,18 @@ class ChatFanout
     }
 
     /**
+     * 只推给某一个人（他的所有标签页与设备）
+     *
+     * AI 助手的流式增量（`ai.*`）走这里：小k 会话只有提问人自己一个成员，
+     * 增量也只该出现在他的屏幕上。与聊天消息一样是不可靠投递——
+     * 丢了的增量无所谓，回答结束时会落库并以 `message.new` 送达（docs/ai-tech.md §7.2）。
+     */
+    public static function toUser(string $event, int $userId, array $payload): void
+    {
+        self::publish($event, 0, [$userId], $payload);
+    }
+
+    /**
      * 发布
      *
      * `user_ids` 由调用方（HTTP 侧）算好传进来，**不让网关去查库**：

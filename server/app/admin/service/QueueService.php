@@ -364,8 +364,16 @@ class QueueService
     {
         $result = [];
 
-        foreach (glob(app_path() . '/queue/*.php') ?: [] as $file) {
-            $class = 'app\\queue\\' . basename($file, '.php');
+        // 两组消费进程各有自己的目录（AI 助手单独一组，见 config/plugin/webman/redis-queue/process.php），
+        // 只扫 app/queue 的话 keel:ai 会被标成「无消费者」
+        $files = [];
+        foreach (['queue', 'queue_ai'] as $dir) {
+            foreach (glob(app_path() . "/{$dir}/*.php") ?: [] as $file) {
+                $files[$file] = "app\\{$dir}\\" . basename($file, '.php');
+            }
+        }
+
+        foreach ($files as $file => $class) {
             if (!class_exists($class) || !is_subclass_of($class, Consumer::class)) {
                 continue;
             }

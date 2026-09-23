@@ -221,6 +221,9 @@ class ChatService
         $convs = ImConversationModel::query()
             ->whereIn('id', $members->keys()->all())
             ->where('status', ImConversationModel::STATUS_NORMAL)
+            // 小k 会话固定显示在「系统公告」下面，不参与这里的排序与置顶（docs/ai-prd.md §5.1）。
+            // 它的数据由 unreadSummary() 的 ai 一项给出，与公告那一行同一个路子
+            ->where('type', '!=', ImConversationModel::TYPE_AI)
             ->orderByDesc('last_msg_at')
             ->orderByDesc('id')
             ->get();
@@ -273,7 +276,11 @@ class ChatService
             ->where('m.is_visible', 1)
             ->where('c.status', ImConversationModel::STATUS_NORMAL)
             ->whereColumn('c.max_seq', '>', 'm.last_read_seq')
-            ->get(['c.max_seq', 'm.last_read_seq', 'm.is_muted', 'm.at_seq']);
+            ->get(['c.type', 'c.max_seq', 'm.last_read_seq', 'm.is_muted', 'm.at_seq']);
+
+        // 小k 那一行：没有 ai:use 或功能关着时为 null，它的未读也不计入总数——
+        // 权限被收回后，一个点不进去的会话还在贡献红点，用户只会觉得红点坏了
+        $ai = AiService::chatEntry($userId);
 
         $total = 0;
         $convs = 0;
@@ -282,6 +289,9 @@ class ChatService
         foreach ($rows as $r) {
             $diff = (int) $r->max_seq - (int) $r->last_read_seq;
             if ($diff <= 0) {
+                continue;
+            }
+            if ((int) $r->type === ImConversationModel::TYPE_AI && $ai === null) {
                 continue;
             }
 
@@ -303,6 +313,8 @@ class ChatService
             'total' => $total + $notice['unread'],
             // 消息列表顶部「系统公告」那一行
             'notice' => $notice,
+            // 公告下面「小k」那一行；null = 这个人用不了（没有 ai:use 或功能未启用）
+            'ai' => $ai,
             // 有未读的会话数：含免打扰，用于「有消息但不弹数字」的小圆点
             'conversations' => $convs,
             'has_at' => $hasAt,
@@ -318,6 +330,7 @@ class ChatService
     public static function updateSettings(int $convId, int $userId, array $data): array
     {
         $member = self::assertMember($convId, $userId);
+        self::assertNotAi($convId);
 
         $patch = [];
         if (array_key_exists('is_pinned', $data)) {
@@ -355,6 +368,7 @@ class ChatService
     public static function removeConversation(int $convId, int $userId): void
     {
         $member = self::assertMember($convId, $userId);
+        self::assertNotAi($convId);
 
         /** @var ImConversationModel|null $conv */
         $conv = ImConversationModel::query()->find($convId);
@@ -804,7 +818,10 @@ class ChatService
         $data['member_count'] = (int) $conv->member_count;
         $data['owner_id']     = (int) $conv->owner_id;
 
-        if ((int) $conv->type === ImConversationModel::TYPE_SINGLE) {
+        if ((int) $conv->type === ImConversationModel::TYPE_AI) {
+            // 小k 没有名字和头像可存，前端固定展示
+            $data['name'] = AiService::NAME;
+        } elseif ((int) $conv->type === ImConversationModel::TYPE_SINGLE) {
             $peerId = self::peerIdOf($conv, $userId);
             /** @var SysUserModel|null $peer */
             $peer = $peerId ? SysUserModel::withoutDataScope()->find($peerId) : null;
@@ -959,6 +976,9 @@ class ChatService
     public static function send(int $convId, int $userId, array $data): array
     {
         self::assertMember($convId, $userId);
+        // 往小k 会话里发消息要走 AiService::ask()：从这里发进去的消息不会触发回答，
+        // 用户只会以为小k 挂了
+        self::assertNotAi($convId);
         self::assertPeerActive($convId, $userId);
 
         $type    = (string) ($data['type'] ?? ImMessageModel::TYPE_TEXT);
@@ -1082,6 +1102,74 @@ class ChatService
         ChatFanout::messageCreated($convId, self::memberIds($convId), $payload);
 
         return $payload;
+    }
+
+    /**
+     * 由服务端写入一条消息（小k 的提问与回答走这里）
+     *
+     * 与 send() 的区别：不做成员、长度、频率、@ 的校验——调用方（AiService / AiRunner）
+     * 已经各自校验过，而且它们的规则与聊天不同（提问有每日配额，回答的发送人是 0）。
+     * 与 systemMessage() 的区别：类型和 extra 由调用方定，且返回消息本体。
+     *
+     * 事务提交之后才广播，理由见 send() 的注释。
+     *
+     * @param int $senderId 0 = 小k / 系统
+     */
+    public static function appendMessage(
+        int $convId,
+        int $senderId,
+        string $senderName,
+        string $type,
+        string $content,
+        ?array $extra = null,
+        string $clientMsgId = '',
+    ): array {
+        $message = Db::transaction(function () use ($convId, $senderId, $senderName, $type, $content, $extra, $clientMsgId) {
+            $seq = self::nextSeq($convId);
+
+            $message = ImMessageModel::create([
+                'conv_id'       => $convId,
+                'seq'           => $seq,
+                'sender_id'     => $senderId,
+                'sender_name'   => $senderName,
+                'type'          => $type,
+                'content'       => $content,
+                'extra'         => $extra,
+                // sender_id 为 0 时必须由服务端生成，理由见 systemMessage()
+                'client_msg_id' => $clientMsgId !== '' ? $clientMsgId : self::uuid(),
+                'status'        => ImMessageModel::STATUS_NORMAL,
+            ]);
+
+            ImConversationModel::query()->where('id', $convId)->update([
+                'last_msg_id'   => $message->id,
+                'last_msg_at'   => $message->created_at,
+                'last_msg_text' => self::summarize($type, $content),
+                'updated_at'    => date('Y-m-d H:i:s'),
+            ]);
+
+            if ($senderId > 0) {
+                ImConversationMemberModel::query()
+                    ->where('conv_id', $convId)
+                    ->where('user_id', $senderId)
+                    ->update(['last_read_seq' => $seq, 'updated_at' => date('Y-m-d H:i:s')]);
+            }
+
+            return $message;
+        });
+
+        $payload = self::presentMessage($message);
+        ChatFanout::messageCreated($convId, self::memberIds($convId), $payload);
+
+        return $payload;
+    }
+
+    /** 小k 会话不支持聊天侧的操作（发送、置顶、免打扰、删除） */
+    private static function assertNotAi(int $convId): void
+    {
+        $type = (int) ImConversationModel::query()->whereKey($convId)->value('type');
+        if ($type === ImConversationModel::TYPE_AI) {
+            throw new BusinessException('小k 会话不支持该操作');
+        }
     }
 
     /**
@@ -1409,6 +1497,8 @@ class ChatService
         return match ($type) {
             ImMessageModel::TYPE_IMAGE => '[图片]',
             ImMessageModel::TYPE_FILE  => '[文件]',
+            // 回答里的链接标记不该出现在摘要里
+            ImMessageModel::TYPE_AI    => mb_substr(trim((string) preg_replace('/\[\[link:\d+\]\]|[*`#>|]/', '', $content)), 0, 40),
             default                    => mb_substr($content, 0, 40),
         };
     }

@@ -28,7 +28,7 @@ export interface ChatFace {
 
 export interface ChatConversation {
   id: number
-  /** 1 单聊 · 2 群聊 */
+  /** 1 单聊 · 2 群聊 · 3 AI 助手（不出现在会话列表里，见 ChatUnread.ai） */
   type: number
   /** 单聊时是对方的姓名，服务端已经算好，前端不用再查人 */
   name: string
@@ -54,7 +54,8 @@ export interface ChatMessage {
   seq: number
   sender_id: number
   sender_name: string
-  type: 'text' | 'image' | 'file' | 'system'
+  /** ai = 小k 的回答（sender_id 为 0） */
+  type: 'text' | 'image' | 'file' | 'system' | 'ai'
   content: string
   /**
    * 附件。服务端按白名单洗过，只会有这几个键——
@@ -70,6 +71,9 @@ export interface ChatMessage {
     /** @ 到的人；`at_all` 时服务端已展开成全体成员 */
     at_user_ids?: number[]
     at_all?: boolean
+    /** 小k 会话里的字段，见 api/ai.ts 的 AiMessageExtra */
+    run_id?: number
+    kind?: 'welcome' | 'ai_reset'
   } | null
   /** 客户端生成的幂等 ID，本地乐观上屏的消息靠它对号入座 */
   client_msg_id: string
@@ -119,6 +123,18 @@ export interface ChatUnread {
   /** 有未读的会话数，含免打扰——用于「有消息但不弹数字」的小圆点 */
   conversations: number
   has_at: boolean
+  /** 公告下面「小k」那一行；null = 这个人用不了（没有 ai:use，或功能未启用） */
+  ai: ChatAiEntry | null
+}
+
+export interface ChatAiEntry {
+  /** 0 = 还没聊过，点进去时服务端才建 */
+  conv_id: number
+  unread: number
+  latest_text: string
+  latest_at: string | null
+  /** 有没有正在回答的问题 */
+  running: boolean
 }
 
 export function getUnread() {

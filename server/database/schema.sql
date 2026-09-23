@@ -360,7 +360,7 @@ CREATE TABLE IF NOT EXISTS `sys_task_logs` (
 
 CREATE TABLE IF NOT EXISTS `im_conversations` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `type`          TINYINT         NOT NULL                COMMENT '1单聊 2群聊',
+  `type`          TINYINT         NOT NULL                COMMENT '1单聊 2群聊 3AI 助手',
   -- 群聊必须是 NULL 不能是空串：唯一索引对 NULL 不去重（正是群聊要的），
   -- 而空串只能存在一个，第二个群就会撞 uk_peer
   `peer_key`      VARCHAR(48)     NULL DEFAULT NULL       COMMENT '单聊唯一键 min(uid):max(uid)，群聊为 NULL',
@@ -428,6 +428,64 @@ CREATE TABLE IF NOT EXISTS `im_messages` (
   UNIQUE KEY `uk_client_msg` (`sender_id`, `client_msg_id`),
   KEY `idx_conv_created` (`conv_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息';
+
+-- ---------------------------------------------------------------- AI 助手「小k」（docs/ai-tech.md §8）
+-- 对话本身存在 im_messages 里（小k 会话是 im_conversations.type=3），这两张表只存元数据：
+-- 不存提问与回答原文、不存模型的思考内容、不存查询结果——那些要么已在消息表里，
+-- 要么会复述业务数据，在审计表里再存一份等于多一处要保护的敏感数据
+CREATE TABLE IF NOT EXISTS `ai_runs` (
+  `id`                BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`           BIGINT UNSIGNED  NOT NULL                COMMENT '提问人',
+  `dept_id`           BIGINT UNSIGNED  NOT NULL DEFAULT 0      COMMENT '提问时所在部门，统计用',
+  `conv_id`           BIGINT UNSIGNED  NOT NULL                COMMENT '小k 会话',
+  `question_msg_id`   BIGINT UNSIGNED  NOT NULL DEFAULT 0      COMMENT '提问消息',
+  `answer_msg_id`     BIGINT UNSIGNED  NOT NULL DEFAULT 0      COMMENT '回答消息，未结束为 0',
+  `status`            TINYINT          NOT NULL DEFAULT 0      COMMENT '0排队 1运行 2完成 3停止 4失败，字典 ai_run_status',
+  `provider`          VARCHAR(32)      NOT NULL DEFAULT 'deepseek' COMMENT '服务商',
+  `model`             VARCHAR(64)      NOT NULL DEFAULT ''     COMMENT '实际使用的模型（参数会被改，所以记下来）',
+  `reasoning_effort`  VARCHAR(8)       NOT NULL DEFAULT ''     COMMENT '思考强度 none/low/high/max',
+  `steps`             TINYINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '工具调用次数',
+  `rounds`            TINYINT UNSIGNED NOT NULL DEFAULT 0      COMMENT '模型调用轮数',
+  `cache_hit_tokens`  INT UNSIGNED     NOT NULL DEFAULT 0      COMMENT '各轮 prompt_cache_hit_tokens 之和',
+  `cache_miss_tokens` INT UNSIGNED     NOT NULL DEFAULT 0      COMMENT '各轮 prompt_cache_miss_tokens 之和',
+  `output_tokens`     INT UNSIGNED     NOT NULL DEFAULT 0      COMMENT '各轮 completion_tokens 之和（含思考）',
+  `reasoning_tokens`  INT UNSIGNED     NOT NULL DEFAULT 0      COMMENT '其中思考部分',
+  `is_peak`           TINYINT(1)       NOT NULL DEFAULT 0      COMMENT '是否按高峰价计',
+  `cost_usd`          DECIMAL(12,6)    NOT NULL DEFAULT 0      COMMENT '估算费用（美元），对账以服务商控制台为准',
+  `first_token_ms`    INT UNSIGNED     NOT NULL DEFAULT 0      COMMENT '首个正文字的延迟（不含思考阶段）',
+  `duration_ms`       INT UNSIGNED     NOT NULL DEFAULT 0      COMMENT '总耗时',
+  `http_status`       SMALLINT         NOT NULL DEFAULT 0      COMMENT '失败时服务商的 HTTP 状态码',
+  `error_msg`         VARCHAR(255)     NOT NULL DEFAULT ''     COMMENT '失败原因（给人看的，不含堆栈）',
+  `rating`            TINYINT          NOT NULL DEFAULT 0      COMMENT '反馈 0无 1赞 -1踩',
+  `feedback`          VARCHAR(500)     NOT NULL DEFAULT ''     COMMENT '踩的原因',
+  `trace_id`          VARCHAR(32)      NOT NULL DEFAULT ''     COMMENT '提问请求的 traceId',
+  `created_at`        DATETIME         NOT NULL                COMMENT '提问时间',
+  `started_at`        DATETIME         NULL                    COMMENT '开始运行时间',
+  `finished_at`       DATETIME         NULL                    COMMENT '结束时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_created` (`user_id`, `created_at`),
+  KEY `idx_status_created` (`status`, `created_at`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 问答运行记录';
+
+CREATE TABLE IF NOT EXISTS `ai_tool_calls` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `run_id`         BIGINT UNSIGNED NOT NULL                COMMENT '所属问答',
+  -- 从 Ctx::userId() 取而不是抄 ai_runs.user_id：两者不一致就是身份串号，专项用例断言的就是这一列
+  `acting_user_id` BIGINT UNSIGNED NOT NULL                COMMENT '以谁的身份执行',
+  `tool`           VARCHAR(64)     NOT NULL                COMMENT '工具名',
+  `label`          VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '人话描述',
+  `args`           JSON            NULL                    COMMENT '模型给的参数',
+  `result_rows`    INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '返回给模型的行数',
+  `result_total`   INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '真实总数',
+  `denied`         TINYINT(1)      NOT NULL DEFAULT 0      COMMENT '因权限被拒',
+  `error_msg`      VARCHAR(255)    NOT NULL DEFAULT ''     COMMENT '失败原因',
+  `duration_ms`    INT UNSIGNED    NOT NULL DEFAULT 0      COMMENT '耗时',
+  `created_at`     DATETIME        NOT NULL                COMMENT '调用时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_run` (`run_id`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 工具调用审计';
 
 -- ---------------------------------------------------------------- 基础数据
 -- 权限点、字典、参数由 scripts/seed.php 播种（那边能表达父子关系与授权）

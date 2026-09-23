@@ -24,6 +24,7 @@ import {
   Edit,
   FolderOpened,
   Loading,
+  MagicStick,
   MuteNotification,
   Notebook,
   Picture,
@@ -38,6 +39,7 @@ import {
 import EmptyState from '@/components/EmptyState.vue'
 import { EMOJIS } from './emoji'
 import GroupAvatar from './GroupAvatar.vue'
+import AiPanel from './AiPanel.vue'
 import { BizError } from '@/utils/request'
 import { formatListTime, formatMessageTime, parseChatTime } from '@/utils/chatTime'
 import { copyText as writeClipboard, uuid } from '@/utils/secureFallback'
@@ -315,6 +317,7 @@ async function selectConversation(row: ChatConversationRow) {
   }
 
   noticeMode.value = false
+  aiMode.value = false
   conversation.value = row
   chatStore.enter(row.id)
   clearUnreadLocally(row.id)
@@ -540,6 +543,37 @@ async function openWith(contact: ContactPerson) {
   }
 }
 
+// ---------------------------------------------------------------- AI 助手「小k」
+
+/**
+ * 「小k」入口（docs/ai-prd.md §5.1）
+ *
+ * 与系统公告一样固定在列表顶部、不参与置顶排序、没有右键菜单（删不掉、不能免打扰）；
+ * 不同的是它是一个真的会话（type=3），有历史、有未读。数据由未读汇总的 `ai` 一项给出，
+ * 服务端的会话列表里不含它。没有 ai:use 或功能未启用时 chatStore.ai 为 null，这一行不出现。
+ *
+ * 右栏交给 AiPanel：流式输出、停止、查询步骤这些与聊天完全不同，混进这个三千多行的页面只会更难维护。
+ */
+const aiMode = ref(false)
+
+const showAiRow = computed(() => {
+  if (!chatStore.ai) return false
+  const kw = convKeyword.value.trim()
+  return !kw || '小k'.includes(kw) || 'AI 助手'.toLowerCase().includes(kw.toLowerCase())
+})
+
+function openAiPanel() {
+  if (conversation.value && listRef.value) {
+    scrollMemo.set(conversation.value.id, listRef.value.scrollTop)
+  }
+  conversation.value = null
+  messages.value = []
+  noticeMode.value = false
+  // AiPanel 挂载时会 enter 自己的会话 id；这里先 leave，别让上一个会话继续被当成「正在看」
+  chatStore.leave()
+  aiMode.value = true
+}
+
 // ---------------------------------------------------------------- 系统公告
 
 /**
@@ -574,6 +608,7 @@ async function openNoticePanel(focusId = 0) {
   // 看公告时没有「正在看的会话」，这期间来的消息照常计未读、照常提醒
   chatStore.leave()
 
+  aiMode.value = false
   noticeMode.value = true
   noticeDetail.value = null
   await loadNotices(true)
@@ -1480,6 +1515,10 @@ function upsert(msg: ChatMessage) {
  * 发现 seq 不连续就用 HTTP 把中间的补回来——可靠性在数据库不在长连接。
  */
 async function onPush(msg: ChatMessage) {
+  // 小k 会话的消息由 AiPanel 与 chatStore 处理：它不在左栏列表里，走下面的「列表里没有 → 重拉」
+  // 会让每一条回答都白拉一次会话列表
+  if (chatStore.ai?.conv_id && msg.conv_id === chatStore.ai.conv_id) return
+
   const conv = conversation.value
 
   // 不是当前会话的消息：只更新左栏（摘要、时间、未读、排序），不碰消息区
@@ -1619,6 +1658,12 @@ async function openFromQuery() {
   }
 
   const wanted = Number(route.query.conv || 0)
+  // 从「小k 回答好了」的桌面通知点进来
+  if (wanted && chatStore.ai?.conv_id === wanted) {
+    sideTab.value = 'chat'
+    openAiPanel()
+    return
+  }
   if (wanted) {
     const row = conversations.value.find((c) => c.id === wanted)
     if (row) await selectConversation(row)
@@ -1844,6 +1889,29 @@ async function copyText(m: LocalMessage) {
               <span class="conv__brief">{{ chatStore.notice.latest_title || '暂无公告' }}</span>
               <span v-if="chatStore.notice.unread > 0" class="conv__badge">
                 {{ chatStore.notice.unread > 99 ? '99+' : chatStore.notice.unread }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 小k：固定在公告下面，同样不参与置顶排序、没有右键菜单 -->
+        <div
+          v-if="showAiRow && chatStore.ai"
+          class="conv conv--notice"
+          :class="{ 'conv--active': aiMode }"
+          @click="openAiPanel()"
+          @contextmenu.prevent
+        >
+          <div class="conv__ai-icon"><el-icon><MagicStick /></el-icon></div>
+          <div class="conv__body">
+            <div class="conv__line">
+              <span class="conv__name">小k</span>
+              <span class="conv__time">{{ listTime(chatStore.ai.latest_at) }}</span>
+            </div>
+            <div class="conv__line">
+              <span class="conv__brief">{{ chatStore.ai.running ? '正在回答…' : (chatStore.ai.latest_text || 'AI 助手，帮你查数据、答疑问') }}</span>
+              <span v-if="chatStore.ai.unread > 0 && !aiMode" class="conv__badge">
+                {{ chatStore.ai.unread > 99 ? '99+' : chatStore.ai.unread }}
               </span>
             </div>
           </div>
@@ -2362,6 +2430,8 @@ async function copyText(m: LocalMessage) {
         </div>
       </template>
 
+      <AiPanel v-else-if="aiMode" />
+
       <EmptyState v-else scene="empty" description="选择一个会话开始聊天" :action="false" />
     </section>
 
@@ -2788,6 +2858,19 @@ async function copyText(m: LocalMessage) {
   color: var(--el-color-warning);
 }
 
+.conv__ai-icon {
+  display: flex;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  font-size: 19px;
+  color: var(--el-color-white);
+}
+
 .notice-list {
   flex: 1;
   overflow-y: auto;
@@ -2943,7 +3026,7 @@ async function copyText(m: LocalMessage) {
   padding: 0 5px;
   border-radius: 9px;
   background: var(--el-color-danger);
-  color: #fff;
+  color: var(--el-color-white);
   font-size: 12px;
   line-height: 18px;
   text-align: center;

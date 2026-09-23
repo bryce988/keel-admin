@@ -45,6 +45,8 @@ class ImMessageModel extends BaseModel
     public const TYPE_IMAGE  = 'image';
     public const TYPE_FILE   = 'file';
     public const TYPE_SYSTEM = 'system';
+    /** 小k 的回答。sender_id 为 0，与系统消息一样要由服务端生成 client_msg_id */
+    public const TYPE_AI     = 'ai';
 
     public const STATUS_NORMAL   = 1;
     public const STATUS_RECALLED = 2;
